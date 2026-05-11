@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { X, PlusCircle } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
   ReferenceDot, ResponsiveContainer, Legend,
@@ -9,12 +9,13 @@ import {
 interface Props {
   ticker: string;
   onClose: () => void;
+  onAddTransaction: () => void;
 }
 
 interface HistoryPoint { date: string; close: number; }
 interface TxPoint { date: string; type: string; quantity: number; price: number; }
 
-export default function TradeAnalysisModal({ ticker, onClose }: Props) {
+export default function TradeAnalysisModal({ ticker, onClose, onAddTransaction }: Props) {
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [transactions, setTransactions] = useState<TxPoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,7 +65,13 @@ export default function TradeAnalysisModal({ ticker, onClose }: Props) {
               <span style={{ color: 'var(--muted)', fontSize: 13 }}>현재가 ${currentPrice.toFixed(2)}</span>
             )}
           </div>
-          <button onClick={onClose} style={{ background: 'none', color: 'var(--muted)' }}><X size={20} /></button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={onAddTransaction}
+              style={{ background: 'var(--accent)', color: 'white', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 600, borderRadius: 6 }}>
+              <PlusCircle size={14} /> 거래 입력
+            </button>
+            <button onClick={onClose} style={{ background: 'none', color: 'var(--muted)' }}><X size={20} /></button>
+          </div>
         </div>
 
         {loading ? (

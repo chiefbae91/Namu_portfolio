@@ -10,6 +10,8 @@ interface Props {
   editingTx: Transaction | null;
   onSubmit: (data: any) => Promise<void>;
   onClose: () => void;
+  prefillTicker?: string;
+  prefillAccountId?: number;
 }
 
 const TX_TYPES = [
@@ -184,7 +186,7 @@ function TaxLotPanel({ ticker, accountId, sellQty, sellPrice, method, onMethodCh
 }
 
 // ─── Modal ────────────────────────────────────────────────────────
-export default function TransactionModal({ accounts, currency, editingTx, onSubmit, onClose }: Props) {
+export default function TransactionModal({ accounts, currency, editingTx, onSubmit, onClose, prefillTicker, prefillAccountId }: Props) {
   const visible = accounts.filter(a => !a.hidden);
   const dateRef = useRef<HTMLInputElement>(null);
   const sym = SYM[currency];
@@ -218,11 +220,15 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
       setFee(editingTx.fee > 0 ? formatPriceInput(String(editingTx.fee)) : '');
       setNotes(editingTx.notes || '');
     } else {
-      setType('buy'); setTicker(''); setDate(todayStr());
+      setType('buy'); setTicker(prefillTicker ?? ''); setDate(todayStr());
       setQty(''); setPrice(''); setFee(''); setNotes('');
       setReinvest(false); setReinvestQty(''); setReinvestPrice('');
       setLotMethod('average_cost'); setSpecificSelections({});
-      if (visible.length > 0) setAccountId(visible[0].id);
+      if (prefillAccountId) {
+        setAccountId(prefillAccountId);
+      } else if (visible.length > 0) {
+        setAccountId(visible[0].id);
+      }
     }
   }, [editingTx]);
 
@@ -317,8 +323,9 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
               {type !== 'cash' && (
                 <div className="form-group" style={{ flex:1 }}>
                   <label>종목</label>
-                  <input value={ticker} onChange={e => setTicker(e.target.value.toUpperCase())}
-                    placeholder="AAPL" style={{ width:'100%' }} required />
+                  <input value={ticker} onChange={e => !prefillTicker && setTicker(e.target.value.toUpperCase())}
+                    placeholder="AAPL" style={{ width:'100%', opacity: prefillTicker ? 0.7 : 1 }}
+                    readOnly={!!prefillTicker} required />
                 </div>
               )}
             </div>

@@ -22,6 +22,7 @@ export default function Home() {
   const [txModalOpen, setTxModalOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [analysisTicker, setAnalysisTicker] = useState<string | null>(null);
+  const [txPrefill, setTxPrefill] = useState<{ ticker: string; accountId: number } | null>(null);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
@@ -82,6 +83,15 @@ export default function Home() {
   const closeTransactionModal = () => {
     setTxModalOpen(false);
     setEditingTx(null);
+    setTxPrefill(null);
+  };
+
+  const handleAddTransactionFromAnalysis = (ticker: string) => {
+    const lastTx = transactions.find(t => t.ticker === ticker);
+    setTxPrefill({ ticker, accountId: lastTx?.account_id ?? visibleAccounts[0]?.id ?? 0 });
+    setAnalysisTicker(null);
+    setEditingTx(null);
+    setTxModalOpen(true);
   };
 
   const handleDeleteTx = async (id: number) => {
@@ -214,6 +224,8 @@ export default function Home() {
           editingTx={editingTx}
           onSubmit={handleTransactionSubmit}
           onClose={closeTransactionModal}
+          prefillTicker={txPrefill?.ticker}
+          prefillAccountId={txPrefill?.accountId}
         />
       )}
 
@@ -228,7 +240,11 @@ export default function Home() {
         />
       )}
       {analysisTicker && (
-        <TradeAnalysisModal ticker={analysisTicker} onClose={() => setAnalysisTicker(null)} />
+        <TradeAnalysisModal
+          ticker={analysisTicker}
+          onClose={() => setAnalysisTicker(null)}
+          onAddTransaction={() => handleAddTransactionFromAnalysis(analysisTicker)}
+        />
       )}
       {csvImportOpen && (
         <CsvImportModal accounts={accounts} onClose={() => setCsvImportOpen(false)} onImported={() => { refreshAll(); setCsvImportOpen(false); }} />
