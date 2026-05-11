@@ -1,10 +1,10 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { Settings, FileUp } from 'lucide-react';
+import { Settings, FileUp, PlusCircle } from 'lucide-react';
 import { Account, Currency, ExchangeRates, PortfolioPosition, SummaryData, Transaction } from '@/lib/types';
 import StockPortfolio from '@/components/tabs/StockPortfolio';
 import TransactionHistory from '@/components/tabs/TransactionHistory';
-import TransactionForm from '@/components/TransactionForm';
+import TransactionModal from '@/components/modals/TransactionModal';
 import AccountSettingsModal from '@/components/modals/AccountSettingsModal';
 import TradeAnalysisModal from '@/components/modals/TradeAnalysisModal';
 import CsvImportModal from '@/components/modals/CsvImportModal';
@@ -20,6 +20,7 @@ export default function Home() {
   const [positions, setPositions] = useState<PortfolioPosition[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [summary, setSummary] = useState<SummaryData>({ cash: 0, stock: 0, options_pnl: 0, total: 0 });
+  const [txModalOpen, setTxModalOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [analysisTicker, setAnalysisTicker] = useState<string | null>(null);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
@@ -72,6 +73,16 @@ export default function Home() {
       });
     }
     refreshAll();
+  };
+
+  const openEditModal = (tx: Transaction) => {
+    setEditingTx(tx);
+    setTxModalOpen(true);
+  };
+
+  const closeTransactionModal = () => {
+    setTxModalOpen(false);
+    setEditingTx(null);
   };
 
   const handleDeleteTx = async (id: number) => {
@@ -146,6 +157,11 @@ export default function Home() {
           ))}
         </div>
 
+        <button onClick={() => { setEditingTx(null); setTxModalOpen(true); }}
+          style={{ background: 'var(--accent)', color: 'white', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}>
+          <PlusCircle size={15} /> 거래 입력
+        </button>
+
         <button onClick={() => setCsvImportOpen(true)}
           style={{ background: 'var(--border)', color: 'var(--muted)', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
           <FileUp size={14} /> CSV 임포트
@@ -188,22 +204,24 @@ export default function Home() {
               transactions={transactions}
               currency={currency}
               rates={rates}
-              onEdit={tx => setEditingTx(tx)}
+              onEdit={openEditModal}
               onDelete={handleDeleteTx}
               onDeleteMany={handleDeleteMany}
             />
           )}
         </div>
 
-        {/* Transaction Form */}
-        <TransactionForm
+      </div>
+
+      {txModalOpen && (
+        <TransactionModal
           accounts={accounts}
           currency={currency}
           editingTx={editingTx}
           onSubmit={handleTransactionSubmit}
-          onCancelEdit={() => setEditingTx(null)}
+          onClose={closeTransactionModal}
         />
-      </div>
+      )}
 
       {accountSettingsOpen && (
         <AccountSettingsModal
