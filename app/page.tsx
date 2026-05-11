@@ -10,6 +10,8 @@ import AccountSettingsModal from '@/components/modals/AccountSettingsModal';
 import TradeAnalysisModal from '@/components/modals/TradeAnalysisModal';
 import CsvImportModal from '@/components/modals/CsvImportModal';
 
+const TRANSFER_OFFSET = 1_000_000;
+
 export default function Home() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
@@ -52,8 +54,30 @@ export default function Home() {
 
   const fetchTransactions = useCallback(async () => {
     const q = selectedAccountId !== 'all' ? `?account_id=${selectedAccountId}` : '';
-    const res = await fetch(`/api/transactions${q}`);
-    setTransactions(await res.json());
+    const [txRes, tfRes] = await Promise.all([
+      fetch(`/api/transactions${q}`),
+      fetch(`/api/transfers${q}`),
+    ]);
+    const txs: Transaction[] = await txRes.json();
+    const tfs: any[] = await tfRes.json();
+
+    const transfers: Transaction[] = tfs.map(tf => ({
+      id: TRANSFER_OFFSET + tf.id,
+      account_id: tf.account_id,
+      account_name: tf.account_name,
+      date: tf.date,
+      ticker: '',
+      type: tf.type === 'DEPOSIT' ? 'transfer_deposit' : 'transfer_withdraw',
+      quantity: 0,
+      price: tf.amount,
+      fee: 0,
+      currency: 'USD',
+      notes: tf.description,
+    }));
+
+    const combined = [...txs, ...transfers]
+      .sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+    setTransactions(combined);
   }, [selectedAccountId]);
 
   useEffect(() => { fetchAccounts(); fetchRates(); }, []);
@@ -62,7 +86,18 @@ export default function Home() {
   const refreshAll = () => { fetchPortfolio(); fetchTransactions(); };
 
   const handleTransactionSubmit = async (data: any) => {
-    if (editingTx) {
+    if (data.type === 'transfer_deposit' || data.type === 'transfer_withdraw') {
+      await fetch('/api/transfers', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account_id: data.account_id,
+          date: data.date,
+          amount: data.price,
+          type: data.type === 'transfer_deposit' ? 'DEPOSIT' : 'WITHDRAW',
+          description: data.notes,
+        }),
+      });
+    } else if (editingTx) {
       await fetch(`/api/transactions/${editingTx.id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
       });
@@ -94,13 +129,20 @@ export default function Home() {
     setTxModalOpen(true);
   };
 
+  const deleteOne = (id: number) => {
+    if (id >= TRANSFER_OFFSET) {
+      return fetch(`/api/transfers/${id - TRANSFER_OFFSET}`, { method: 'DELETE' });
+    }
+    return fetch(`/api/transactions/${id}`, { method: 'DELETE' });
+  };
+
   const handleDeleteTx = async (id: number) => {
-    await fetch(`/api/transactions/${id}`, { method: 'DELETE' });
+    await deleteOne(id);
     refreshAll();
   };
 
   const handleDeleteMany = async (ids: number[]) => {
-    await Promise.all(ids.map(id => fetch(`/api/transactions/${id}`, { method: 'DELETE' })));
+    await Promise.all(ids.map(deleteOne));
     refreshAll();
   };
 

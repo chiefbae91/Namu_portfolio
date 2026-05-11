@@ -1,5 +1,5 @@
 export type Currency = 'USD' | 'KRW' | 'EUR';
-export type TransactionType = 'buy' | 'sell' | 'dividend' | 'cash' | 'option';
+export type TransactionType = 'buy' | 'sell' | 'dividend' | 'cash' | 'option' | 'transfer_deposit' | 'transfer_withdraw';
 export type TaxLotMethod = 'average_cost' | 'fifo' | 'lifo' | 'specific';
 
 export interface LotInfo {

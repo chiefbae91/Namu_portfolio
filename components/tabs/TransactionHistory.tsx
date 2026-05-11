@@ -13,8 +13,14 @@ interface Props {
   onDeleteMany: (ids: number[]) => Promise<void>;
 }
 
-const TYPE_LABELS: Record<string, string> = { buy: '매수', sell: '매도', dividend: '배당', cash: '현금' };
-const TYPE_COLORS: Record<string, string> = { buy: 'var(--green)', sell: 'var(--red)', dividend: '#f59e0b', cash: '#60a5fa' };
+const TYPE_LABELS: Record<string, string> = {
+  buy: '매수', sell: '매도', dividend: '배당', cash: '현금',
+  transfer_deposit: 'Transfer - 입금', transfer_withdraw: 'Transfer - 출금',
+};
+const TYPE_COLORS: Record<string, string> = {
+  buy: 'var(--green)', sell: 'var(--red)', dividend: '#f59e0b', cash: '#60a5fa',
+  transfer_deposit: '#34d399', transfer_withdraw: '#f87171',
+};
 
 interface ConfirmModalProps {
   count: number;
@@ -138,7 +144,8 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
           </thead>
           <tbody>
             {filtered.map(tx => {
-              const total = tx.type === 'cash' ? tx.price : tx.quantity * tx.price;
+              const isTransfer = tx.type === 'transfer_deposit' || tx.type === 'transfer_withdraw';
+              const total = (tx.type === 'cash' || isTransfer) ? tx.price : tx.quantity * tx.price;
               const isSelected = selected.has(tx.id);
               return (
                 <tr key={tx.id} style={{ background: isSelected ? 'rgba(99,102,241,0.08)' : undefined }}>
@@ -158,8 +165,10 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
                   <td style={{ textAlign: 'right' }}>{fmt(total)}</td>
                   <td style={{ textAlign: 'right' }} className="muted">{tx.fee > 0 ? fmt(tx.fee) : '-'}</td>
                   <td style={{ display: 'flex', gap: 6 }}>
-                    <button style={{ background: 'none', color: 'var(--accent)', padding: 4 }}
-                      onClick={() => onEdit(tx)} title="수정"><Pencil size={13} /></button>
+                    {tx.type !== 'transfer_deposit' && tx.type !== 'transfer_withdraw' && (
+                      <button style={{ background: 'none', color: 'var(--accent)', padding: 4 }}
+                        onClick={() => onEdit(tx)} title="수정"><Pencil size={13} /></button>
+                    )}
                     <button style={{ background: 'none', color: 'var(--red)', padding: 4 }}
                       onClick={() => handleDeleteOne(tx.id)} title="삭제"><Trash2 size={13} /></button>
                   </td>

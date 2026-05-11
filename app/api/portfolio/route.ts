@@ -122,7 +122,7 @@ export async function GET(req: NextRequest) {
     };
   });
 
-  // Cash balance
+  // Cash balance from transactions
   const allTx = db.prepare(`
     SELECT t.type, t.quantity, t.price, t.fee FROM transactions t
     JOIN accounts a ON t.account_id = a.id WHERE a.hidden = 0 ${accWhere}
@@ -130,10 +130,21 @@ export async function GET(req: NextRequest) {
 
   let cash = 0;
   for (const tx of allTx) {
-    if (tx.type === 'cash') cash += tx.price;
+    if (tx.type === 'cash') cash += tx.price; // legacy
     else if (tx.type === 'sell') cash += tx.quantity * tx.price - tx.fee;
     else if (tx.type === 'buy') cash -= tx.quantity * tx.price + tx.fee;
     else if (tx.type === 'dividend') cash += tx.quantity * tx.price;
+  }
+
+  // Cash balance from cash_flow (Transfer deposits/withdrawals)
+  const cashFlowRows = db.prepare(`
+    SELECT cf.amount, cf.type FROM cash_flow cf
+    JOIN accounts a ON cf.account_id = a.id WHERE a.hidden = 0 ${accWhere}
+  `).all(...accArgs) as any[];
+
+  for (const cf of cashFlowRows) {
+    if (cf.type === 'DEPOSIT') cash += cf.amount;
+    else if (cf.type === 'WITHDRAW') cash -= cf.amount;
   }
 
   return NextResponse.json({

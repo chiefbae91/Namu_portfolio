@@ -18,7 +18,7 @@ const TX_TYPES = [
   { value: 'buy', label: '주식매수' },
   { value: 'sell', label: '주식매도' },
   { value: 'dividend', label: '배당' },
-  { value: 'cash', label: '현금' },
+  { value: 'transfer', label: 'Transfer' },
 ];
 
 const LOT_METHODS: { value: TaxLotMethod; label: string }[] = [
@@ -205,6 +205,7 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
   const [reinvestPrice, setReinvestPrice] = useState('');
   const [lotMethod, setLotMethod] = useState<TaxLotMethod>('average_cost');
   const [specificSelections, setSpecificSelections] = useState<Record<number, string>>({});
+  const [transferDir, setTransferDir] = useState<'DEPOSIT' | 'WITHDRAW'>('DEPOSIT');
   const [loading, setLoading] = useState(false);
   const [dateError, setDateError] = useState('');
 
@@ -223,7 +224,7 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
       setType('buy'); setTicker(prefillTicker ?? ''); setDate(todayStr());
       setQty(''); setPrice(''); setFee(''); setNotes('');
       setReinvest(false); setReinvestQty(''); setReinvestPrice('');
-      setLotMethod('average_cost'); setSpecificSelections({});
+      setLotMethod('average_cost'); setSpecificSelections({}); setTransferDir('DEPOSIT');
       if (prefillAccountId) {
         setAccountId(prefillAccountId);
       } else if (visible.length > 0) {
@@ -257,23 +258,33 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
     setLoading(true);
     try {
       const ymd = displayToYmd(date);
-      const lot_assignments = type==='sell' && lotMethod==='specific'
-        ? Object.entries(specificSelections)
-            .filter(([,v]) => parseFloat(v)>0)
-            .map(([id,v]) => ({ buy_tx_id: Number(id), quantity: parseFloat(v) }))
-        : undefined;
 
-      await onSubmit({
-        account_id: accountId, date: ymd,
-        ticker: type==='cash' ? '' : ticker.toUpperCase(),
-        type, quantity: parseFloat(qty||'0'), price: parsePriceInput(price),
-        fee: parsePriceInput(fee), notes,
-        lot_method: type==='sell' ? lotMethod : undefined,
-        lot_assignments,
-        reinvest: type==='dividend' ? reinvest : false,
-        reinvest_qty: reinvest ? parseFloat(reinvestQty||'0') : 0,
-        reinvest_price: reinvest ? parsePriceInput(reinvestPrice) : 0,
-      });
+      if (type === 'transfer') {
+        await onSubmit({
+          account_id: accountId, date: ymd,
+          type: transferDir === 'DEPOSIT' ? 'transfer_deposit' : 'transfer_withdraw',
+          price: parsePriceInput(price),
+          notes,
+        });
+      } else {
+        const lot_assignments = type==='sell' && lotMethod==='specific'
+          ? Object.entries(specificSelections)
+              .filter(([,v]) => parseFloat(v)>0)
+              .map(([id,v]) => ({ buy_tx_id: Number(id), quantity: parseFloat(v) }))
+          : undefined;
+
+        await onSubmit({
+          account_id: accountId, date: ymd,
+          ticker: ticker.toUpperCase(),
+          type, quantity: parseFloat(qty||'0'), price: parsePriceInput(price),
+          fee: parsePriceInput(fee), notes,
+          lot_method: type==='sell' ? lotMethod : undefined,
+          lot_assignments,
+          reinvest: type==='dividend' ? reinvest : false,
+          reinvest_qty: reinvest ? parseFloat(reinvestQty||'0') : 0,
+          reinvest_price: reinvest ? parsePriceInput(reinvestPrice) : 0,
+        });
+      }
       onClose();
     } finally { setLoading(false); }
   };
@@ -320,7 +331,7 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
                   {visible.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                 </select>
               </div>
-              {type !== 'cash' && (
+              {type !== 'transfer' && (
                 <div className="form-group" style={{ flex:1 }}>
                   <label>종목</label>
                   <input value={ticker} onChange={e => !prefillTicker && setTicker(e.target.value.toUpperCase())}
@@ -349,7 +360,18 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
                 {dateError && <span style={{ color:'var(--red)', fontSize:11 }}>{dateError}</span>}
               </div>
 
-              {type !== 'cash' && type !== 'dividend' && (
+              {type === 'transfer' && (
+                <div className="form-group">
+                  <label>유형</label>
+                  <select value={transferDir} onChange={e => setTransferDir(e.target.value as 'DEPOSIT' | 'WITHDRAW')}
+                    style={{ width: 160 }}>
+                    <option value="DEPOSIT">입금 (Deposit)</option>
+                    <option value="WITHDRAW">출금 (Withdraw)</option>
+                  </select>
+                </div>
+              )}
+
+              {type !== 'transfer' && type !== 'dividend' && (
                 <div className="form-group">
                   <label>수량</label>
                   <input value={qty} onChange={e => setQty(e.target.value)}
@@ -358,12 +380,12 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
               )}
 
               <div className="form-group">
-                <label>{type==='cash'?`금액 (${sym})`:type==='dividend'?`배당금 (${sym})`:`단가 (${sym})`}</label>
+                <label>{type==='transfer'?`금액 (${sym})`:type==='dividend'?`배당금 (${sym})`:`단가 (${sym})`}</label>
                 <input value={price} onChange={e => setPrice(formatPriceInput(e.target.value))}
-                  type="text" inputMode="decimal" placeholder="0.00" style={{ width:110 }} />
+                  type="text" inputMode="decimal" placeholder="0.00" style={{ width:110 }} required />
               </div>
 
-              {type !== 'cash' && (
+              {type !== 'transfer' && (
                 <div className="form-group">
                   <label>수수료 ({sym})</label>
                   <input value={fee} onChange={e => setFee(formatPriceInput(e.target.value))}
