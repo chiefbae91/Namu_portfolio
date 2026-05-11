@@ -49,11 +49,10 @@ export default function TradeAnalysisModal({ ticker, onClose }: Props) {
     dividend: txByDate[h.date]?.find(t => t.type === 'dividend')?.price ?? null,
   }));
 
-  const CustomDot = (type: string, color: string) => (props: any) => {
-    const { cx, cy, payload } = props;
-    if (payload[type] === null) return null;
+  function CustomDot({ type, color, cx, cy, payload }: { type: string; color: string; cx?: number; cy?: number; payload?: any }) {
+    if (!payload || payload[type] === null || payload[type] === undefined) return null;
     return <circle cx={cx} cy={cy} r={5} fill={color} stroke="white" strokeWidth={1.5} />;
-  };
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>

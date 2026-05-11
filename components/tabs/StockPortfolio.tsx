@@ -1,5 +1,6 @@
 'use client';
 import { PortfolioPosition, Currency, ExchangeRates } from '@/lib/types';
+import { formatCurrency } from '@/lib/format';
 
 interface Props {
   positions: PortfolioPosition[];
@@ -8,16 +9,8 @@ interface Props {
   onTickerClick: (ticker: string) => void;
 }
 
-const SYMBOLS: Record<Currency, string> = { USD: '$', KRW: '₩', EUR: '€' };
-
 export default function StockPortfolio({ positions, currency, rates, onTickerClick }: Props) {
-  const conv = (usd: number) => usd * rates[currency];
-  const fmt = (usd: number) => {
-    const v = conv(usd);
-    const sym = SYMBOLS[currency];
-    if (currency === 'KRW') return `${sym}${Math.round(v).toLocaleString()}`;
-    return `${sym}${v.toFixed(2)}`;
-  };
+  const fmt = (usd: number) => formatCurrency(usd, currency, rates);
 
   if (positions.length === 0) {
     return <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)' }}>보유 주식 없음</div>;

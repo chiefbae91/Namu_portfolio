@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import { Transaction, Currency, ExchangeRates } from '@/lib/types';
+import { formatCurrency } from '@/lib/format';
 
 interface Props {
   transactions: Transaction[];
@@ -12,7 +13,6 @@ interface Props {
   onDeleteMany: (ids: number[]) => Promise<void>;
 }
 
-const SYMBOLS: Record<Currency, string> = { USD: '$', KRW: '₩', EUR: '€' };
 const TYPE_LABELS: Record<string, string> = { buy: '매수', sell: '매도', dividend: '배당', cash: '현금' };
 const TYPE_COLORS: Record<string, string> = { buy: 'var(--green)', sell: 'var(--red)', dividend: '#f59e0b', cash: '#60a5fa' };
 
@@ -45,12 +45,7 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const fmt = (usd: number) => {
-    const v = usd * rates[currency];
-    const sym = SYMBOLS[currency];
-    if (currency === 'KRW') return `${sym}${Math.round(v).toLocaleString()}`;
-    return `${sym}${v.toFixed(2)}`;
-  };
+  const fmt = (usd: number) => formatCurrency(usd, currency, rates);
 
   const tickers = [...new Set(transactions.map(t => t.ticker).filter(Boolean))].sort();
   const filtered = tickerFilter ? transactions.filter(t => t.ticker === tickerFilter) : transactions;

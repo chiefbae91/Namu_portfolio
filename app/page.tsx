@@ -2,14 +2,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Settings, FileUp, PlusCircle } from 'lucide-react';
 import { Account, Currency, ExchangeRates, PortfolioPosition, SummaryData, Transaction } from '@/lib/types';
+import { formatCurrency } from '@/lib/format';
 import StockPortfolio from '@/components/tabs/StockPortfolio';
 import TransactionHistory from '@/components/tabs/TransactionHistory';
 import TransactionModal from '@/components/modals/TransactionModal';
 import AccountSettingsModal from '@/components/modals/AccountSettingsModal';
 import TradeAnalysisModal from '@/components/modals/TradeAnalysisModal';
 import CsvImportModal from '@/components/modals/CsvImportModal';
-
-const SYMBOLS: Record<Currency, string> = { USD: '$', KRW: '₩', EUR: '€' };
 
 export default function Home() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -120,12 +119,7 @@ export default function Home() {
   };
 
   const visibleAccounts = accounts.filter(a => !a.hidden);
-  const fmt = (usd: number) => {
-    const v = usd * rates[currency];
-    const sym = SYMBOLS[currency];
-    if (currency === 'KRW') return `${sym}${Math.round(v).toLocaleString()}`;
-    return `${sym}${v.toFixed(2)}`;
-  };
+  const fmt = (usd: number) => formatCurrency(usd, currency, rates);
 
   return (
     <div style={{ minHeight: '100vh', padding: '0 0 40px' }}>
@@ -144,7 +138,7 @@ export default function Home() {
         <div style={{ flex: 1 }} />
 
         <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', gap: 10 }}>
-          <span>1 USD = ₩{rates.KRW.toLocaleString()}</span>
+          <span>1 USD = ₩{Math.round(rates.KRW).toLocaleString('en-US')}</span>
           <span>1 USD = €{rates.EUR.toFixed(4)}</span>
         </div>
 

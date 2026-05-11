@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { X, CalendarDays } from 'lucide-react';
 import { Account, Transaction, Currency, LotInfo, LotSelection, TaxLotMethod } from '@/lib/types';
+import { formatPriceInput, parsePriceInput } from '@/lib/format';
 
 interface Props {
   accounts: Account[];
@@ -58,6 +59,7 @@ function TaxLotPanel({ ticker, accountId, sellQty, sellPrice, method, onMethodCh
   const [costPerShare, setCostPerShare] = useState(0);
   const [avgCostAll, setAvgCostAll] = useState(0);
   const sym = SYM[currency];
+  const fmtAmt = (v: number) => `${sym}${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const fetchLots = useCallback(async () => {
     if (!ticker || !accountId) return;
@@ -100,17 +102,17 @@ function TaxLotPanel({ ticker, accountId, sellQty, sellPrice, method, onMethodCh
 
       {/* Summary */}
       <div style={{ display:'flex', gap:16, flexWrap:'wrap', marginBottom: method==='specific' ? 10 : 0 }}>
-        <span style={{ fontSize:12, color:'var(--muted)' }}>전체 평단: <strong style={{ color:'var(--text)' }}>{sym}{avgCostAll.toFixed(2)}</strong></span>
+        <span style={{ fontSize:12, color:'var(--muted)' }}>전체 평단: <strong style={{ color:'var(--text)' }}>{fmtAmt(avgCostAll)}</strong></span>
         {activeCps > 0 && method !== 'specific' && (
-          <span style={{ fontSize:12, color:'var(--muted)' }}>선택 원가: <strong style={{ color:'var(--text)' }}>{sym}{activeCps.toFixed(2)}/주</strong></span>
+          <span style={{ fontSize:12, color:'var(--muted)' }}>선택 원가: <strong style={{ color:'var(--text)' }}>{fmtAmt(activeCps)}/주</strong></span>
         )}
         {method==='specific' && specificQty>0 && (
-          <span style={{ fontSize:12, color:'var(--muted)' }}>선택 원가: <strong style={{ color:'var(--text)' }}>{sym}{activeCps.toFixed(2)}/주</strong></span>
+          <span style={{ fontSize:12, color:'var(--muted)' }}>선택 원가: <strong style={{ color:'var(--text)' }}>{fmtAmt(activeCps)}/주</strong></span>
         )}
         {pnl !== null && (
           <span style={{ fontSize:12, color:'var(--muted)' }}>예상 손익:{' '}
             <strong style={{ color: pnl>=0 ? 'var(--green)' : 'var(--red)' }}>
-              {pnl>=0?'+':''}{sym}{pnl.toFixed(2)}
+              {pnl>=0?'+':''}{fmtAmt(pnl)}
               {activeCost>0 ? ` (${((pnl/activeCost)*100).toFixed(1)}%)` : ''}
             </strong>
           </span>
@@ -126,8 +128,8 @@ function TaxLotPanel({ ticker, accountId, sellQty, sellPrice, method, onMethodCh
             return (
               <div key={i} style={{ display:'flex', gap:12, fontSize:12, background:'rgba(99,102,241,0.1)', padding:'4px 10px', borderRadius:4 }}>
                 <span style={{ color:'var(--muted)' }}>{lot.date}</span>
-                <span>{sel.quantity}주 @ {sym}{sel.price.toFixed(2)}</span>
-                <span style={{ marginLeft:'auto', color:'var(--accent)' }}>{sym}{(sel.quantity*sel.price).toFixed(2)}</span>
+                <span>{sel.quantity}주 @ {fmtAmt(sel.price)}</span>
+                <span style={{ marginLeft:'auto', color:'var(--accent)' }}>{fmtAmt(sel.quantity*sel.price)}</span>
               </div>
             );
           })}
@@ -151,7 +153,7 @@ function TaxLotPanel({ ticker, accountId, sellQty, sellPrice, method, onMethodCh
                 return (
                   <tr key={lot.id} style={{ background: useQty>0 ? 'rgba(99,102,241,0.08)' : 'transparent' }}>
                     <td style={{ fontSize:12, padding:'4px 6px', color:'var(--muted)' }}>{lot.date}</td>
-                    <td style={{ fontSize:12, padding:'4px 6px', textAlign:'right' }}>{sym}{lot.price.toFixed(2)}</td>
+                    <td style={{ fontSize:12, padding:'4px 6px', textAlign:'right' }}>{fmtAmt(lot.price)}</td>
                     <td style={{ fontSize:12, padding:'4px 6px', textAlign:'right' }}>{lot.remaining}</td>
                     <td style={{ padding:'3px 6px', textAlign:'right' }}>
                       <input type="number" step="any" min="0" max={lot.remaining}
@@ -160,7 +162,7 @@ function TaxLotPanel({ ticker, accountId, sellQty, sellPrice, method, onMethodCh
                         style={{ width:72, textAlign:'right', padding:'2px 6px', fontSize:12 }} placeholder="0" />
                     </td>
                     <td style={{ fontSize:12, padding:'4px 6px', textAlign:'right', color: useQty>0?'var(--accent)':'var(--muted)' }}>
-                      {useQty>0 ? `${sym}${(useQty*lot.price).toFixed(2)}` : '-'}
+                      {useQty>0 ? fmtAmt(useQty*lot.price) : '-'}
                     </td>
                   </tr>
                 );
@@ -212,8 +214,8 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
       setTicker(editingTx.ticker);
       setDate(ymdToDisplay(editingTx.date));
       setQty(editingTx.quantity > 0 ? String(editingTx.quantity) : '');
-      setPrice(editingTx.price > 0 ? String(editingTx.price) : '');
-      setFee(editingTx.fee > 0 ? String(editingTx.fee) : '');
+      setPrice(editingTx.price > 0 ? formatPriceInput(String(editingTx.price)) : '');
+      setFee(editingTx.fee > 0 ? formatPriceInput(String(editingTx.fee)) : '');
       setNotes(editingTx.notes || '');
     } else {
       setType('buy'); setTicker(''); setDate(todayStr());
@@ -258,13 +260,13 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
       await onSubmit({
         account_id: accountId, date: ymd,
         ticker: type==='cash' ? '' : ticker.toUpperCase(),
-        type, quantity: parseFloat(qty||'0'), price: parseFloat(price||'0'),
-        fee: parseFloat(fee||'0'), notes,
+        type, quantity: parseFloat(qty||'0'), price: parsePriceInput(price),
+        fee: parsePriceInput(fee), notes,
         lot_method: type==='sell' ? lotMethod : undefined,
         lot_assignments,
         reinvest: type==='dividend' ? reinvest : false,
         reinvest_qty: reinvest ? parseFloat(reinvestQty||'0') : 0,
-        reinvest_price: reinvest ? parseFloat(reinvestPrice||'0') : 0,
+        reinvest_price: reinvest ? parsePriceInput(reinvestPrice) : 0,
       });
       onClose();
     } finally { setLoading(false); }
@@ -350,15 +352,15 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
 
               <div className="form-group">
                 <label>{type==='cash'?`금액 (${sym})`:type==='dividend'?`배당금 (${sym})`:`단가 (${sym})`}</label>
-                <input value={price} onChange={e => setPrice(e.target.value)}
-                  type="number" step="any" min="0" placeholder="0.00" style={{ width:110 }} />
+                <input value={price} onChange={e => setPrice(formatPriceInput(e.target.value))}
+                  type="text" inputMode="decimal" placeholder="0.00" style={{ width:110 }} />
               </div>
 
               {type !== 'cash' && (
                 <div className="form-group">
                   <label>수수료 ({sym})</label>
-                  <input value={fee} onChange={e => setFee(e.target.value)}
-                    type="number" step="any" min="0" placeholder="0" style={{ width:90 }} />
+                  <input value={fee} onChange={e => setFee(formatPriceInput(e.target.value))}
+                    type="text" inputMode="decimal" placeholder="0" style={{ width:90 }} />
                 </div>
               )}
             </div>
@@ -390,8 +392,8 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
                     </div>
                     <div className="form-group">
                       <label>재투자 단가 ({sym})</label>
-                      <input value={reinvestPrice} onChange={e => setReinvestPrice(e.target.value)}
-                        type="number" step="any" min="0" placeholder="0.00" style={{ width:110 }} required />
+                      <input value={reinvestPrice} onChange={e => setReinvestPrice(formatPriceInput(e.target.value))}
+                        type="text" inputMode="decimal" placeholder="0.00" style={{ width:110 }} required />
                     </div>
                   </div>
                 )}
