@@ -1,0 +1,85 @@
+import { NextRequest, NextResponse } from 'next/server';
+import getDb from '@/lib/db';
+
+export async function GET(req: NextRequest) {
+  const db = getDb();
+  const { searchParams } = new URL(req.url);
+  const accountId = searchParams.get('account_id');
+  const ticker = searchParams.get('ticker');
+
+  let sql = `
+    SELECT t.*, a.name as account_name
+    FROM transactions t
+    JOIN accounts a ON t.account_id = a.id
+    WHERE a.hidden = 0
+  `;
+  const args: any[] = [];
+
+  if (accountId && accountId !== 'all') {
+    sql += ' AND t.account_id = ?';
+    args.push(Number(accountId));
+  }
+  if (ticker) {
+    sql += ' AND t.ticker = ?';
+    args.push(ticker);
+  }
+  sql += ' ORDER BY t.date DESC, t.id DESC';
+
+  const rows = db.prepare(sql).all(...args);
+  return NextResponse.json(rows);
+}
+
+export async function POST(req: NextRequest) {
+  const db = getDb();
+  const body = await req.json();
+  const { account_id, date, ticker, type, quantity, price, fee, currency, notes,
+          reinvest, reinvest_qty, reinvest_price,
+          lot_method, lot_assignments } = body;
+
+  if (!account_id || !date || !type) {
+    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+  }
+
+  const insertTx = db.prepare(`
+    INSERT INTO transactions (account_id, date, ticker, type, quantity, price, fee, currency, notes, lot_method)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const insertLotAssignment = db.prepare(`
+    INSERT INTO lot_assignments (sell_tx_id, buy_tx_id, quantity) VALUES (?, ?, ?)
+  `);
+
+  const created: any[] = [];
+
+  db.transaction(() => {
+    const result = insertTx.run(
+      account_id, date, ticker || '', type,
+      quantity || 0, price || 0, fee || 0,
+      currency || 'USD', notes || '',
+      type === 'sell' ? (lot_method || 'average_cost') : null
+    );
+    const newId = result.lastInsertRowid;
+    created.push(db.prepare('SELECT * FROM transactions WHERE id = ?').get(newId));
+
+    // Save specific lot assignments for sell transactions
+    if (type === 'sell' && lot_method === 'specific' && Array.isArray(lot_assignments)) {
+      for (const la of lot_assignments) {
+        if (la.quantity > 0) {
+          insertLotAssignment.run(newId, la.buy_tx_id, la.quantity);
+        }
+      }
+    }
+
+    // Auto-create buy record for reinvested dividends
+    if (type === 'dividend' && reinvest && reinvest_qty && reinvest_price) {
+      const r2 = insertTx.run(
+        account_id, date, ticker || '', 'buy',
+        reinvest_qty, reinvest_price, 0, currency || 'USD',
+        'Dividend reinvestment', null
+      );
+      created.push(db.prepare('SELECT * FROM transactions WHERE id = ?').get(r2.lastInsertRowid));
+    }
+  })();
+
+  return NextResponse.json(created, { status: 201 });
+}

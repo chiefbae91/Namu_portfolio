@@ -1,0 +1,144 @@
+import { NextRequest, NextResponse } from 'next/server';
+import getDb from '@/lib/db';
+import { TaxLotMethod } from '@/lib/types';
+
+interface Lot {
+  id: number;
+  date: string;
+  ticker: string;
+  account_id: number;
+  quantity: number;
+  price: number;
+  fee: number;
+  remaining: number;
+}
+
+async function fetchPrice(ticker: string): Promise<number> {
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`;
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, next: { revalidate: 60 } });
+    if (!res.ok) return 0;
+    const data = await res.json();
+    return data?.chart?.result?.[0]?.meta?.regularMarketPrice ?? 0;
+  } catch { return 0; }
+}
+
+export async function GET(req: NextRequest) {
+  const db = getDb();
+  const { searchParams } = new URL(req.url);
+  const accountId = searchParams.get('account_id');
+  const accFilter = accountId && accountId !== 'all' ? Number(accountId) : null;
+
+  const accWhere = accFilter ? 'AND t.account_id = ?' : '';
+  const accArgs = accFilter ? [accFilter] : [];
+
+  // All buy lots
+  const buyRows = db.prepare(`
+    SELECT t.id, t.date, t.ticker, t.account_id, t.quantity, t.price, t.fee
+    FROM transactions t JOIN accounts a ON t.account_id = a.id
+    WHERE t.type = 'buy' AND a.hidden = 0 ${accWhere}
+    ORDER BY t.date ASC, t.id ASC
+  `).all(...accArgs) as any[];
+
+  const lots: Lot[] = buyRows.map(r => ({ ...r, remaining: r.quantity }));
+
+  // All sell transactions
+  const sellRows = db.prepare(`
+    SELECT t.id, t.ticker, t.quantity, t.price, t.fee, t.lot_method, t.account_id
+    FROM transactions t JOIN accounts a ON t.account_id = a.id
+    WHERE t.type = 'sell' AND a.hidden = 0 ${accWhere}
+    ORDER BY t.date ASC, t.id ASC
+  `).all(...accArgs) as any[];
+
+  // Lot assignments
+  const assignRows = db.prepare(`
+    SELECT la.sell_tx_id, la.buy_tx_id, la.quantity FROM lot_assignments la
+    JOIN transactions s ON la.sell_tx_id = s.id
+    JOIN accounts a ON s.account_id = a.id
+    WHERE a.hidden = 0 ${accFilter ? 'AND s.account_id = ?' : ''}
+  `).all(...(accFilter ? [accFilter] : [])) as any[];
+
+  const assignsBySell: Record<number, { buy_tx_id: number; quantity: number }[]> = {};
+  for (const a of assignRows) {
+    if (!assignsBySell[a.sell_tx_id]) assignsBySell[a.sell_tx_id] = [];
+    assignsBySell[a.sell_tx_id].push(a);
+  }
+
+  // Apply sells to reduce lot remainders
+  for (const sell of sellRows) {
+    const assignments = assignsBySell[sell.id];
+    if (assignments?.length) {
+      for (const a of assignments) {
+        const lot = lots.find(l => l.id === a.buy_tx_id);
+        if (lot) lot.remaining = Math.max(0, lot.remaining - a.quantity);
+      }
+    } else {
+      const method: TaxLotMethod = (sell.lot_method as TaxLotMethod) || 'fifo';
+      const tickerLots = lots.filter(
+        l => l.ticker === sell.ticker && l.account_id === sell.account_id && l.remaining > 0
+      );
+      const ordered = method === 'lifo' ? [...tickerLots].reverse() : tickerLots;
+      let need = sell.quantity;
+      for (const lot of ordered) {
+        if (need <= 0) break;
+        const use = Math.min(lot.remaining, need);
+        lot.remaining -= use;
+        need -= use;
+      }
+    }
+  }
+
+  // Build positions from remaining lots
+  const posMap: Record<string, { qty: number; cost: number }> = {};
+  for (const lot of lots) {
+    if (lot.remaining < 0.00001) continue;
+    if (!posMap[lot.ticker]) posMap[lot.ticker] = { qty: 0, cost: 0 };
+    const feePerShare = lot.quantity > 0 ? lot.fee / lot.quantity : 0;
+    posMap[lot.ticker].qty += lot.remaining;
+    posMap[lot.ticker].cost += lot.remaining * (lot.price + feePerShare);
+  }
+
+  const activeTickers = Object.keys(posMap);
+  const prices = await Promise.all(activeTickers.map(fetchPrice));
+  const priceMap: Record<string, number> = {};
+  activeTickers.forEach((t, i) => { priceMap[t] = prices[i]; });
+
+  const positions = activeTickers.map(ticker => {
+    const pos = posMap[ticker];
+    const avg_cost = pos.qty > 0 ? pos.cost / pos.qty : 0;
+    const current_price = priceMap[ticker] || 0;
+    const value = pos.qty * current_price;
+    const return_amount = value - pos.cost;
+    const return_pct = pos.cost > 0 ? (return_amount / pos.cost) * 100 : 0;
+    return {
+      ticker,
+      quantity: Math.round(pos.qty * 10000) / 10000,
+      avg_cost: Math.round(avg_cost * 100) / 100,
+      current_price,
+      value: Math.round(value * 100) / 100,
+      cost: Math.round(pos.cost * 100) / 100,
+      return_pct: Math.round(return_pct * 100) / 100,
+      return_amount: Math.round(return_amount * 100) / 100,
+    };
+  });
+
+  // Cash balance
+  const allTx = db.prepare(`
+    SELECT t.type, t.quantity, t.price, t.fee FROM transactions t
+    JOIN accounts a ON t.account_id = a.id WHERE a.hidden = 0 ${accWhere}
+  `).all(...accArgs) as any[];
+
+  let cash = 0;
+  for (const tx of allTx) {
+    if (tx.type === 'cash') cash += tx.price;
+    else if (tx.type === 'sell') cash += tx.quantity * tx.price - tx.fee;
+    else if (tx.type === 'buy') cash -= tx.quantity * tx.price + tx.fee;
+    else if (tx.type === 'dividend') cash += tx.quantity * tx.price;
+  }
+
+  return NextResponse.json({
+    positions,
+    cash,
+    stock_value: positions.reduce((s, p) => s + p.value, 0),
+  });
+}
