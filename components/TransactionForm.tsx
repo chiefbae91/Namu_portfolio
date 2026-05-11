@@ -16,7 +16,6 @@ const TX_TYPES = [
   { value: 'sell', label: '주식매도' },
   { value: 'dividend', label: '배당' },
   { value: 'cash', label: '현금' },
-  { value: 'option', label: '옵션' },
 ];
 
 const LOT_METHODS: { value: TaxLotMethod; label: string }[] = [
