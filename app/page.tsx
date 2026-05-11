@@ -44,11 +44,18 @@ export default function Home() {
     const q = selectedAccountId !== 'all' ? `?account_id=${selectedAccountId}` : '';
     try {
       const res = await fetch(`/api/portfolio${q}`);
+      if (!res.ok) {
+        const text = await res.text();
+        console.error('Portfolio API error:', res.status, text);
+        return;
+      }
       const data = await res.json();
       setPositions(data.positions || []);
       const stock = data.stock_value ?? 0;
       const cash = data.cash ?? 0;
       setSummary({ cash, stock, options_pnl: 0, total: cash + stock });
+    } catch (err) {
+      console.error('fetchPortfolio failed:', err);
     } finally { setPortfolioLoading(false); }
   }, [selectedAccountId]);
 

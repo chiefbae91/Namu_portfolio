@@ -137,9 +137,10 @@ export async function GET(req: NextRequest) {
   }
 
   // Cash balance from cash_flow (Transfer deposits/withdrawals)
+  const cfWhere = accFilter ? 'AND cf.account_id = ?' : '';
   const cashFlowRows = db.prepare(`
     SELECT cf.amount, cf.type FROM cash_flow cf
-    JOIN accounts a ON cf.account_id = a.id WHERE a.hidden = 0 ${accWhere}
+    JOIN accounts a ON cf.account_id = a.id WHERE a.hidden = 0 ${cfWhere}
   `).all(...accArgs) as any[];
 
   for (const cf of cashFlowRows) {
