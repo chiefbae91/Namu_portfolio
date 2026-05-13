@@ -10,6 +10,7 @@ const HINT_TYPES = [
   { value: 'long_target',     label: '장기 목표 주가 (Long-term Target)' },
   { value: 'buy_stop',        label: '매수 중지 (Buy Stop)' },
   { value: 'trailing_supply', label: '추격 매물대 (Trailing Supply)' },
+  { value: 'note_only',       label: 'Note Only' },
 ];
 
 function todayFormatted() {
@@ -46,7 +47,7 @@ export default function TradingHintModal({ onClose, onSaved }: Props) {
   const [hintDate, setHintDate] = useState(todayFormatted());
   const [type, setType] = useState('');
   const [priceStr, setPriceStr] = useState('');
-  const [currentPrice, setCurrentPrice] = useState<number | null>(null);
+  const [currentPriceStr, setCurrentPriceStr] = useState('');
   const [priceFetching, setPriceFetching] = useState(false);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
@@ -55,17 +56,20 @@ export default function TradingHintModal({ onClose, onSaved }: Props) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isBuyStop = type === 'buy_stop';
+  const isNoteOnly = type === 'note_only';
+  const priceDisabled = isBuyStop || isNoteOnly;
+  const cpDisabled = isNoteOnly;
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!ticker.trim()) { setCurrentPrice(null); return; }
+    if (!ticker.trim()) { setCurrentPriceStr(''); return; }
     debounceRef.current = setTimeout(async () => {
       setPriceFetching(true);
       try {
         const res = await fetch(`/api/market-price?ticker=${encodeURIComponent(ticker.trim())}&range=5d&interval=1d`);
         const data = await res.json();
-        setCurrentPrice(data.price > 0 ? data.price : null);
-      } catch { setCurrentPrice(null); }
+        if (data.price > 0) setCurrentPriceStr(fmtPrice(String(data.price)));
+      } catch {}
       finally { setPriceFetching(false); }
     }, 600);
   }, [ticker]);
@@ -74,7 +78,8 @@ export default function TradingHintModal({ onClose, onSaved }: Props) {
     if (!ticker.trim()) { setError('Ticker is required'); return; }
     if (!hintDate.trim()) { setError('Date is required'); return; }
     if (!type) { setError('Type is required'); return; }
-    const price = isBuyStop ? null : (parseFloat(priceStr.replace(/,/g, '')) || null);
+    const price = priceDisabled ? null : (parseFloat(priceStr.replace(/,/g, '')) || null);
+    const current_price = cpDisabled ? null : (parseFloat(currentPriceStr.replace(/,/g, '')) || null);
     setSaving(true);
     setError('');
     try {
@@ -86,7 +91,7 @@ export default function TradingHintModal({ onClose, onSaved }: Props) {
           hint_date: mmddyyyyToISO(hintDate),
           type,
           price,
-          current_price: currentPrice,
+          current_price,
           note: note.trim() || null,
         }),
       });
@@ -100,15 +105,6 @@ export default function TradingHintModal({ onClose, onSaved }: Props) {
     }
   };
 
-  const cpText = priceFetching
-    ? 'Loading...'
-    : currentPrice != null
-      ? `$${currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-      : ticker ? 'N/A' : '';
-
-  const readonlyStyle: React.CSSProperties = {
-    width: '100%', background: 'var(--border)', color: 'var(--muted)', cursor: 'default',
-  };
   const disabledStyle: React.CSSProperties = {
     width: '100%', background: 'var(--border)', color: 'var(--muted)', cursor: 'not-allowed',
   };
@@ -129,7 +125,6 @@ export default function TradingHintModal({ onClose, onSaved }: Props) {
               type="text"
               value={ticker}
               onChange={e => setTicker(e.target.value.toUpperCase())}
-              placeholder="AAPL"
               style={{ width: '100%' }}
               autoFocus
             />
@@ -143,7 +138,6 @@ export default function TradingHintModal({ onClose, onSaved }: Props) {
                 type="text"
                 value={hintDate}
                 onChange={e => setHintDate(e.target.value)}
-                placeholder="MM/DD/YYYY"
                 style={{ flex: 1 }}
               />
               <button
@@ -176,37 +170,30 @@ export default function TradingHintModal({ onClose, onSaved }: Props) {
 
           {/* Price */}
           <div className="form-group">
-            <label>
-              Price
-              {isBuyStop && (
-                <span style={{ color: 'var(--muted)', fontSize: 12, marginLeft: 6 }}>
-                  (N/A for 매수 중지)
-                </span>
-              )}
-            </label>
+            <label>Price</label>
             <input
               type="text"
-              value={isBuyStop ? '' : priceStr}
+              value={priceDisabled ? '' : priceStr}
               onChange={e => setPriceStr(e.target.value)}
-              onBlur={() => { if (!isBuyStop && priceStr) setPriceStr(fmtPrice(priceStr)); }}
-              placeholder={isBuyStop ? 'N/A' : '0.00'}
-              disabled={isBuyStop}
-              style={isBuyStop ? disabledStyle : { width: '100%' }}
+              onBlur={() => { if (!priceDisabled && priceStr) setPriceStr(fmtPrice(priceStr)); }}
+              disabled={priceDisabled}
+              style={priceDisabled ? disabledStyle : { width: '100%' }}
             />
           </div>
 
-          {/* Current Price (read-only) */}
+          {/* Current Price */}
           <div className="form-group">
             <label>
               Current Price
-              <span style={{ color: 'var(--muted)', fontSize: 11, marginLeft: 6 }}>(auto)</span>
+              {priceFetching && <span style={{ color: 'var(--muted)', fontSize: 11, marginLeft: 6 }}>Loading...</span>}
             </label>
             <input
               type="text"
-              readOnly
-              value={cpText}
-              placeholder="Enter ticker above"
-              style={readonlyStyle}
+              value={cpDisabled ? '' : currentPriceStr}
+              onChange={e => setCurrentPriceStr(e.target.value)}
+              onBlur={() => { if (!cpDisabled && currentPriceStr) setCurrentPriceStr(fmtPrice(currentPriceStr)); }}
+              disabled={cpDisabled}
+              style={cpDisabled ? disabledStyle : { width: '100%' }}
             />
           </div>
 
@@ -216,7 +203,6 @@ export default function TradingHintModal({ onClose, onSaved }: Props) {
             <textarea
               value={note}
               onChange={e => setNote(e.target.value)}
-              placeholder="Optional notes"
               rows={3}
               style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', fontSize: 13 }}
             />
