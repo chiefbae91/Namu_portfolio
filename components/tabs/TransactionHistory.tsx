@@ -11,6 +11,7 @@ interface Props {
   onEdit: (tx: Transaction) => void;
   onDelete: (id: number) => Promise<void>;
   onDeleteMany: (ids: number[]) => Promise<void>;
+  deepLink?: { ticker: string; id: number } | null;
 }
 
 const NAMED_BADGE_COLORS: [string, string][] = [
@@ -102,7 +103,7 @@ const TYPE_FILTER_OPTIONS = [
   { value: 'transfer_withdraw', label: 'Withdraw' },
 ];
 
-export default function TransactionHistory({ transactions, currency, rates, onEdit, onDelete, onDeleteMany }: Props) {
+export default function TransactionHistory({ transactions, currency, rates, onEdit, onDelete, onDeleteMany, deepLink }: Props) {
   const [tickerFilter, setTickerFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -111,6 +112,14 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
   const [page, setPage] = useState(1);
 
   useEffect(() => { setPage(1); }, [tickerFilter, typeFilter]);
+
+  useEffect(() => {
+    if (deepLink) {
+      setTickerFilter(deepLink.ticker);
+      setTypeFilter('');
+      setPage(1);
+    }
+  }, [deepLink]);
 
   // When the transactions list changes (e.g. account switch), reset filter if the
   // selected ticker no longer exists in the new data, and clear all selections.

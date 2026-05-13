@@ -413,6 +413,15 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
               )}
             </div>
 
+            {/* Note */}
+            <div className="form-group">
+              <label>Note</label>
+              <textarea value={notes} onChange={e => setNotes(e.target.value)}
+                placeholder="Trade notes (optional)"
+                rows={2}
+                style={{ width:'100%', resize:'vertical', fontFamily:'inherit', fontSize:13 }} />
+            </div>
+
             {/* Tax Lot (sell only) */}
             {type==='sell' && !isEditing && ticker && (
               <TaxLotPanel

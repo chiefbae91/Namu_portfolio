@@ -27,6 +27,7 @@ export default function Home() {
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [analysisTicker, setAnalysisTicker] = useState<string | null>(null);
   const [txPrefill, setTxPrefill] = useState<{ ticker: string; accountId: number } | null>(null);
+  const [historyDeepLink, setHistoryDeepLink] = useState<{ ticker: string; id: number } | null>(null);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
@@ -150,6 +151,12 @@ export default function Home() {
     setTxModalOpen(false);
     setEditingTx(null);
     setTxPrefill(null);
+  };
+
+  const handleShowHistoryForTicker = (ticker: string) => {
+    setAnalysisTicker(null);
+    setActiveTab('history');
+    setHistoryDeepLink({ ticker, id: Date.now() });
   };
 
   const handleAddTransactionFromAnalysis = (ticker: string) => {
@@ -300,6 +307,7 @@ export default function Home() {
               onEdit={openEditModal}
               onDelete={handleDeleteTx}
               onDeleteMany={handleDeleteMany}
+              deepLink={historyDeepLink}
             />
           )}
         </div>
@@ -335,6 +343,7 @@ export default function Home() {
           rates={rates}
           onClose={() => setAnalysisTicker(null)}
           onAddTransaction={() => handleAddTransactionFromAnalysis(analysisTicker)}
+          onShowHistory={handleShowHistoryForTicker}
         />
       )}
       {csvImportOpen && (

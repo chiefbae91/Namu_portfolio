@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useState } from 'react';
-import { X, PlusCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, PlusCircle } from 'lucide-react';
 import { Currency, ExchangeRates } from '@/lib/types';
 import { formatCurrency } from '@/lib/format';
 import StockChart, { StockChartData, TxRow, Holding } from '@/components/StockChart';
@@ -28,28 +28,16 @@ const TYPE_COLORS: Record<string, string> = { buy: '#00e676', sell: '#ff5252', d
 
 const PAGE_SIZE = 10;
 
-function getPageNums(current: number, total: number): (number | null)[] {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-  const result: (number | null)[] = [];
-  const left = Math.max(2, current - 1);
-  const right = Math.min(total - 1, current + 1);
-  result.push(1);
-  if (left > 2) result.push(null);
-  for (let i = left; i <= right; i++) result.push(i);
-  if (right < total - 1) result.push(null);
-  result.push(total);
-  return result;
-}
-
 interface Props {
   ticker: string;
   currency: Currency;
   rates: ExchangeRates;
   onClose: () => void;
   onAddTransaction: () => void;
+  onShowHistory?: (ticker: string) => void;
 }
 
-export default function TradeAnalysisModal({ ticker, currency, rates, onClose, onAddTransaction }: Props) {
+export default function TradeAnalysisModal({ ticker, currency, rates, onClose, onAddTransaction, onShowHistory }: Props) {
   const [period, setPeriod] = useState<Period>(() => {
     if (typeof window === 'undefined') return '1mo';
     return (localStorage.getItem('chart_period') as Period) ?? '1mo';
@@ -62,8 +50,6 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
   const [transactions, setTransactions] = useState<TxRow[]>([]);
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [resolvedInterval, setResolvedInterval] = useState('1d');
-  const [page, setPage] = useState(1);
-
   const fmt = (v: number) => formatCurrency(v, currency, rates);
 
   const handleChartLoaded = useCallback((data: StockChartData) => {
@@ -83,10 +69,8 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
     setIntervalState(iv);
   };
 
-  const totalPages = Math.max(1, Math.ceil(transactions.length / PAGE_SIZE));
-  const start = (page - 1) * PAGE_SIZE;
-  const end = Math.min(start + PAGE_SIZE, transactions.length);
-  const paginated = transactions.slice(start, end);
+  const preview = transactions.slice(0, PAGE_SIZE);
+  const hasMore = transactions.length > PAGE_SIZE;
 
   const intervalCorrected = resolvedInterval !== interval;
 
@@ -185,7 +169,7 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
           <div style={{ marginTop: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Trade History</h3>
-              <span style={{ fontSize: 12, color: 'var(--muted)' }}>{start + 1}–{end} of {transactions.length}</span>
+              <span style={{ fontSize: 12, color: 'var(--muted)' }}>{transactions.length} trades</span>
             </div>
 
             <div style={{ overflowX: 'auto' }}>
@@ -200,7 +184,7 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
                   </tr>
                 </thead>
                 <tbody>
-                  {paginated.map((tx, i) => {
+                  {preview.map((tx, i) => {
                     const total = tx.quantity > 0 ? tx.quantity * tx.price : tx.price;
                     return (
                       <tr key={tx.id ?? i}>
@@ -223,23 +207,12 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
               </table>
             </div>
 
-            {totalPages > 1 && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 12 }}>
-                <button onClick={() => setPage(p => p - 1)} disabled={page === 1}
-                  style={{ padding: '4px 10px', background: 'var(--border)', color: page === 1 ? 'var(--muted)' : 'var(--text)', borderRadius: 4, fontSize: 12, display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <ChevronLeft size={12} /> Prev
-                </button>
-                {getPageNums(page, totalPages).map((p, i) =>
-                  p === null
-                    ? <span key={`e${i}`} style={{ padding: '4px 6px', color: 'var(--muted)', fontSize: 12 }}>…</span>
-                    : <button key={p} onClick={() => setPage(p)}
-                        style={{ padding: '4px 10px', borderRadius: 4, fontSize: 12, fontWeight: p === page ? 700 : 400, background: p === page ? 'var(--accent)' : 'var(--border)', color: p === page ? 'white' : 'var(--text)' }}>
-                        {p}
-                      </button>
-                )}
-                <button onClick={() => setPage(p => p + 1)} disabled={page === totalPages}
-                  style={{ padding: '4px 10px', background: 'var(--border)', color: page === totalPages ? 'var(--muted)' : 'var(--text)', borderRadius: 4, fontSize: 12, display: 'flex', alignItems: 'center', gap: 2 }}>
-                  Next <ChevronRight size={12} />
+            {hasMore && (
+              <div style={{ textAlign: 'center', marginTop: 10 }}>
+                <button
+                  onClick={() => { onClose(); onShowHistory?.(ticker); }}
+                  style={{ background: 'none', color: 'var(--accent)', fontSize: 13, fontWeight: 600, textDecoration: 'underline', cursor: 'pointer' }}>
+                  More ({transactions.length - PAGE_SIZE} more trades)
                 </button>
               </div>
             )}
