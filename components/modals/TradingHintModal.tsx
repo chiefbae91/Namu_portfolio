@@ -30,6 +30,26 @@ function isoToMMDDYYYY(s: string) {
   return `${mm}/${dd}/${yyyy}`;
 }
 
+function todayISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Roll Saturday → Friday, Sunday → Friday (previous)
+function toWeekday(isoDate: string): string {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  const dt = new Date(y, m - 1, d); // local time, no UTC shift
+  const day = dt.getDay();
+  if (day === 6) dt.setDate(dt.getDate() - 1);
+  else if (day === 0) dt.setDate(dt.getDate() - 2);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}
+
+function sanitizeISO(isoDate: string): string {
+  const today = todayISO();
+  return toWeekday(isoDate > today ? today : isoDate);
+}
+
 function fmtPrice(raw: string) {
   const n = parseFloat(raw.replace(/,/g, ''));
   if (isNaN(n)) return raw;
@@ -77,14 +97,9 @@ export default function TradingHintModal({ onClose, onSaved }: Props) {
         const res = await fetch(`/api/historical-price?ticker=${encodeURIComponent(t)}&date=${isoDate}`);
         const data = await res.json();
         if (data.error) {
-          setPriceError(data.error);
+          setPriceError('No price data for this date');
         } else if (data.price > 0) {
           setCurrentPriceStr(fmtPrice(String(data.price)));
-          // Show note if returned date differs from requested
-          const isoReq = isoDate;
-          if (data.date && data.date !== isoReq) {
-            setPriceError(`No data for ${hintDate} — showing ${data.date}`);
-          }
         }
       } catch { setPriceError('Failed to fetch price'); }
       finally { setPriceFetching(false); }
@@ -155,6 +170,13 @@ export default function TradingHintModal({ onClose, onSaved }: Props) {
                 type="text"
                 value={hintDate}
                 onChange={e => setHintDate(e.target.value)}
+                onBlur={e => {
+                  const val = e.target.value;
+                  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(val)) return;
+                  const sanitized = sanitizeISO(mmddyyyyToISO(val));
+                  const formatted = isoToMMDDYYYY(sanitized);
+                  if (formatted !== val) setHintDate(formatted);
+                }}
                 style={{ flex: 1 }}
               />
               <button
@@ -168,8 +190,12 @@ export default function TradingHintModal({ onClose, onSaved }: Props) {
               <input
                 ref={dateInputRef}
                 type="date"
+                max={todayISO()}
                 style={{ display: 'none' }}
-                onChange={e => setHintDate(isoToMMDDYYYY(e.target.value))}
+                onChange={e => {
+                  if (!e.target.value) return;
+                  setHintDate(isoToMMDDYYYY(sanitizeISO(e.target.value)));
+                }}
               />
             </div>
           </div>
