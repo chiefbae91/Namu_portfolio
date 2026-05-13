@@ -1,8 +1,9 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { X, CalendarDays } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { X } from 'lucide-react';
 import { Account, Transaction, Currency, LotInfo, LotSelection, TaxLotMethod } from '@/lib/types';
 import { formatPriceInput, parsePriceInput } from '@/lib/format';
+import DatePickerInput from '@/components/DatePickerInput';
 
 interface Props {
   accounts: Account[];
@@ -188,7 +189,6 @@ function TaxLotPanel({ ticker, accountId, sellQty, sellPrice, method, onMethodCh
 // ─── Modal ────────────────────────────────────────────────────────
 export default function TransactionModal({ accounts, currency, editingTx, onSubmit, onClose, prefillTicker, prefillAccountId }: Props) {
   const visible = accounts.filter(a => !a.hidden);
-  const dateRef = useRef<HTMLInputElement>(null);
   const sym = SYM[currency];
   const isEditing = !!editingTx;
 
@@ -345,19 +345,11 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
             <div className="form-row">
               <div className="form-group">
                 <label>날짜</label>
-                <div style={{ display:'flex', gap:4 }}>
-                  <input value={date}
-                    onChange={e => { setDate(e.target.value); setDateError(isValidDate(e.target.value)?'':'날짜 형식: MM/DD/YYYY'); }}
-                    placeholder="MM/DD/YYYY"
-                    style={{ width:110, borderColor: dateError?'var(--red)':undefined }} />
-                  <button type="button" onClick={() => dateRef.current?.showPicker?.()}
-                    style={{ background:'var(--border)', color:'var(--text)', padding:'6px 8px' }}>
-                    <CalendarDays size={14} />
-                  </button>
-                  <input ref={dateRef} type="date" style={{ display:'none' }}
-                    onChange={e => { const p=e.target.value.split('-'); if(p.length===3){setDate(`${p[1]}/${p[2]}/${p[0]}`);setDateError('');} }} />
-                </div>
-                {dateError && <span style={{ color:'var(--red)', fontSize:11 }}>{dateError}</span>}
+                <DatePickerInput
+                  value={date}
+                  onChange={val => { setDate(val); setDateError(isValidDate(val) ? '' : '날짜 형식: MM/DD/YYYY'); }}
+                  error={dateError}
+                />
               </div>
 
               {type === 'transfer' && (

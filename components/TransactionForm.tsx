@@ -1,6 +1,7 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { CalendarDays, RotateCcw, Info } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { RotateCcw, Info } from 'lucide-react';
+import DatePickerInput from '@/components/DatePickerInput';
 import { Account, Transaction, Currency, LotInfo, LotSelection, TaxLotMethod } from '@/lib/types';
 
 interface Props {
@@ -254,7 +255,6 @@ function TaxLotPanel({
 // ─── Main Form ────────────────────────────────────────────────────
 export default function TransactionForm({ accounts, currency, editingTx, onSubmit, onCancelEdit }: Props) {
   const visibleAccounts = accounts.filter(a => !a.hidden);
-  const dateRef = useRef<HTMLInputElement>(null);
 
   const [type, setType] = useState('buy');
   const [accountId, setAccountId] = useState<number>(visibleAccounts[0]?.id ?? 0);
@@ -313,15 +313,6 @@ export default function TransactionForm({ accounts, currency, editingTx, onSubmi
 
   const validateDate = (val: string) => {
     setDateError(isValidDate(val) ? '' : '날짜 형식: MM/DD/YYYY');
-  };
-
-  const handleDateNative = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const ymd = e.target.value;
-    if (ymd) {
-      const p = ymd.split('-');
-      setDate(`${p[1]}/${p[2]}/${p[0]}`);
-      setDateError('');
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -418,20 +409,11 @@ export default function TransactionForm({ accounts, currency, editingTx, onSubmi
           {/* Date */}
           <div className="form-group">
             <label>날짜</label>
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              <input
-                value={date}
-                onChange={e => { setDate(e.target.value); validateDate(e.target.value); }}
-                placeholder="MM/DD/YYYY"
-                style={{ width: 110, borderColor: dateError ? 'var(--red)' : undefined }}
-              />
-              <button type="button" onClick={() => dateRef.current?.showPicker?.()}
-                style={{ background: 'var(--border)', color: 'var(--text)', padding: '6px 8px' }}>
-                <CalendarDays size={14} />
-              </button>
-              <input ref={dateRef} type="date" style={{ display: 'none' }} onChange={handleDateNative} />
-            </div>
-            {dateError && <span style={{ color: 'var(--red)', fontSize: 11 }}>{dateError}</span>}
+            <DatePickerInput
+              value={date}
+              onChange={val => { setDate(val); validateDate(val); }}
+              error={dateError}
+            />
           </div>
 
           {/* Quantity */}
