@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 export interface OHLCPoint {
   time: number;
@@ -45,8 +45,9 @@ export default function CandlestickChart({ candles, transactions = [], resolvedI
   const [width, setWidth] = useState(600);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!containerRef.current) return;
+    setWidth(containerRef.current.offsetWidth || 600);
     const ro = new ResizeObserver(e => setWidth(e[0].contentRect.width || 600));
     ro.observe(containerRef.current);
     return () => ro.disconnect();
@@ -106,7 +107,7 @@ export default function CandlestickChart({ candles, transactions = [], resolvedI
   const toRight = tooltip ? tooltip.x < width * 0.62 : true;
 
   return (
-    <div ref={containerRef} style={{ width: '100%', position: 'relative', userSelect: 'none' }}>
+    <div ref={containerRef} style={{ width: '100%', position: 'relative', userSelect: 'none', overflow: 'hidden' }}>
       <svg
         width={width} height={H}
         onMouseMove={handleMouseMove}

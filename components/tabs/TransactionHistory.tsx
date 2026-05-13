@@ -13,12 +13,21 @@ interface Props {
   onDeleteMany: (ids: number[]) => Promise<void>;
 }
 
-// Deterministic color from account name
-const BADGE_COLORS = ['#00e676', '#40c4ff', '#ff9100', '#e040fb', '#ffea00', '#69f0ae', '#ff6e40', '#f48fb1'];
-function getAccountColor(name: string): string {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
-  return BADGE_COLORS[Math.abs(h) % BADGE_COLORS.length];
+const NAMED_BADGE_COLORS: [string, string][] = [
+  ['robinhood', '#00c853'],
+  ['chase', '#1e88e5'],
+  ['fidelity', '#f59e0b'],
+  ['schwab', '#8b5cf6'],
+  ['etrade', '#06b6d4'],
+  ['webull', '#ef4444'],
+  ['tdameritrade', '#fb923c'],
+];
+function getAccountBadgeColor(name: string): string {
+  const lname = name.toLowerCase();
+  for (const [key, color] of NAMED_BADGE_COLORS) {
+    if (lname.includes(key)) return color;
+  }
+  return '#666';
 }
 function getAccountInitials(name: string): string {
   const words = name.trim().split(/\s+/);
@@ -223,11 +232,10 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       {tx.account_name && (
                         <span style={{
-                          fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
-                          background: getAccountColor(tx.account_name) + '22',
-                          color: getAccountColor(tx.account_name),
-                          border: `1px solid ${getAccountColor(tx.account_name)}55`,
-                          letterSpacing: '0.03em', flexShrink: 0,
+                          fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 3,
+                          background: getAccountBadgeColor(tx.account_name),
+                          color: 'white',
+                          letterSpacing: '0.04em', flexShrink: 0,
                         }}>
                           {getAccountInitials(tx.account_name)}
                         </span>
