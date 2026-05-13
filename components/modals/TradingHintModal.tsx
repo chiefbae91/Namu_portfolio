@@ -1,6 +1,7 @@
 'use client';
 import { useRef, useState } from 'react';
 import { X, Calendar } from 'lucide-react';
+import { TradingHint } from '@/lib/types';
 
 const HINT_TYPES = [
   { value: 'resistance',      label: '벽 (Resistance)' },
@@ -58,19 +59,26 @@ function fmtPrice(raw: string) {
 }
 
 interface Props {
+  editingHint?: TradingHint | null;
   onClose: () => void;
   onSaved: () => void;
 }
 
-export default function TradingHintModal({ onClose, onSaved }: Props) {
-  const [ticker, setTicker] = useState('');
-  const [hintDate, setHintDate] = useState(todayFormatted());
-  const [type, setType] = useState('');
-  const [priceStr, setPriceStr] = useState('');
-  const [currentPriceStr, setCurrentPriceStr] = useState('');
+export default function TradingHintModal({ editingHint, onClose, onSaved }: Props) {
+  const [ticker, setTicker] = useState(() => editingHint?.ticker ?? '');
+  const [hintDate, setHintDate] = useState(() =>
+    editingHint ? isoToMMDDYYYY(editingHint.hint_date) : todayFormatted()
+  );
+  const [type, setType] = useState(() => editingHint?.type ?? '');
+  const [priceStr, setPriceStr] = useState(() =>
+    editingHint?.price != null ? fmtPrice(String(editingHint.price)) : ''
+  );
+  const [currentPriceStr, setCurrentPriceStr] = useState(() =>
+    editingHint?.current_price != null ? fmtPrice(String(editingHint.current_price)) : ''
+  );
   const [priceFetching, setPriceFetching] = useState(false);
   const [priceError, setPriceError] = useState('');
-  const [note, setNote] = useState('');
+  const [note, setNote] = useState(() => editingHint?.note ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -102,8 +110,9 @@ export default function TradingHintModal({ onClose, onSaved }: Props) {
     setSaving(true);
     setError('');
     try {
-      const res = await fetch('/api/trading-hints', {
-        method: 'POST',
+      const url = editingHint ? `/api/trading-hints/${editingHint.id}` : '/api/trading-hints';
+      const res = await fetch(url, {
+        method: editingHint ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ticker: ticker.trim().toUpperCase(),
@@ -134,7 +143,7 @@ export default function TradingHintModal({ onClose, onSaved }: Props) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Trading Hint</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>{editingHint ? 'Edit Trading Hint' : 'Trading Hint'}</h2>
           <button onClick={onClose} style={{ background: 'none', color: 'var(--muted)' }}><X size={18} /></button>
         </div>
 

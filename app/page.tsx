@@ -1,9 +1,10 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { Settings, FileUp, PlusCircle, RefreshCw } from 'lucide-react';
-import { Account, AccountBreakdown, ExchangeRates, PortfolioPosition, SummaryData, Transaction } from '@/lib/types';
+import { Account, AccountBreakdown, ExchangeRates, PortfolioPosition, SummaryData, Transaction, TradingHint } from '@/lib/types';
 import StockPortfolio from '@/components/tabs/StockPortfolio';
 import TransactionHistory from '@/components/tabs/TransactionHistory';
+import TradingHints from '@/components/tabs/TradingHints';
 import TransactionModal from '@/components/modals/TransactionModal';
 import AccountSettingsModal from '@/components/modals/AccountSettingsModal';
 import TradeAnalysisModal from '@/components/modals/TradeAnalysisModal';
@@ -19,7 +20,7 @@ export default function Home() {
   const [rates, setRates] = useState<ExchangeRates>({ USD: 1, KRW: 1380, EUR: 0.92 });
   const [showKrw, setShowKrw] = useState(false);
   const [showEur, setShowEur] = useState(false);
-  const [activeTab, setActiveTab] = useState<'portfolio' | 'history'>('portfolio');
+  const [activeTab, setActiveTab] = useState<'portfolio' | 'history' | 'hints'>('portfolio');
   const [positions, setPositions] = useState<PortfolioPosition[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [summary, setSummary] = useState<SummaryData>({ cash: 0, stock: 0, options_pnl: 0, total: 0 });
@@ -32,9 +33,16 @@ export default function Home() {
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [tradingHintOpen, setTradingHintOpen] = useState(false);
+  const [editingHint, setEditingHint] = useState<TradingHint | null>(null);
+  const [tradingHints, setTradingHints] = useState<TradingHint[]>([]);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
   const [ratesUpdatedAt, setRatesUpdatedAt] = useState<Date | null>(null);
   const [ratesRefreshing, setRatesRefreshing] = useState(false);
+
+  const fetchTradingHints = useCallback(async () => {
+    const res = await fetch('/api/trading-hints');
+    setTradingHints(await res.json());
+  }, []);
 
   const fetchAccounts = useCallback(async () => {
     const res = await fetch('/api/accounts');
@@ -101,7 +109,7 @@ export default function Home() {
     setTransactions(combined);
   }, [selectedAccountId]);
 
-  useEffect(() => { fetchAccounts(); fetchRates(); }, []);
+  useEffect(() => { fetchAccounts(); fetchRates(); fetchTradingHints(); }, []);
 
   // Auto-refresh rates every 5 minutes
   useEffect(() => {
@@ -153,6 +161,21 @@ export default function Home() {
     setTxModalOpen(false);
     setEditingTx(null);
     setTxPrefill(null);
+  };
+
+  const handleDeleteHint = async (id: number) => {
+    await fetch(`/api/trading-hints/${id}`, { method: 'DELETE' });
+    fetchTradingHints();
+  };
+
+  const handleEditHint = (hint: TradingHint) => {
+    setEditingHint(hint);
+    setTradingHintOpen(true);
+  };
+
+  const closeTradingHintModal = () => {
+    setTradingHintOpen(false);
+    setEditingHint(null);
   };
 
   const handleShowHistoryForTicker = (ticker: string) => {
@@ -268,7 +291,7 @@ export default function Home() {
           <PlusCircle size={15} /> Add Trade
         </button>
 
-        <button onClick={() => setTradingHintOpen(true)}
+        <button onClick={() => { setEditingHint(null); setTradingHintOpen(true); }}
           style={{ background: 'var(--accent)', color: 'white', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}>
           Trading Hint
         </button>
@@ -294,7 +317,7 @@ export default function Home() {
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-          {([['portfolio', 'Portfolio'], ['history', 'Trading History']] as const).map(([tab, label]) => (
+          {([['portfolio', 'Portfolio'], ['history', 'Trading History'], ['hints', 'Trading Hint']] as const).map(([tab, label]) => (
             <button key={tab} className={`tab ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
               {label}
             </button>
@@ -315,6 +338,13 @@ export default function Home() {
               onDelete={handleDeleteTx}
               onDeleteMany={handleDeleteMany}
               deepLink={historyDeepLink}
+            />
+          )}
+          {activeTab === 'hints' && (
+            <TradingHints
+              hints={tradingHints}
+              onEdit={handleEditHint}
+              onDelete={handleDeleteHint}
             />
           )}
         </div>
@@ -357,7 +387,11 @@ export default function Home() {
         <CsvImportModal accounts={accounts} onClose={() => setCsvImportOpen(false)} onImported={() => { refreshAll(); setCsvImportOpen(false); }} />
       )}
       {tradingHintOpen && (
-        <TradingHintModal onClose={() => setTradingHintOpen(false)} onSaved={() => {}} />
+        <TradingHintModal
+          editingHint={editingHint}
+          onClose={closeTradingHintModal}
+          onSaved={() => { fetchTradingHints(); closeTradingHintModal(); }}
+        />
       )}
     </div>
   );
