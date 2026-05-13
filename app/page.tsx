@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { Settings, FileUp, PlusCircle } from 'lucide-react';
+import { Settings, FileUp, PlusCircle, RefreshCw } from 'lucide-react';
 import { Account, AccountBreakdown, ExchangeRates, PortfolioPosition, SummaryData, Transaction } from '@/lib/types';
 import StockPortfolio from '@/components/tabs/StockPortfolio';
 import TransactionHistory from '@/components/tabs/TransactionHistory';
@@ -30,6 +30,8 @@ export default function Home() {
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
+  const [ratesUpdatedAt, setRatesUpdatedAt] = useState<Date | null>(null);
+  const [ratesRefreshing, setRatesRefreshing] = useState(false);
 
   const fetchAccounts = useCallback(async () => {
     const res = await fetch('/api/accounts');
@@ -37,8 +39,14 @@ export default function Home() {
   }, []);
 
   const fetchRates = useCallback(async () => {
-    const res = await fetch('/api/exchange-rates');
-    setRates(await res.json());
+    try {
+      setRatesRefreshing(true);
+      const res = await fetch('/api/exchange-rates');
+      setRates(await res.json());
+      setRatesUpdatedAt(new Date());
+    } finally {
+      setRatesRefreshing(false);
+    }
   }, []);
 
   const fetchPortfolio = useCallback(async () => {
@@ -91,6 +99,12 @@ export default function Home() {
   }, [selectedAccountId]);
 
   useEffect(() => { fetchAccounts(); fetchRates(); }, []);
+
+  // Auto-refresh rates every 10 seconds
+  useEffect(() => {
+    const id = setInterval(fetchRates, 10_000);
+    return () => clearInterval(id);
+  }, [fetchRates]);
   useEffect(() => { fetchPortfolio(); fetchTransactions(); }, [selectedAccountId]);
 
   const refreshAll = () => { fetchPortfolio(); fetchTransactions(); };
@@ -216,9 +230,21 @@ export default function Home() {
           </label>
         </div>
 
-        <div style={{ fontSize: 11, color: 'var(--muted)', display: 'flex', gap: 8 }}>
+        <div style={{ fontSize: 11, color: 'var(--muted)', display: 'flex', gap: 8, alignItems: 'center' }}>
           {showKrw && <span>₩{Math.round(rates.KRW).toLocaleString('en-US')}/USD</span>}
           {showEur && <span>€{rates.EUR.toFixed(4)}/USD</span>}
+          {ratesUpdatedAt && (
+            <span style={{ opacity: 0.5, fontSize: 10 }}>
+              {ratesUpdatedAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </span>
+          )}
+          <button
+            onClick={fetchRates}
+            title="환율 새로고침"
+            style={{ background: 'none', color: 'var(--muted)', padding: 2, display: 'flex', alignItems: 'center' }}
+          >
+            <RefreshCw size={11} style={{ animation: ratesRefreshing ? 'spin 0.6s linear infinite' : 'none' }} />
+          </button>
         </div>
 
         <button onClick={() => { setEditingTx(null); setTxModalOpen(true); }}
