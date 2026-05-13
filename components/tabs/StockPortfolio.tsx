@@ -10,7 +10,7 @@ interface Props {
   onTickerClick: (ticker: string) => void;
 }
 
-type SortKey = 'ticker' | 'current_price' | 'quantity' | 'avg_cost' | 'value' | 'cost' | 'weight' | 'return_amount' | 'return_pct';
+type SortKey = 'ticker' | 'value' | 'cost' | 'weight' | 'return_amount' | 'return_pct';
 type SortDir = 'asc' | 'desc';
 
 function SortIndicator({ active, dir }: { active: boolean; dir: SortDir }) {
@@ -68,11 +68,8 @@ export default function StockPortfolio({ positions, currency, rates, onTickerCli
       return sortDir === 'asc' ? cmp : -cmp;
     }
     const valueOf = (p: PortfolioPosition): number => {
-      if (p.current_price === 0 && sortKey !== 'quantity' && sortKey !== 'avg_cost' && sortKey !== 'cost') return -Infinity;
+      if (p.current_price === 0 && sortKey !== 'cost') return -Infinity;
       switch (sortKey) {
-        case 'current_price': return p.current_price;
-        case 'quantity':      return p.quantity;
-        case 'avg_cost':      return p.avg_cost;
         case 'value':         return p.value;
         case 'cost':          return p.cost;
         case 'weight':        return p.value;
@@ -95,15 +92,19 @@ export default function StockPortfolio({ positions, currency, rates, onTickerCli
     onClick: () => handleSort(key),
   });
 
+  const thStatic = (align: 'left' | 'right' = 'right') => ({
+    style: { textAlign: align as 'left' | 'right' },
+  });
+
   return (
     <div style={{ overflowX: 'auto' }}>
       <table>
         <thead>
           <tr>
             <th {...th('ticker', 'left')}>종목 <SortIndicator active={sortKey === 'ticker'} dir={sortDir} /></th>
-            <th {...th('current_price')}>현재가 <SortIndicator active={sortKey === 'current_price'} dir={sortDir} /></th>
-            <th {...th('quantity')}>수량 <SortIndicator active={sortKey === 'quantity'} dir={sortDir} /></th>
-            <th {...th('avg_cost')}>평균단가 <SortIndicator active={sortKey === 'avg_cost'} dir={sortDir} /></th>
+            <th {...thStatic()}>현재가</th>
+            <th {...thStatic()}>수량</th>
+            <th {...thStatic()}>평균단가</th>
             <th {...th('value')}>평가금액 <SortIndicator active={sortKey === 'value'} dir={sortDir} /></th>
             <th {...th('cost')}>코스트 <SortIndicator active={sortKey === 'cost'} dir={sortDir} /></th>
             <th {...th('weight')}>비중 <SortIndicator active={sortKey === 'weight'} dir={sortDir} /></th>
