@@ -8,6 +8,7 @@ import TransactionModal from '@/components/modals/TransactionModal';
 import AccountSettingsModal from '@/components/modals/AccountSettingsModal';
 import TradeAnalysisModal from '@/components/modals/TradeAnalysisModal';
 import CsvImportModal from '@/components/modals/CsvImportModal';
+import TradingHintModal from '@/components/modals/TradingHintModal';
 import SummaryCards from '@/components/SummaryCards';
 
 const TRANSFER_OFFSET = 1_000_000;
@@ -30,6 +31,7 @@ export default function Home() {
   const [historyDeepLink, setHistoryDeepLink] = useState<{ ticker: string; id: number } | null>(null);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
+  const [tradingHintOpen, setTradingHintOpen] = useState(false);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
   const [ratesUpdatedAt, setRatesUpdatedAt] = useState<Date | null>(null);
   const [ratesRefreshing, setRatesRefreshing] = useState(false);
@@ -266,6 +268,11 @@ export default function Home() {
           <PlusCircle size={15} /> Add Trade
         </button>
 
+        <button onClick={() => setTradingHintOpen(true)}
+          style={{ background: 'var(--accent)', color: 'white', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}>
+          Trading Hint
+        </button>
+
         <button onClick={() => setCsvImportOpen(true)}
           style={{ background: 'var(--border)', color: 'var(--muted)', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
           <FileUp size={14} /> CSV Import
@@ -348,6 +355,9 @@ export default function Home() {
       )}
       {csvImportOpen && (
         <CsvImportModal accounts={accounts} onClose={() => setCsvImportOpen(false)} onImported={() => { refreshAll(); setCsvImportOpen(false); }} />
+      )}
+      {tradingHintOpen && (
+        <TradingHintModal onClose={() => setTradingHintOpen(false)} onSaved={() => {}} />
       )}
     </div>
   );

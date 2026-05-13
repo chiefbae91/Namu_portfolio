@@ -104,6 +104,17 @@ export interface AccountBreakdown {
   stock_value: number;
 }
 
+export interface TradingHint {
+  id: number;
+  ticker: string;
+  hint_date: string;
+  type: string;
+  price: number | null;
+  current_price: number | null;
+  note: string | null;
+  created_at: string;
+}
+
 export interface CsvPreviewRow {
   date: string;
   ticker: string;

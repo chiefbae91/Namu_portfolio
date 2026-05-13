@@ -1,0 +1,237 @@
+'use client';
+import { useEffect, useRef, useState } from 'react';
+import { X, Calendar } from 'lucide-react';
+
+const HINT_TYPES = [
+  { value: 'resistance',      label: '벽 (Resistance)' },
+  { value: 'support',         label: '지지 (Support)' },
+  { value: 'supply_level',    label: '매물대 (Supply Level)' },
+  { value: 'short_target',    label: '단기 목표 주가 (Short-term Target)' },
+  { value: 'long_target',     label: '장기 목표 주가 (Long-term Target)' },
+  { value: 'buy_stop',        label: '매수 중지 (Buy Stop)' },
+  { value: 'trailing_supply', label: '추격 매물대 (Trailing Supply)' },
+];
+
+function todayFormatted() {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${mm}/${dd}/${d.getFullYear()}`;
+}
+
+function mmddyyyyToISO(s: string) {
+  const [mm, dd, yyyy] = s.split('/');
+  return `${yyyy}-${mm?.padStart(2, '0')}-${dd?.padStart(2, '0')}`;
+}
+
+function isoToMMDDYYYY(s: string) {
+  const [yyyy, mm, dd] = s.split('-');
+  return `${mm}/${dd}/${yyyy}`;
+}
+
+function fmtPrice(raw: string) {
+  const n = parseFloat(raw.replace(/,/g, ''));
+  if (isNaN(n)) return raw;
+  const [int, dec = ''] = n.toFixed(2).split('.');
+  return int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + dec;
+}
+
+interface Props {
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+export default function TradingHintModal({ onClose, onSaved }: Props) {
+  const [ticker, setTicker] = useState('');
+  const [hintDate, setHintDate] = useState(todayFormatted());
+  const [type, setType] = useState('');
+  const [priceStr, setPriceStr] = useState('');
+  const [currentPrice, setCurrentPrice] = useState<number | null>(null);
+  const [priceFetching, setPriceFetching] = useState(false);
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const dateInputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isBuyStop = type === 'buy_stop';
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!ticker.trim()) { setCurrentPrice(null); return; }
+    debounceRef.current = setTimeout(async () => {
+      setPriceFetching(true);
+      try {
+        const res = await fetch(`/api/market-price?ticker=${encodeURIComponent(ticker.trim())}&range=5d&interval=1d`);
+        const data = await res.json();
+        setCurrentPrice(data.price > 0 ? data.price : null);
+      } catch { setCurrentPrice(null); }
+      finally { setPriceFetching(false); }
+    }, 600);
+  }, [ticker]);
+
+  const handleSave = async () => {
+    if (!ticker.trim()) { setError('Ticker is required'); return; }
+    if (!hintDate.trim()) { setError('Date is required'); return; }
+    if (!type) { setError('Type is required'); return; }
+    const price = isBuyStop ? null : (parseFloat(priceStr.replace(/,/g, '')) || null);
+    setSaving(true);
+    setError('');
+    try {
+      const res = await fetch('/api/trading-hints', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticker: ticker.trim().toUpperCase(),
+          hint_date: mmddyyyyToISO(hintDate),
+          type,
+          price,
+          current_price: currentPrice,
+          note: note.trim() || null,
+        }),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      onSaved();
+      onClose();
+    } catch (e: any) {
+      setError(e.message || 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cpText = priceFetching
+    ? 'Loading...'
+    : currentPrice != null
+      ? `$${currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : ticker ? 'N/A' : '';
+
+  const readonlyStyle: React.CSSProperties = {
+    width: '100%', background: 'var(--border)', color: 'var(--muted)', cursor: 'default',
+  };
+  const disabledStyle: React.CSSProperties = {
+    width: '100%', background: 'var(--border)', color: 'var(--muted)', cursor: 'not-allowed',
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Trading Hint</h2>
+          <button onClick={onClose} style={{ background: 'none', color: 'var(--muted)' }}><X size={18} /></button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Ticker */}
+          <div className="form-group">
+            <label>Ticker <span style={{ color: 'var(--red)' }}>*</span></label>
+            <input
+              type="text"
+              value={ticker}
+              onChange={e => setTicker(e.target.value.toUpperCase())}
+              placeholder="AAPL"
+              style={{ width: '100%' }}
+              autoFocus
+            />
+          </div>
+
+          {/* Hint Date */}
+          <div className="form-group">
+            <label>Hint Date <span style={{ color: 'var(--red)' }}>*</span></label>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input
+                type="text"
+                value={hintDate}
+                onChange={e => setHintDate(e.target.value)}
+                placeholder="MM/DD/YYYY"
+                style={{ flex: 1 }}
+              />
+              <button
+                type="button"
+                onClick={() => dateInputRef.current?.showPicker?.()}
+                style={{ background: 'var(--border)', color: 'var(--muted)', padding: '6px 10px', borderRadius: 6, flexShrink: 0 }}
+                title="Pick date"
+              >
+                <Calendar size={15} />
+              </button>
+              <input
+                ref={dateInputRef}
+                type="date"
+                style={{ display: 'none' }}
+                onChange={e => setHintDate(isoToMMDDYYYY(e.target.value))}
+              />
+            </div>
+          </div>
+
+          {/* Type */}
+          <div className="form-group">
+            <label>Type <span style={{ color: 'var(--red)' }}>*</span></label>
+            <select value={type} onChange={e => setType(e.target.value)} style={{ width: '100%' }}>
+              <option value="">Select type...</option>
+              {HINT_TYPES.map(t => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Price */}
+          <div className="form-group">
+            <label>
+              Price
+              {isBuyStop && (
+                <span style={{ color: 'var(--muted)', fontSize: 12, marginLeft: 6 }}>
+                  (N/A for 매수 중지)
+                </span>
+              )}
+            </label>
+            <input
+              type="text"
+              value={isBuyStop ? '' : priceStr}
+              onChange={e => setPriceStr(e.target.value)}
+              onBlur={() => { if (!isBuyStop && priceStr) setPriceStr(fmtPrice(priceStr)); }}
+              placeholder={isBuyStop ? 'N/A' : '0.00'}
+              disabled={isBuyStop}
+              style={isBuyStop ? disabledStyle : { width: '100%' }}
+            />
+          </div>
+
+          {/* Current Price (read-only) */}
+          <div className="form-group">
+            <label>
+              Current Price
+              <span style={{ color: 'var(--muted)', fontSize: 11, marginLeft: 6 }}>(auto)</span>
+            </label>
+            <input
+              type="text"
+              readOnly
+              value={cpText}
+              placeholder="Enter ticker above"
+              style={readonlyStyle}
+            />
+          </div>
+
+          {/* Note */}
+          <div className="form-group">
+            <label>Note</label>
+            <textarea
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              placeholder="Optional notes"
+              rows={3}
+              style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', fontSize: 13 }}
+            />
+          </div>
+
+          {error && <div style={{ color: 'var(--red)', fontSize: 13 }}>{error}</div>}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
+            <button className="btn-secondary" onClick={onClose}>Cancel</button>
+            <button className="btn-primary" onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

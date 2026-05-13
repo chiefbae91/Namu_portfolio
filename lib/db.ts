@@ -85,6 +85,19 @@ function initSchema(db: Database.Database) {
     );
   `);
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS trading_hints (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ticker TEXT NOT NULL,
+      hint_date TEXT NOT NULL,
+      type TEXT NOT NULL,
+      price REAL,
+      current_price REAL,
+      note TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
   // Safe migrations for existing DBs
   const migrations = [
     "ALTER TABLE transactions ADD COLUMN notes TEXT DEFAULT ''",
