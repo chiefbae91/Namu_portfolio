@@ -280,7 +280,7 @@ export default function Home() {
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-          {([['portfolio', '포트폴리오'], ['history', '거래히스토리']] as const).map(([tab, label]) => (
+          {([['portfolio', 'Portfolio'], ['history', 'Trading History']] as const).map(([tab, label]) => (
             <button key={tab} className={`tab ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
               {label}
             </button>
