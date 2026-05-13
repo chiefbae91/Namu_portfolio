@@ -49,6 +49,7 @@ export default function TradingHintModal({ onClose, onSaved }: Props) {
   const [priceStr, setPriceStr] = useState('');
   const [currentPriceStr, setCurrentPriceStr] = useState('');
   const [priceFetching, setPriceFetching] = useState(false);
+  const [priceError, setPriceError] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -62,17 +63,33 @@ export default function TradingHintModal({ onClose, onSaved }: Props) {
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!ticker.trim()) { setCurrentPriceStr(''); return; }
+    const t = ticker.trim();
+    const validDate = /^\d{2}\/\d{2}\/\d{4}$/.test(hintDate);
+    if (!t || !validDate || cpDisabled) {
+      if (!t) setCurrentPriceStr('');
+      return;
+    }
     debounceRef.current = setTimeout(async () => {
       setPriceFetching(true);
+      setPriceError('');
       try {
-        const res = await fetch(`/api/market-price?ticker=${encodeURIComponent(ticker.trim())}&range=5d&interval=1d`);
+        const isoDate = mmddyyyyToISO(hintDate);
+        const res = await fetch(`/api/historical-price?ticker=${encodeURIComponent(t)}&date=${isoDate}`);
         const data = await res.json();
-        if (data.price > 0) setCurrentPriceStr(fmtPrice(String(data.price)));
-      } catch {}
+        if (data.error) {
+          setPriceError(data.error);
+        } else if (data.price > 0) {
+          setCurrentPriceStr(fmtPrice(String(data.price)));
+          // Show note if returned date differs from requested
+          const isoReq = isoDate;
+          if (data.date && data.date !== isoReq) {
+            setPriceError(`No data for ${hintDate} — showing ${data.date}`);
+          }
+        }
+      } catch { setPriceError('Failed to fetch price'); }
       finally { setPriceFetching(false); }
     }, 600);
-  }, [ticker]);
+  }, [ticker, hintDate, cpDisabled]);
 
   const handleSave = async () => {
     if (!ticker.trim()) { setError('Ticker is required'); return; }
@@ -190,11 +207,14 @@ export default function TradingHintModal({ onClose, onSaved }: Props) {
             <input
               type="text"
               value={cpDisabled ? '' : currentPriceStr}
-              onChange={e => setCurrentPriceStr(e.target.value)}
+              onChange={e => { setCurrentPriceStr(e.target.value); setPriceError(''); }}
               onBlur={() => { if (!cpDisabled && currentPriceStr) setCurrentPriceStr(fmtPrice(currentPriceStr)); }}
               disabled={cpDisabled}
               style={cpDisabled ? disabledStyle : { width: '100%' }}
             />
+            {priceError && (
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>{priceError}</div>
+            )}
           </div>
 
           {/* Note */}
