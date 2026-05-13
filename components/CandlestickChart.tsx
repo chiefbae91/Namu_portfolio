@@ -53,10 +53,6 @@ export default function CandlestickChart({ candles, transactions = [], resolvedI
     return () => ro.disconnect();
   }, []);
 
-  if (candles.length === 0) {
-    return <div style={{ textAlign: 'center', padding: 60, color: 'var(--muted)' }}>가격 데이터 없음</div>;
-  }
-
   const cw = width - PAD.left - PAD.right;
   const ch = H - PAD.top - PAD.bottom;
 
@@ -108,7 +104,10 @@ export default function CandlestickChart({ candles, transactions = [], resolvedI
 
   return (
     <div ref={containerRef} style={{ width: '100%', position: 'relative', userSelect: 'none', overflow: 'hidden' }}>
-      <svg
+      {candles.length === 0 && (
+        <div style={{ textAlign: 'center', padding: 60, color: 'var(--muted)' }}>가격 데이터 없음</div>
+      )}
+      {candles.length > 0 && <><svg
         width={width} height={H}
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setTooltip(null)}
@@ -222,7 +221,7 @@ export default function CandlestickChart({ candles, transactions = [], resolvedI
             </div>
           )}
         </div>
-      )}
+      )}</>}
     </div>
   );
 }
