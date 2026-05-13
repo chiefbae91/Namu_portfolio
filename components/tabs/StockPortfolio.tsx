@@ -139,14 +139,7 @@ export default function StockPortfolio({ positions, currency, rates, onTickerCli
                 <td style={{ textAlign: 'right' }}>{hasPrice ? fmt(p.value) : <span className="muted">-</span>}</td>
                 <td style={{ textAlign: 'right' }}>{fmt(p.cost)}</td>
                 <td style={{ textAlign: 'right' }}>
-                  {hasPrice && totalValue > 0 ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
-                      <div style={{ width: 52, height: 3, background: 'var(--border)', borderRadius: 2, flexShrink: 0 }}>
-                        <div style={{ width: `${barPct}%`, height: '100%', background: 'var(--accent)', borderRadius: 2, opacity: 0.75 }} />
-                      </div>
-                      <span style={{ minWidth: 42, textAlign: 'right' }}>{weight.toFixed(1)}%</span>
-                    </div>
-                  ) : <span className="muted">-</span>}
+                  {hasPrice && totalValue > 0 ? `${weight.toFixed(1)}%` : <span className="muted">-</span>}
                 </td>
                 <td style={{ textAlign: 'right' }} className={hasPrice ? (p.return_amount >= 0 ? 'positive' : 'negative') : ''}>
                   {hasPrice ? `${p.return_amount >= 0 ? '+' : ''}${fmt(p.return_amount)}` : <span className="muted">-</span>}
