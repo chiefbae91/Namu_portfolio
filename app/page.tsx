@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { Settings, FileUp, PlusCircle } from 'lucide-react';
-import { Account, AccountBreakdown, Currency, ExchangeRates, PortfolioPosition, SummaryData, Transaction } from '@/lib/types';
+import { Account, AccountBreakdown, ExchangeRates, PortfolioPosition, SummaryData, Transaction } from '@/lib/types';
 import StockPortfolio from '@/components/tabs/StockPortfolio';
 import TransactionHistory from '@/components/tabs/TransactionHistory';
 import TransactionModal from '@/components/modals/TransactionModal';
@@ -15,8 +15,9 @@ const TRANSFER_OFFSET = 1_000_000;
 export default function Home() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
-  const [currency, setCurrency] = useState<Currency>('USD');
   const [rates, setRates] = useState<ExchangeRates>({ USD: 1, KRW: 1380, EUR: 0.92 });
+  const [showKrw, setShowKrw] = useState(false);
+  const [showEur, setShowEur] = useState(false);
   const [activeTab, setActiveTab] = useState<'portfolio' | 'history'>('portfolio');
   const [positions, setPositions] = useState<PortfolioPosition[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -197,18 +198,27 @@ export default function Home() {
 
         <div style={{ flex: 1 }} />
 
-        <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', gap: 10 }}>
-          <span>1 USD = ₩{Math.round(rates.KRW).toLocaleString('en-US')}</span>
-          <span>1 USD = €{rates.EUR.toFixed(4)}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>USD</span>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', userSelect: 'none' }}>
+            <input type="checkbox" checked={showKrw} onChange={e => setShowKrw(e.target.checked)}
+              style={{ cursor: 'pointer', accentColor: '#fbbf24' }} />
+            <span style={{ fontSize: 12, color: showKrw ? '#fbbf24' : 'var(--muted)', fontWeight: showKrw ? 600 : 400 }}>
+              KRW
+            </span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', userSelect: 'none' }}>
+            <input type="checkbox" checked={showEur} onChange={e => setShowEur(e.target.checked)}
+              style={{ cursor: 'pointer', accentColor: '#34d399' }} />
+            <span style={{ fontSize: 12, color: showEur ? '#34d399' : 'var(--muted)', fontWeight: showEur ? 600 : 400 }}>
+              EUR
+            </span>
+          </label>
         </div>
 
-        <div style={{ display: 'flex', gap: 2 }}>
-          {(['USD', 'KRW', 'EUR'] as Currency[]).map(c => (
-            <button key={c} onClick={() => setCurrency(c)}
-              style={{ padding: '5px 10px', background: currency === c ? 'var(--accent)' : 'var(--border)', color: currency === c ? 'white' : 'var(--muted)', fontWeight: 500, fontSize: 12 }}>
-              {c}
-            </button>
-          ))}
+        <div style={{ fontSize: 11, color: 'var(--muted)', display: 'flex', gap: 8 }}>
+          {showKrw && <span>₩{Math.round(rates.KRW).toLocaleString('en-US')}/USD</span>}
+          {showEur && <span>€{rates.EUR.toFixed(4)}/USD</span>}
         </div>
 
         <button onClick={() => { setEditingTx(null); setTxModalOpen(true); }}
@@ -229,6 +239,9 @@ export default function Home() {
           stockValue={summary.stock}
           accountBreakdown={accountBreakdown}
           krwRate={rates.KRW}
+          eurRate={rates.EUR}
+          showKrw={showKrw}
+          showEur={showEur}
           loading={portfolioLoading}
         />
 
@@ -244,12 +257,12 @@ export default function Home() {
         {/* Tab Content */}
         <div className="card" style={{ marginBottom: 20, overflowX: 'auto' }}>
           {activeTab === 'portfolio' && (
-            <StockPortfolio positions={positions} currency={currency} rates={rates} onTickerClick={setAnalysisTicker} />
+            <StockPortfolio positions={positions} currency="USD" rates={rates} onTickerClick={setAnalysisTicker} />
           )}
           {activeTab === 'history' && (
             <TransactionHistory
               transactions={transactions}
-              currency={currency}
+              currency="USD"
               rates={rates}
               onEdit={openEditModal}
               onDelete={handleDeleteTx}
@@ -263,7 +276,7 @@ export default function Home() {
       {txModalOpen && (
         <TransactionModal
           accounts={accounts}
-          currency={currency}
+          currency="USD"
           editingTx={editingTx}
           onSubmit={handleTransactionSubmit}
           onClose={closeTransactionModal}
@@ -285,7 +298,7 @@ export default function Home() {
       {analysisTicker && (
         <TradeAnalysisModal
           ticker={analysisTicker}
-          currency={currency}
+          currency="USD"
           rates={rates}
           onClose={() => setAnalysisTicker(null)}
           onAddTransaction={() => handleAddTransactionFromAnalysis(analysisTicker)}
