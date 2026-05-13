@@ -107,6 +107,7 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
   const [typeFilter, setTypeFilter] = useState('');
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [drConfirmId, setDrConfirmId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
 
   useEffect(() => { setPage(1); }, [tickerFilter, typeFilter]);
@@ -168,6 +169,12 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
   const handleDeleteOne = async (id: number) => {
     await onDelete(id);
     setSelected(prev => { const s = new Set(prev); s.delete(id); return s; });
+  };
+
+  const handleDrConfirmDelete = async () => {
+    if (drConfirmId == null) return;
+    await handleDeleteOne(drConfirmId);
+    setDrConfirmId(null);
   };
 
   const selectedCount = [...selected].filter(id => filteredIds.includes(id)).length;
@@ -268,12 +275,16 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
                   <td style={{ textAlign: 'right' }}>{fmt(total)}</td>
                   <td style={{ textAlign: 'right' }} className="muted">{tx.fee > 0 ? fmt(tx.fee) : '-'}</td>
                   <td style={{ display: 'flex', gap: 6 }}>
-                    {tx.type !== 'transfer_deposit' && tx.type !== 'transfer_withdraw' && tx.subtype !== 'DIVIDEND_REINVEST' && (
+                    {tx.type !== 'transfer_deposit' && tx.type !== 'transfer_withdraw'
+                      && tx.type !== 'dividend' && tx.subtype !== 'DIVIDEND_REINVEST' && (
                       <button style={{ background: 'none', color: 'var(--accent)', padding: 4 }}
                         onClick={() => onEdit(tx)} title="수정"><Pencil size={13} /></button>
                     )}
                     <button style={{ background: 'none', color: 'var(--red)', padding: 4 }}
-                      onClick={() => handleDeleteOne(tx.id)} title="삭제"><Trash2 size={13} /></button>
+                      onClick={() => tx.subtype === 'DIVIDEND_REINVEST'
+                        ? setDrConfirmId(tx.id)
+                        : handleDeleteOne(tx.id)}
+                      title="삭제"><Trash2 size={13} /></button>
                   </td>
                 </tr>
               );
@@ -315,6 +326,23 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
           onConfirm={handleDeleteSelected}
           onCancel={() => setConfirmOpen(false)}
         />
+      )}
+
+      {drConfirmId != null && (
+        <div className="modal-overlay" onClick={() => setDrConfirmId(null)}>
+          <div className="modal" style={{ maxWidth: 380, textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 28, marginBottom: 10 }}>🗑️</div>
+            <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>배당재투자 거래 삭제</h3>
+            <p style={{ color: 'var(--muted)', fontSize: 13, margin: '0 0 20px' }}>
+              이 배당재투자 매수 거래를 삭제합니다.<br />
+              연결된 배당 기록은 유지됩니다.
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+              <button className="btn-secondary" onClick={() => setDrConfirmId(null)}>취소</button>
+              <button className="btn-danger" onClick={handleDrConfirmDelete}>삭제</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

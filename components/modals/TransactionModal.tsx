@@ -302,6 +302,22 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
 
   const sellQtyNum = parseFloat(qty||'0');
 
+  // Dividend and DIVIDEND_REINVEST are not editable via this modal
+  if (isEditing && (editingTx!.type === 'dividend' || editingTx!.subtype === 'DIVIDEND_REINVEST')) {
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal" style={{ maxWidth: 400, textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+          <h3 style={{ margin: '0 0 10px', fontSize: 16 }}>수정 불가</h3>
+          <p style={{ color: 'var(--muted)', fontSize: 13, margin: '0 0 20px' }}>
+            배당 및 배당재투자 거래는 직접 수정할 수 없습니다.<br />
+            삭제 후 재입력해 주세요.
+          </p>
+          <button className="btn-secondary" onClick={onClose}>닫기</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
