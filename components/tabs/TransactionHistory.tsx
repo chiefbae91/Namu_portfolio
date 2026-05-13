@@ -36,8 +36,8 @@ function getAccountInitials(name: string): string {
 }
 
 const TYPE_LABELS: Record<string, string> = {
-  buy: '매수', sell: '매도', dividend: '배당', cash: '현금',
-  transfer_deposit: 'Transfer - 입금', transfer_withdraw: 'Transfer - 출금',
+  buy: 'Buy', sell: 'Sell', dividend: 'Dividend', cash: 'Cash',
+  transfer_deposit: 'Transfer - Deposit', transfer_withdraw: 'Transfer - Withdraw',
 };
 const TYPE_COLORS: Record<string, string> = {
   buy: 'var(--green)', sell: 'var(--red)', dividend: '#f59e0b', cash: '#60a5fa',
@@ -45,7 +45,7 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 function txLabel(tx: { type: string; subtype?: string | null }): string {
-  if (tx.subtype === 'DIVIDEND_REINVEST') return '배당재투자';
+  if (tx.subtype === 'DIVIDEND_REINVEST') return 'Div. Reinvest';
   return TYPE_LABELS[tx.type] || tx.type;
 }
 function txColor(tx: { type: string; subtype?: string | null }): string {
@@ -64,13 +64,13 @@ function ConfirmModal({ count, onConfirm, onCancel }: ConfirmModalProps) {
     <div className="modal-overlay" onClick={onCancel}>
       <div className="modal" style={{ maxWidth: 360, textAlign: 'center' }} onClick={e => e.stopPropagation()}>
         <div style={{ fontSize: 32, marginBottom: 12 }}>🗑️</div>
-        <h3 style={{ margin: '0 0 8px', fontSize: 16 }}>거래 {count}건 삭제</h3>
+        <h3 style={{ margin: '0 0 8px', fontSize: 16 }}>Delete {count} transaction{count !== 1 ? 's' : ''}</h3>
         <p style={{ color: 'var(--muted)', fontSize: 13, margin: '0 0 20px' }}>
-          선택한 거래 내역을 삭제합니다. 이 작업은 되돌릴 수 없습니다.
+          This will permanently delete the selected transactions.
         </p>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-          <button className="btn-secondary" onClick={onCancel}>취소</button>
-          <button className="btn-danger" onClick={onConfirm}>삭제</button>
+          <button className="btn-secondary" onClick={onCancel}>Cancel</button>
+          <button className="btn-danger" onClick={onConfirm}>Delete</button>
         </div>
       </div>
     </div>
@@ -93,13 +93,13 @@ function getPageNums(current: number, total: number): (number | null)[] {
 }
 
 const TYPE_FILTER_OPTIONS = [
-  { value: '', label: '전체 유형' },
-  { value: 'buy', label: '매수 (BUY)' },
-  { value: 'sell', label: '매도 (SELL)' },
-  { value: 'dividend', label: '배당 (DIVIDEND)' },
-  { value: 'dividend_reinvest', label: '배당재투자' },
-  { value: 'transfer_deposit', label: '입금 (DEPOSIT)' },
-  { value: 'transfer_withdraw', label: '출금 (WITHDRAW)' },
+  { value: '', label: 'All Types' },
+  { value: 'buy', label: 'Buy' },
+  { value: 'sell', label: 'Sell' },
+  { value: 'dividend', label: 'Dividend' },
+  { value: 'dividend_reinvest', label: 'Div. Reinvest' },
+  { value: 'transfer_deposit', label: 'Deposit' },
+  { value: 'transfer_withdraw', label: 'Withdraw' },
 ];
 
 export default function TransactionHistory({ transactions, currency, rates, onEdit, onDelete, onDeleteMany }: Props) {
@@ -184,14 +184,14 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
       {/* Toolbar */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
         <select value={tickerFilter} onChange={e => { setTickerFilter(e.target.value); setSelected(new Set()); }} style={{ minWidth: 130 }}>
-          <option value="">전체 종목</option>
+          <option value="">All Symbols</option>
           {tickers.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
         <select value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setSelected(new Set()); }} style={{ minWidth: 160 }}>
           {TYPE_FILTER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
         {(tickerFilter || typeFilter) && (
-          <button className="btn-secondary btn-sm" onClick={() => { setTickerFilter(''); setTypeFilter(''); setSelected(new Set()); }}>초기화</button>
+          <button className="btn-secondary btn-sm" onClick={() => { setTickerFilter(''); setTypeFilter(''); setSelected(new Set()); }}>Reset</button>
         )}
 
         <span className="muted" style={{ fontSize: 12 }}>{filtered.length}건</span>
@@ -204,14 +204,14 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
         {selectedCount > 0 && (
           <>
             <span style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>
-              {selectedCount}건 선택됨
+              {selectedCount} selected
             </span>
             <button
               className="btn-danger btn-sm"
               onClick={() => setConfirmOpen(true)}
               style={{ display: 'flex', alignItems: 'center', gap: 4 }}
             >
-              <Trash2 size={13} /> 선택 삭제
+              <Trash2 size={13} /> Delete Selected
             </button>
           </>
         )}
@@ -231,11 +231,11 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
                   style={{ cursor: 'pointer' }}
                 />
               </th>
-              <th>날짜</th><th>종목</th><th>유형</th>
-              <th style={{ textAlign: 'right' }}>수량</th>
-              <th style={{ textAlign: 'right' }}>단가</th>
-              <th style={{ textAlign: 'right' }}>총액</th>
-              <th style={{ textAlign: 'right' }}>수수료</th>
+              <th>Date</th><th>Symbol</th><th>Type</th>
+              <th style={{ textAlign: 'right' }}>Qty</th>
+              <th style={{ textAlign: 'right' }}>Price</th>
+              <th style={{ textAlign: 'right' }}>Total</th>
+              <th style={{ textAlign: 'right' }}>Fee</th>
               <th></th>
             </tr>
           </thead>
@@ -292,7 +292,7 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
           </tbody>
         </table>
         {filtered.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)' }}>거래 내역 없음</div>
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)' }}>No transactions</div>
         )}
       </div>
 
@@ -302,7 +302,7 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
           <button
             onClick={() => setPage(p => p - 1)} disabled={page === 1}
             style={{ padding: '5px 12px', background: 'var(--border)', color: page === 1 ? 'var(--muted)' : 'var(--text)', borderRadius: 4, fontSize: 12, display: 'flex', alignItems: 'center', gap: 2 }}>
-            <ChevronLeft size={12} /> 이전
+            <ChevronLeft size={12} /> Prev
           </button>
           {getPageNums(page, totalPages).map((p, i) =>
             p === null
@@ -315,7 +315,7 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
           <button
             onClick={() => setPage(p => p + 1)} disabled={page === totalPages}
             style={{ padding: '5px 12px', background: 'var(--border)', color: page === totalPages ? 'var(--muted)' : 'var(--text)', borderRadius: 4, fontSize: 12, display: 'flex', alignItems: 'center', gap: 2 }}>
-            다음 <ChevronRight size={12} />
+            Next <ChevronRight size={12} />
           </button>
         </div>
       )}
@@ -332,14 +332,14 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
         <div className="modal-overlay" onClick={() => setDrConfirmId(null)}>
           <div className="modal" style={{ maxWidth: 380, textAlign: 'center' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 28, marginBottom: 10 }}>🗑️</div>
-            <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>배당재투자 거래 삭제</h3>
+            <h3 style={{ margin: '0 0 8px', fontSize: 15 }}>Delete Dividend Reinvest</h3>
             <p style={{ color: 'var(--muted)', fontSize: 13, margin: '0 0 20px' }}>
-              이 배당재투자 매수 거래를 삭제합니다.<br />
-              연결된 배당 기록은 유지됩니다.
+              This will delete the reinvestment trade.<br />
+              The linked dividend record will be kept.
             </p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-              <button className="btn-secondary" onClick={() => setDrConfirmId(null)}>취소</button>
-              <button className="btn-danger" onClick={handleDrConfirmDelete}>삭제</button>
+              <button className="btn-secondary" onClick={() => setDrConfirmId(null)}>Cancel</button>
+              <button className="btn-danger" onClick={handleDrConfirmDelete}>Delete</button>
             </div>
           </div>
         </div>

@@ -21,26 +21,26 @@ export default function AccountSettingsModal({ accounts, onClose, onAddAccount, 
   const handleAdd = async () => {
     if (!newName.trim()) return;
     try { await onAddAccount(newName.trim()); setNewName(''); setError(''); }
-    catch { setError('이미 존재하는 계좌명입니다.'); }
+    catch { setError('Account name already exists.'); }
   };
 
   const handleRename = async (id: number) => {
     if (!editName.trim()) return;
     try { await onRename(id, editName.trim()); setEditingId(null); setError(''); }
-    catch { setError('이미 존재하는 계좌명입니다.'); }
+    catch { setError('Account name already exists.'); }
   };
 
   const handleDelete = async (id: number, name: string) => {
-    if (!confirm(`"${name}" 계좌를 삭제하시겠습니까?`)) return;
+    if (!confirm(`Delete account "${name}"?`)) return;
     try { await onDelete(id); }
-    catch { setError('거래 내역이 있는 계좌는 삭제할 수 없습니다. Hidden으로 설정하세요.'); }
+    catch { setError('Cannot delete an account with transactions. Set it to Hidden instead.'); }
   };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>⚙️ 계좌 관리</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>⚙️ Account Management</h2>
           <button onClick={onClose} style={{ background: 'none', color: 'var(--muted)' }}><X size={18} /></button>
         </div>
 
@@ -54,7 +54,7 @@ export default function AccountSettingsModal({ accounts, onClose, onAddAccount, 
                   <input value={editName} onChange={e => setEditName(e.target.value)}
                     style={{ flex: 1 }} onKeyDown={e => e.key === 'Enter' && handleRename(acc.id)} autoFocus />
                   <button className="btn-primary btn-sm" onClick={() => handleRename(acc.id)}><Check size={14} /></button>
-                  <button className="btn-secondary btn-sm" onClick={() => setEditingId(null)}>취소</button>
+                  <button className="btn-secondary btn-sm" onClick={() => setEditingId(null)}>Cancel</button>
                 </>
               ) : (
                 <>
@@ -64,7 +64,7 @@ export default function AccountSettingsModal({ accounts, onClose, onAddAccount, 
                     onClick={() => { setEditingId(acc.id); setEditName(acc.name); }}><Edit2 size={14} /></button>
                   <button style={{ background: 'none', color: 'var(--muted)', padding: 4 }}
                     onClick={() => onToggleHidden(acc.id, !acc.hidden)}
-                    title={acc.hidden ? '표시' : '숨기기'}>
+                    title={acc.hidden ? 'Show' : 'Hide'}>
                     {acc.hidden ? <Eye size={14} /> : <EyeOff size={14} />}
                   </button>
                   <button style={{ background: 'none', color: 'var(--red)', padding: 4 }}
@@ -76,9 +76,9 @@ export default function AccountSettingsModal({ accounts, onClose, onAddAccount, 
         </div>
 
         <div style={{ display: 'flex', gap: 8 }}>
-          <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="새 계좌명"
+          <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="New account name"
             style={{ flex: 1 }} onKeyDown={e => e.key === 'Enter' && handleAdd()} />
-          <button className="btn-primary" onClick={handleAdd}>추가</button>
+          <button className="btn-primary" onClick={handleAdd}>Add</button>
         </div>
       </div>
     </div>

@@ -42,7 +42,7 @@ export default function StockPortfolio({ positions, currency, rates, onTickerCli
   const fmt = (usd: number) => formatCurrency(usd, currency, rates);
 
   if (positions.length === 0) {
-    return <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)' }}>보유 주식 없음</div>;
+    return <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)' }}>No positions</div>;
   }
 
   const totalValue = positions
@@ -101,15 +101,15 @@ export default function StockPortfolio({ positions, currency, rates, onTickerCli
       <table>
         <thead>
           <tr>
-            <th {...th('ticker', 'left')}>종목 <SortIndicator active={sortKey === 'ticker'} dir={sortDir} /></th>
-            <th {...thStatic()}>현재가</th>
-            <th {...thStatic()}>수량</th>
-            <th {...thStatic()}>평균단가</th>
-            <th {...th('value')}>평가금액 <SortIndicator active={sortKey === 'value'} dir={sortDir} /></th>
-            <th {...th('cost')}>코스트 <SortIndicator active={sortKey === 'cost'} dir={sortDir} /></th>
-            <th {...th('weight')}>비중 <SortIndicator active={sortKey === 'weight'} dir={sortDir} /></th>
-            <th {...th('return_amount')}>손익 <SortIndicator active={sortKey === 'return_amount'} dir={sortDir} /></th>
-            <th {...th('return_pct')}>수익률 <SortIndicator active={sortKey === 'return_pct'} dir={sortDir} /></th>
+            <th {...th('ticker', 'left')}>Symbol <SortIndicator active={sortKey === 'ticker'} dir={sortDir} /></th>
+            <th {...thStatic()}>Price</th>
+            <th {...thStatic()}>Shares</th>
+            <th {...thStatic()}>Avg Cost</th>
+            <th {...th('value')}>Mkt Value <SortIndicator active={sortKey === 'value'} dir={sortDir} /></th>
+            <th {...th('cost')}>Cost Basis <SortIndicator active={sortKey === 'cost'} dir={sortDir} /></th>
+            <th {...th('weight')}>Weight <SortIndicator active={sortKey === 'weight'} dir={sortDir} /></th>
+            <th {...th('return_amount')}>P&amp;L <SortIndicator active={sortKey === 'return_amount'} dir={sortDir} /></th>
+            <th {...th('return_pct')}>Return% <SortIndicator active={sortKey === 'return_pct'} dir={sortDir} /></th>
           </tr>
         </thead>
         <tbody>

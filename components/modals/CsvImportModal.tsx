@@ -47,7 +47,7 @@ export default function CsvImportModal({ accounts, onClose, onImported }: Props)
       setNeedsTicker(false);
       setPreview(data.preview);
       setTotal(data.total);
-    } catch { setError('파일 파싱 실패'); }
+    } catch { setError('Failed to parse file'); }
   };
 
   const handleFileChange = async () => {
@@ -68,22 +68,22 @@ export default function CsvImportModal({ accounts, onClose, onImported }: Props)
       const data = await res.json();
       setResult(data);
       onImported();
-    } catch { setError('임포트 실패'); }
+    } catch { setError('Import failed'); }
     finally { setImporting(false); }
   };
 
-  const typeLabel = (t: string) => ({ buy: '매수', sell: '매도', dividend: '배당', cash: '현금', skip: '건너뜀' }[t] ?? t);
+  const typeLabel = (t: string) => ({ buy: 'Buy', sell: 'Sell', dividend: 'Dividend', cash: 'Cash', skip: 'Skip' }[t] ?? t);
   const typeColor = (t: string) => ({ buy: 'var(--green)', sell: 'var(--red)', dividend: '#f59e0b', cash: '#60a5fa', skip: 'var(--muted)' }[t] ?? 'var(--muted)');
 
   const importable = preview?.filter(r => !r.skip && !r.duplicate) ?? [];
-  const formatLabel = format === 'new' ? '일반 포맷' : format === 'robinhood' ? 'Robinhood' : '';
+  const formatLabel = format === 'new' ? 'Generic' : format === 'robinhood' ? 'Robinhood' : '';
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 900 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>CSV 임포트</h2>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>CSV Import</h2>
             {formatLabel && (
               <span style={{ fontSize: 11, background: 'var(--border)', color: 'var(--muted)', padding: '2px 8px', borderRadius: 10, fontWeight: 500 }}>
                 {formatLabel}
@@ -95,7 +95,7 @@ export default function CsvImportModal({ accounts, onClose, onImported }: Props)
 
         <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <div className="form-group">
-            <label>계좌</label>
+            <label>Account</label>
             <select value={accountId} onChange={e => setAccountId(Number(e.target.value))} style={{ minWidth: 160 }}>
               {accounts.filter(a => !a.hidden).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
@@ -111,7 +111,7 @@ export default function CsvImportModal({ accounts, onClose, onImported }: Props)
           {needsTicker && (
             <>
               <div className="form-group">
-                <label>종목 코드</label>
+                <label>Symbol</label>
                 <input
                   type="text"
                   value={ticker}
@@ -129,7 +129,7 @@ export default function CsvImportModal({ accounts, onClose, onImported }: Props)
                   disabled={!ticker}
                   style={{ padding: '7px 14px' }}
                 >
-                  미리보기
+                  Preview
                 </button>
               </div>
             </>
@@ -138,7 +138,7 @@ export default function CsvImportModal({ accounts, onClose, onImported }: Props)
 
         {needsTicker && !ticker && (
           <div style={{ color: '#f59e0b', marginBottom: 12, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <AlertCircle size={14} /> 이 포맷은 종목 정보가 없습니다. 종목 코드를 입력 후 미리보기를 클릭하세요.
+            <AlertCircle size={14} /> This format has no symbol info. Enter a symbol and click Preview.
           </div>
         )}
 
@@ -150,24 +150,24 @@ export default function CsvImportModal({ accounts, onClose, onImported }: Props)
 
         {result && (
           <div style={{ color: 'var(--green)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <CheckCircle size={15} /> {result.imported}건 임포트 완료
+            <CheckCircle size={15} /> {result.imported} records imported
           </div>
         )}
 
         {preview && !result && (
           <>
             <div style={{ marginBottom: 12, color: 'var(--muted)', fontSize: 13 }}>
-              총 {total}건 · 임포트 대상 {importable.length}건 · 중복 {preview.filter(r => r.duplicate).length}건 · 건너뜀 {preview.filter(r => r.skip).length}건
+              Total: {total} · Import: {importable.length} · Duplicate: {preview.filter(r => r.duplicate).length} · Skipped: {preview.filter(r => r.skip).length}
             </div>
             <div style={{ maxHeight: 340, overflowY: 'auto', marginBottom: 16, border: '1px solid var(--border)', borderRadius: 8 }}>
               <table>
                 <thead>
                   <tr>
-                    <th>날짜</th><th>종목</th><th>유형</th>
-                    <th style={{ textAlign: 'right' }}>수량</th>
-                    <th style={{ textAlign: 'right' }}>단가</th>
-                    <th style={{ textAlign: 'right' }}>수수료</th>
-                    <th>메모</th><th>상태</th>
+                    <th>Date</th><th>Symbol</th><th>Type</th>
+                    <th style={{ textAlign: 'right' }}>Qty</th>
+                    <th style={{ textAlign: 'right' }}>Price</th>
+                    <th style={{ textAlign: 'right' }}>Fee</th>
+                    <th>Notes</th><th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -181,8 +181,8 @@ export default function CsvImportModal({ accounts, onClose, onImported }: Props)
                       <td style={{ textAlign: 'right' }}>{r.fee > 0 ? `$${r.fee.toFixed(2)}` : '-'}</td>
                       <td style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--muted)', fontSize: 12 }}>{r.notes}</td>
                       <td>
-                        {r.duplicate && <span style={{ fontSize: 11, color: '#f59e0b' }}>중복</span>}
-                        {r.skip && <span style={{ fontSize: 11, color: 'var(--muted)' }}>건너뜀</span>}
+                        {r.duplicate && <span style={{ fontSize: 11, color: '#f59e0b' }}>Duplicate</span>}
+                        {r.skip && <span style={{ fontSize: 11, color: 'var(--muted)' }}>Skipped</span>}
                         {!r.duplicate && !r.skip && <span style={{ fontSize: 11, color: 'var(--green)' }}>✓</span>}
                       </td>
                     </tr>
@@ -191,9 +191,9 @@ export default function CsvImportModal({ accounts, onClose, onImported }: Props)
               </table>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-              <button className="btn-secondary" onClick={onClose}>취소</button>
+              <button className="btn-secondary" onClick={onClose}>Cancel</button>
               <button className="btn-primary" onClick={handleImport} disabled={importing || importable.length === 0}>
-                {importing ? '임포트 중...' : `${importable.length}건 임포트`}
+                {importing ? 'Importing...' : `Import ${importable.length}`}
               </button>
             </div>
           </>

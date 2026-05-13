@@ -16,9 +16,9 @@ interface Props {
 }
 
 const TX_TYPES = [
-  { value: 'buy', label: '주식매수' },
-  { value: 'sell', label: '주식매도' },
-  { value: 'dividend', label: '배당' },
+  { value: 'buy', label: 'Buy' },
+  { value: 'sell', label: 'Sell' },
+  { value: 'dividend', label: 'Dividend' },
   { value: 'transfer', label: 'Transfer' },
 ];
 
@@ -86,7 +86,7 @@ function TaxLotPanel({ ticker, accountId, sellQty, sellPrice, method, onMethodCh
 
   if (!ticker) return null;
   if (lots.length === 0) return (
-    <div style={{ fontSize:12, color:'var(--muted)', marginTop:10 }}>보유 로트 없음</div>
+    <div style={{ fontSize:12, color:'var(--muted)', marginTop:10 }}>No lots found</div>
   );
 
   return (
@@ -105,15 +105,15 @@ function TaxLotPanel({ ticker, accountId, sellQty, sellPrice, method, onMethodCh
 
       {/* Summary */}
       <div style={{ display:'flex', gap:16, flexWrap:'wrap', marginBottom: method==='specific' ? 10 : 0 }}>
-        <span style={{ fontSize:12, color:'var(--muted)' }}>전체 평단: <strong style={{ color:'var(--text)' }}>{fmtAmt(avgCostAll)}</strong></span>
+        <span style={{ fontSize:12, color:'var(--muted)' }}>Avg Cost All: <strong style={{ color:'var(--text)' }}>{fmtAmt(avgCostAll)}</strong></span>
         {activeCps > 0 && method !== 'specific' && (
-          <span style={{ fontSize:12, color:'var(--muted)' }}>선택 원가: <strong style={{ color:'var(--text)' }}>{fmtAmt(activeCps)}/주</strong></span>
+          <span style={{ fontSize:12, color:'var(--muted)' }}>Selected Cost: <strong style={{ color:'var(--text)' }}>{fmtAmt(activeCps)}/sh</strong></span>
         )}
         {method==='specific' && specificQty>0 && (
-          <span style={{ fontSize:12, color:'var(--muted)' }}>선택 원가: <strong style={{ color:'var(--text)' }}>{fmtAmt(activeCps)}/주</strong></span>
+          <span style={{ fontSize:12, color:'var(--muted)' }}>Selected Cost: <strong style={{ color:'var(--text)' }}>{fmtAmt(activeCps)}/sh</strong></span>
         )}
         {pnl !== null && (
-          <span style={{ fontSize:12, color:'var(--muted)' }}>예상 손익:{' '}
+          <span style={{ fontSize:12, color:'var(--muted)' }}>Est. P&amp;L:{' '}
             <strong style={{ color: pnl>=0 ? 'var(--green)' : 'var(--red)' }}>
               {pnl>=0?'+':''}{fmtAmt(pnl)}
               {activeCost>0 ? ` (${((pnl/activeCost)*100).toFixed(1)}%)` : ''}
@@ -145,8 +145,8 @@ function TaxLotPanel({ ticker, accountId, sellQty, sellPrice, method, onMethodCh
           <table style={{ width:'100%' }}>
             <thead>
               <tr>
-                {['매입일','단가','잔여','매도수량','원가'].map(h => (
-                  <th key={h} style={{ fontSize:11, color:'var(--muted)', padding:'4px 6px', borderBottom:'1px solid var(--border)', textAlign: h==='매입일' ? 'left' : 'right' }}>{h}</th>
+                {['Date','Price','Remaining','Sell Qty','Cost'].map(h => (
+                  <th key={h} style={{ fontSize:11, color:'var(--muted)', padding:'4px 6px', borderBottom:'1px solid var(--border)', textAlign: h==='Date' ? 'left' : 'right' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -174,10 +174,10 @@ function TaxLotPanel({ ticker, accountId, sellQty, sellPrice, method, onMethodCh
           </table>
           {sellQty>0 && (
             <div style={{ textAlign:'right', fontSize:12, marginTop:6 }}>
-              선택: <strong style={{ color: specificQty===sellQty?'var(--green)':specificQty>sellQty?'var(--red)':'var(--text)' }}>
+              Selected: <strong style={{ color: specificQty===sellQty?'var(--green)':specificQty>sellQty?'var(--red)':'var(--text)' }}>
                 {specificQty}
-              </strong> / {sellQty}주
-              {specificQty>sellQty && <span style={{ color:'var(--red)', marginLeft:6 }}>초과</span>}
+              </strong> / {sellQty} sh
+              {specificQty>sellQty && <span style={{ color:'var(--red)', marginLeft:6 }}>Exceeded</span>}
             </div>
           )}
         </>
@@ -307,12 +307,12 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
     return (
       <div className="modal-overlay" onClick={onClose}>
         <div className="modal" style={{ maxWidth: 400, textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-          <h3 style={{ margin: '0 0 10px', fontSize: 16 }}>수정 불가</h3>
+          <h3 style={{ margin: '0 0 10px', fontSize: 16 }}>Not Editable</h3>
           <p style={{ color: 'var(--muted)', fontSize: 13, margin: '0 0 20px' }}>
-            배당 및 배당재투자 거래는 직접 수정할 수 없습니다.<br />
-            삭제 후 재입력해 주세요.
+            Dividend and dividend reinvest trades cannot be edited directly.<br />
+            Please delete and re-enter.
           </p>
-          <button className="btn-secondary" onClick={onClose}>닫기</button>
+          <button className="btn-secondary" onClick={onClose}>Close</button>
         </div>
       </div>
     );
@@ -325,7 +325,7 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
           {/* Header */}
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
             <h2 style={{ margin:0, fontSize:17, fontWeight:700 }}>
-              {isEditing ? `거래 수정 #${editingTx!.id}` : '거래 입력'}
+              {isEditing ? `Edit Trade #${editingTx!.id}` : 'Add Trade'}
             </h2>
             <button type="button" onClick={onClose} style={{ background:'none', color:'var(--muted)', padding:4 }}>
               <X size={18} />
@@ -336,7 +336,7 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
           <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
             {/* Type selector */}
             <div className="form-group">
-              <label>거래유형</label>
+              <label>Type</label>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                 {TX_TYPES.map(t => (
                   <button key={t.value} type="button"
@@ -353,14 +353,14 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
             {/* Row: Account + Ticker */}
             <div className="form-row">
               <div className="form-group" style={{ flex:1 }}>
-                <label>계좌</label>
+                <label>Account</label>
                 <select value={accountId} onChange={e => setAccountId(Number(e.target.value))} style={{ width:'100%' }}>
                   {visible.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                 </select>
               </div>
               {type !== 'transfer' && (
                 <div className="form-group" style={{ flex:1 }}>
-                  <label>종목</label>
+                  <label>Symbol</label>
                   <input value={ticker} onChange={e => !prefillTicker && setTicker(e.target.value.toUpperCase())}
                     placeholder="AAPL" style={{ width:'100%', opacity: prefillTicker ? 0.7 : 1 }}
                     readOnly={!!prefillTicker} required />
@@ -371,42 +371,42 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
             {/* Row: Date + Qty + Price + Fee */}
             <div className="form-row">
               <div className="form-group">
-                <label>날짜</label>
+                <label>Date</label>
                 <DatePickerInput
                   value={date}
-                  onChange={val => { setDate(val); setDateError(isValidDate(val) ? '' : '날짜 형식: MM/DD/YYYY'); }}
+                  onChange={val => { setDate(val); setDateError(isValidDate(val) ? '' : 'Format: MM/DD/YYYY'); }}
                   error={dateError}
                 />
               </div>
 
               {type === 'transfer' && (
                 <div className="form-group">
-                  <label>유형</label>
+                  <label>Direction</label>
                   <select value={transferDir} onChange={e => setTransferDir(e.target.value as 'DEPOSIT' | 'WITHDRAW')}
                     style={{ width: 160 }}>
-                    <option value="DEPOSIT">입금 (Deposit)</option>
-                    <option value="WITHDRAW">출금 (Withdraw)</option>
+                    <option value="DEPOSIT">Deposit</option>
+                    <option value="WITHDRAW">Withdraw</option>
                   </select>
                 </div>
               )}
 
               {type !== 'transfer' && type !== 'dividend' && (
                 <div className="form-group">
-                  <label>수량</label>
+                  <label>Shares</label>
                   <input value={qty} onChange={e => setQty(e.target.value)}
                     type="number" step="any" min="0" placeholder="0" style={{ width:90 }} />
                 </div>
               )}
 
               <div className="form-group">
-                <label>{type==='transfer'?`금액 (${sym})`:type==='dividend'?`배당금 (${sym})`:`단가 (${sym})`}</label>
+                <label>{type==='transfer'?`Amount (${sym})`:type==='dividend'?`Dividend (${sym})`:`Price (${sym})`}</label>
                 <input value={price} onChange={e => setPrice(formatPriceInput(e.target.value))}
                   type="text" inputMode="decimal" placeholder="0.00" style={{ width:110 }} required />
               </div>
 
               {type !== 'transfer' && (
                 <div className="form-group">
-                  <label>수수료 ({sym})</label>
+                  <label>Fee ({sym})</label>
                   <input value={fee} onChange={e => setFee(formatPriceInput(e.target.value))}
                     type="text" inputMode="decimal" placeholder="0" style={{ width:90 }} />
                 </div>
@@ -429,17 +429,17 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
               <div style={{ padding:12, background:'rgba(99,102,241,0.08)', borderRadius:8, border:'1px solid rgba(99,102,241,0.2)' }}>
                 <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer' }}>
                   <input type="checkbox" checked={reinvest} onChange={e => setReinvest(e.target.checked)} />
-                  <span style={{ fontSize:13, fontWeight:500 }}>배당 재투자</span>
+                  <span style={{ fontSize:13, fontWeight:500 }}>Reinvest Dividend</span>
                 </label>
                 {reinvest && (
                   <div className="form-row" style={{ marginTop:10 }}>
                     <div className="form-group">
-                      <label>재투자 수량</label>
+                      <label>Reinvest Shares</label>
                       <input value={reinvestQty} onChange={e => setReinvestQty(e.target.value)}
                         type="number" step="any" min="0" placeholder="0" style={{ width:90 }} required />
                     </div>
                     <div className="form-group">
-                      <label>재투자 단가 ({sym})</label>
+                      <label>Reinvest Price ({sym})</label>
                       <input value={reinvestPrice} onChange={e => setReinvestPrice(formatPriceInput(e.target.value))}
                         type="text" inputMode="decimal" placeholder="0.00" style={{ width:110 }} required />
                     </div>
@@ -451,9 +451,9 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
 
           {/* Footer */}
           <div style={{ display:'flex', justifyContent:'flex-end', gap:10, marginTop:24, paddingTop:16, borderTop:'1px solid var(--border)' }}>
-            <button type="button" className="btn-secondary" onClick={onClose}>취소</button>
+            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn-primary" disabled={loading} style={{ minWidth:90 }}>
-              {loading ? '처리중...' : isEditing ? '업데이트' : '저장'}
+              {loading ? 'Saving...' : isEditing ? 'Update' : 'Save'}
             </button>
           </div>
         </form>

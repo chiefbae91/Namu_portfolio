@@ -9,21 +9,21 @@ type Period = '5d' | '1mo' | '3mo' | '6mo' | '1y';
 type Interval = '1m' | '15m' | '1d' | '1wk';
 
 const PERIODS: { value: Period; label: string }[] = [
-  { value: '5d', label: '5일' },
-  { value: '1mo', label: '1개월' },
-  { value: '3mo', label: '3개월' },
-  { value: '6mo', label: '6개월' },
-  { value: '1y', label: '1년' },
+  { value: '5d', label: '5D' },
+  { value: '1mo', label: '1M' },
+  { value: '3mo', label: '3M' },
+  { value: '6mo', label: '6M' },
+  { value: '1y', label: '1Y' },
 ];
 
 const INTERVALS: { value: Interval; label: string }[] = [
-  { value: '1m', label: '1분' },
-  { value: '15m', label: '15분' },
-  { value: '1d', label: '일봉' },
-  { value: '1wk', label: '주봉' },
+  { value: '1m', label: '1m' },
+  { value: '15m', label: '15m' },
+  { value: '1d', label: 'Daily' },
+  { value: '1wk', label: 'Weekly' },
 ];
 
-const TYPE_LABELS: Record<string, string> = { buy: '매수', sell: '매도', dividend: '배당' };
+const TYPE_LABELS: Record<string, string> = { buy: 'Buy', sell: 'Sell', dividend: 'Dividend' };
 const TYPE_COLORS: Record<string, string> = { buy: '#00e676', sell: '#ff5252', dividend: '#f59e0b' };
 
 const PAGE_SIZE = 10;
@@ -116,7 +116,7 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
           <div>
             <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>{ticker}</h2>
             {currentPrice > 0 && (
-              <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 2 }}>현재가 {fmt(currentPrice)}</div>
+              <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 2 }}>Price: {fmt(currentPrice)}</div>
             )}
 
             {/* Per-account holdings */}
@@ -127,7 +127,7 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
                     <span style={{ minWidth: 90, fontWeight: 500, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 130 }}>
                       {h.account_name}
                     </span>
-                    <span style={{ color: 'var(--muted)' }}>{h.quantity.toLocaleString('en-US')}주</span>
+                    <span style={{ color: 'var(--muted)' }}>{h.quantity.toLocaleString('en-US')} sh</span>
                     <span style={{ color: '#64748b' }}>@ {fmt(h.avg_cost)}</span>
                     <span style={{ color: '#64748b' }}>=</span>
                     <span style={{ fontWeight: 600, color: 'var(--text)' }}>{fmt(h.quantity * currentPrice)}</span>
@@ -135,8 +135,8 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
                 ))}
                 {holdings.length > 1 && (
                   <div style={{ display: 'flex', gap: 6, alignItems: 'baseline', borderTop: '1px solid var(--border)', paddingTop: 3, marginTop: 1 }}>
-                    <span style={{ minWidth: 90, fontWeight: 600, color: 'var(--text)' }}>합계</span>
-                    <span style={{ color: 'var(--muted)', fontWeight: 600 }}>{totalQty.toLocaleString('en-US')}주</span>
+                    <span style={{ minWidth: 90, fontWeight: 600, color: 'var(--text)' }}>Total</span>
+                    <span style={{ color: 'var(--muted)', fontWeight: 600 }}>{totalQty.toLocaleString('en-US')} sh</span>
                     <span style={{ color: '#64748b' }}></span>
                     <span style={{ color: '#64748b' }}>=</span>
                     <span style={{ fontWeight: 700, color: 'var(--text)' }}>{fmt(totalValue)}</span>
@@ -149,7 +149,7 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             <button onClick={onAddTransaction}
               style={{ background: 'var(--accent)', color: 'white', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 600, borderRadius: 6 }}>
-              <PlusCircle size={14} /> 거래 입력
+              <PlusCircle size={14} /> Add Trade
             </button>
             <button onClick={onClose} style={{ background: 'none', color: 'var(--muted)' }}><X size={20} /></button>
           </div>
@@ -173,7 +173,7 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
             ))}
           </div>
           {intervalCorrected && (
-            <span style={{ fontSize: 11, color: 'var(--muted)' }}>→ {resolvedInterval} (자동 조정)</span>
+            <span style={{ fontSize: 11, color: 'var(--muted)' }}>→ {resolvedInterval} (auto)</span>
           )}
         </div>
 
@@ -184,7 +184,7 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
         {transactions.length > 0 && (
           <div style={{ marginTop: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>거래 히스토리</h3>
+              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Trade History</h3>
               <span style={{ fontSize: 12, color: 'var(--muted)' }}>{start + 1}–{end} / {transactions.length}건</span>
             </div>
 
@@ -192,11 +192,11 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
               <table>
                 <thead>
                   <tr>
-                    <th>날짜</th><th>계좌</th><th>종목</th><th>유형</th>
-                    <th style={{ textAlign: 'right' }}>수량</th>
-                    <th style={{ textAlign: 'right' }}>단가</th>
-                    <th style={{ textAlign: 'right' }}>총액</th>
-                    <th style={{ textAlign: 'right' }}>수수료</th>
+                    <th>Date</th><th>Account</th><th>Symbol</th><th>Type</th>
+                    <th style={{ textAlign: 'right' }}>Qty</th>
+                    <th style={{ textAlign: 'right' }}>Price</th>
+                    <th style={{ textAlign: 'right' }}>Total</th>
+                    <th style={{ textAlign: 'right' }}>Fee</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -227,7 +227,7 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 12 }}>
                 <button onClick={() => setPage(p => p - 1)} disabled={page === 1}
                   style={{ padding: '4px 10px', background: 'var(--border)', color: page === 1 ? 'var(--muted)' : 'var(--text)', borderRadius: 4, fontSize: 12, display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <ChevronLeft size={12} /> 이전
+                  <ChevronLeft size={12} /> Prev
                 </button>
                 {getPageNums(page, totalPages).map((p, i) =>
                   p === null
@@ -239,7 +239,7 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
                 )}
                 <button onClick={() => setPage(p => p + 1)} disabled={page === totalPages}
                   style={{ padding: '4px 10px', background: 'var(--border)', color: page === totalPages ? 'var(--muted)' : 'var(--text)', borderRadius: 4, fontSize: 12, display: 'flex', alignItems: 'center', gap: 2 }}>
-                  다음 <ChevronRight size={12} />
+                  Next <ChevronRight size={12} />
                 </button>
               </div>
             )}

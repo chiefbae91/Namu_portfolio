@@ -43,7 +43,7 @@ function SummaryCard({ label, total, accounts, krwRate, eurRate, showKrw, showEu
 
       {/* USD total */}
       <div style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1.2, marginBottom: hasExtra ? 3 : 12 }}>
-        {loading ? <span style={{ fontSize: 14, color: 'var(--muted)' }}>로딩중...</span> : fmtUSD(total)}
+        {loading ? <span style={{ fontSize: 14, color: 'var(--muted)' }}>Loading...</span> : fmtUSD(total)}
       </div>
 
       {/* KRW total */}
@@ -96,19 +96,19 @@ function SummaryCard({ label, total, accounts, krwRate, eurRate, showKrw, showEu
 export default function SummaryCards({ cash, stockValue, accountBreakdown, krwRate, eurRate, showKrw, showEur, loading }: Props) {
   const cards = [
     {
-      label: '현금',
+      label: 'Cash',
       total: cash,
       accounts: accountBreakdown.map(a => ({ name: a.account_name, value: a.cash })),
       color: '#60a5fa',
     },
     {
-      label: '평가금액',
+      label: 'Market Value',
       total: stockValue,
       accounts: accountBreakdown.map(a => ({ name: a.account_name, value: a.stock_value })),
       color: '#6366f1',
     },
     {
-      label: '총자산',
+      label: 'Total Assets',
       total: cash + stockValue,
       accounts: accountBreakdown.map(a => ({ name: a.account_name, value: a.cash + a.stock_value })),
       color: '#e2e8f0',

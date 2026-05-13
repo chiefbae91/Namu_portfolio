@@ -210,12 +210,12 @@ export default function Home() {
         <h1 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--accent)', marginRight: 8 }}>Namu Portfolio</h1>
 
         <select value={selectedAccountId} onChange={e => setSelectedAccountId(e.target.value)} style={{ minWidth: 140 }}>
-          <option value="all">전체 계좌</option>
+          <option value="all">All Accounts</option>
           {visibleAccounts.map(a => <option key={a.id} value={String(a.id)}>{a.name}</option>)}
         </select>
         <button onClick={() => setAccountSettingsOpen(true)}
           style={{ background: 'var(--border)', color: 'var(--muted)', padding: '6px 10px' }}
-          title="계좌 관리"><Settings size={15} /></button>
+          title="Manage Accounts"><Settings size={15} /></button>
 
         <div style={{ flex: 1 }} />
 
@@ -247,7 +247,7 @@ export default function Home() {
           )}
           <button
             onClick={fetchRates}
-            title="환율 새로고침"
+            title="Refresh Rates"
             style={{ background: 'none', color: 'var(--muted)', padding: 2, display: 'flex', alignItems: 'center' }}
           >
             <RefreshCw size={11} style={{ animation: ratesRefreshing ? 'spin 0.6s linear infinite' : 'none' }} />
@@ -256,12 +256,12 @@ export default function Home() {
 
         <button onClick={() => { setEditingTx(null); setTxModalOpen(true); }}
           style={{ background: 'var(--accent)', color: 'white', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}>
-          <PlusCircle size={15} /> 거래 입력
+          <PlusCircle size={15} /> Add Trade
         </button>
 
         <button onClick={() => setCsvImportOpen(true)}
           style={{ background: 'var(--border)', color: 'var(--muted)', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
-          <FileUp size={14} /> CSV 임포트
+          <FileUp size={14} /> CSV Import
         </button>
       </div>
 
