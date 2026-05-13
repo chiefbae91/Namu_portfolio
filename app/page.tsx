@@ -102,7 +102,7 @@ export default function Home() {
 
   // Auto-refresh rates every 10 seconds
   useEffect(() => {
-    const id = setInterval(fetchRates, 10_000);
+    const id = setInterval(fetchRates, 300_000);
     return () => clearInterval(id);
   }, [fetchRates]);
   useEffect(() => { fetchPortfolio(); fetchTransactions(); }, [selectedAccountId]);
