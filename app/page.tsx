@@ -1,14 +1,14 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { Settings, FileUp, PlusCircle } from 'lucide-react';
-import { Account, Currency, ExchangeRates, PortfolioPosition, SummaryData, Transaction } from '@/lib/types';
-import { formatCurrency } from '@/lib/format';
+import { Account, AccountBreakdown, Currency, ExchangeRates, PortfolioPosition, SummaryData, Transaction } from '@/lib/types';
 import StockPortfolio from '@/components/tabs/StockPortfolio';
 import TransactionHistory from '@/components/tabs/TransactionHistory';
 import TransactionModal from '@/components/modals/TransactionModal';
 import AccountSettingsModal from '@/components/modals/AccountSettingsModal';
 import TradeAnalysisModal from '@/components/modals/TradeAnalysisModal';
 import CsvImportModal from '@/components/modals/CsvImportModal';
+import SummaryCards from '@/components/SummaryCards';
 
 const TRANSFER_OFFSET = 1_000_000;
 
@@ -21,6 +21,7 @@ export default function Home() {
   const [positions, setPositions] = useState<PortfolioPosition[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [summary, setSummary] = useState<SummaryData>({ cash: 0, stock: 0, options_pnl: 0, total: 0 });
+  const [accountBreakdown, setAccountBreakdown] = useState<AccountBreakdown[]>([]);
   const [txModalOpen, setTxModalOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [analysisTicker, setAnalysisTicker] = useState<string | null>(null);
@@ -54,6 +55,7 @@ export default function Home() {
       const stock = data.stock_value ?? 0;
       const cash = data.cash ?? 0;
       setSummary({ cash, stock, options_pnl: 0, total: cash + stock });
+      setAccountBreakdown(data.account_breakdown || []);
     } catch (err) {
       console.error('fetchPortfolio failed:', err);
     } finally { setPortfolioLoading(false); }
@@ -178,7 +180,6 @@ export default function Home() {
   };
 
   const visibleAccounts = accounts.filter(a => !a.hidden);
-  const fmt = (usd: number) => formatCurrency(usd, currency, rates);
 
   return (
     <div style={{ minHeight: '100vh', padding: '0 0 40px' }}>
@@ -223,20 +224,13 @@ export default function Home() {
 
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: '20px 20px 0' }}>
         {/* Summary Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
-          {[
-            { label: '현금', value: summary.cash, color: '#60a5fa' },
-            { label: '주식 평가금액', value: summary.stock, color: 'var(--accent)', loading: portfolioLoading },
-            { label: '총자산', value: summary.cash + summary.stock, color: '#e2e8f0' },
-          ].map(card => (
-            <div key={card.label} className="card" style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>{card.label}</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: card.color }}>
-                {card.loading ? <span style={{ fontSize: 14, color: 'var(--muted)' }}>로딩중...</span> : fmt(card.value)}
-              </div>
-            </div>
-          ))}
-        </div>
+        <SummaryCards
+          cash={summary.cash}
+          stockValue={summary.stock}
+          accountBreakdown={accountBreakdown}
+          krwRate={rates.KRW}
+          loading={portfolioLoading}
+        />
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>

@@ -90,6 +90,13 @@ export interface SummaryData {
   total: number;
 }
 
+export interface AccountBreakdown {
+  account_id: number;
+  account_name: string;
+  cash: number;
+  stock_value: number;
+}
+
 export interface CsvPreviewRow {
   date: string;
   ticker: string;

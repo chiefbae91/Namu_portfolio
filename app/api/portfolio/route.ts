@@ -148,9 +148,56 @@ export async function GET(req: NextRequest) {
     else if (cf.type === 'WITHDRAW') cash -= cf.amount;
   }
 
+  // ── Per-account breakdown ─────────────────────────────────────────
+  const visAccounts = db.prepare(
+    `SELECT id, name FROM accounts WHERE hidden = 0${accFilter ? ' AND id = ?' : ''} ORDER BY name`
+  ).all(...(accFilter ? [accFilter] : [])) as any[];
+
+  // Per-account tx cash
+  const accTxRows = db.prepare(`
+    SELECT t.account_id,
+      SUM(CASE
+        WHEN t.type = 'sell'     THEN t.quantity * t.price - t.fee
+        WHEN t.type = 'buy'      THEN -(t.quantity * t.price + t.fee)
+        WHEN t.type = 'dividend' THEN t.quantity * t.price
+        WHEN t.type = 'cash'     THEN t.price
+        ELSE 0 END) AS tx_cash
+    FROM transactions t JOIN accounts a ON t.account_id = a.id
+    WHERE a.hidden = 0 ${accWhere}
+    GROUP BY t.account_id
+  `).all(...accArgs) as any[];
+
+  const accCfRows = db.prepare(`
+    SELECT cf.account_id,
+      SUM(CASE WHEN cf.type = 'DEPOSIT' THEN cf.amount ELSE -cf.amount END) AS flow
+    FROM cash_flow cf JOIN accounts a ON cf.account_id = a.id
+    WHERE a.hidden = 0 ${cfWhere}
+    GROUP BY cf.account_id
+  `).all(...accArgs) as any[];
+
+  // Per-account stock value from remaining lots × current prices
+  const accStockMap: Record<number, number> = {};
+  for (const lot of lots) {
+    if (lot.remaining < 0.00001) continue;
+    if (!accStockMap[lot.account_id]) accStockMap[lot.account_id] = 0;
+    accStockMap[lot.account_id] += lot.remaining * (priceMap[lot.ticker] || 0);
+  }
+
+  const accCashMap: Record<number, number> = {};
+  for (const row of accTxRows) accCashMap[row.account_id] = row.tx_cash || 0;
+  for (const row of accCfRows) accCashMap[row.account_id] = (accCashMap[row.account_id] || 0) + (row.flow || 0);
+
+  const account_breakdown = visAccounts.map((acc: any) => ({
+    account_id: acc.id,
+    account_name: acc.name,
+    cash: Math.round((accCashMap[acc.id] || 0) * 100) / 100,
+    stock_value: Math.round((accStockMap[acc.id] || 0) * 100) / 100,
+  }));
+
   return NextResponse.json({
     positions,
     cash,
     stock_value: positions.reduce((s, p) => s + p.value, 0),
+    account_breakdown,
   });
 }
