@@ -18,7 +18,7 @@ function PriceChange({ current, prev }: { current: number; prev: number }) {
     return <div style={{ fontSize: 11, color: '#666' }}>→ 0.00 (0.00%)</div>;
   }
   const up = diff > 0;
-  const color = up ? '#ff5252' : '#40c4ff';
+  const color = up ? '#00e676' : '#ff5252';
   const arrow = up ? '▲' : '▼';
   const sign = up ? '+' : '';
   return (
