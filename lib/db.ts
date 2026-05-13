@@ -92,6 +92,8 @@ function initSchema(db: Database.Database) {
     "ALTER TABLE transactions ADD COLUMN lot_method TEXT DEFAULT 'average_cost'",
     "ALTER TABLE accounts ADD COLUMN hidden INTEGER DEFAULT 0",
     "ALTER TABLE accounts ADD COLUMN currency TEXT DEFAULT 'USD'",
+    "ALTER TABLE transactions ADD COLUMN dividend_id INTEGER DEFAULT NULL",
+    "ALTER TABLE transactions ADD COLUMN subtype TEXT DEFAULT NULL",
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* already exists */ }

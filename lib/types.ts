@@ -47,6 +47,12 @@ export interface Transaction {
   fee: number;
   currency: string;
   notes?: string;
+  subtype?: string | null;
+  dividend_id?: number | null;
+  // populated only on dividend rows that have a linked reinvest
+  reinvest_id?: number | null;
+  reinvest_qty?: number | null;
+  reinvest_price?: number | null;
 }
 
 export interface PortfolioPosition {

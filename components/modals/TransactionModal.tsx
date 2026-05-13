@@ -220,6 +220,16 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
       setPrice(editingTx.price > 0 ? formatPriceInput(String(editingTx.price)) : '');
       setFee(editingTx.fee > 0 ? formatPriceInput(String(editingTx.fee)) : '');
       setNotes(editingTx.notes || '');
+      // Pre-populate reinvest if this dividend has a linked reinvest record
+      if (editingTx.type === 'dividend' && editingTx.reinvest_id) {
+        setReinvest(true);
+        setReinvestQty(editingTx.reinvest_qty ? String(editingTx.reinvest_qty) : '');
+        setReinvestPrice(editingTx.reinvest_price ? formatPriceInput(String(editingTx.reinvest_price)) : '');
+      } else {
+        setReinvest(false);
+        setReinvestQty('');
+        setReinvestPrice('');
+      }
     } else {
       setType('buy'); setTicker(prefillTicker ?? ''); setDate(todayStr());
       setQty(''); setPrice(''); setFee(''); setNotes('');
@@ -283,6 +293,7 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
           reinvest: type==='dividend' ? reinvest : false,
           reinvest_qty: reinvest ? parseFloat(reinvestQty||'0') : 0,
           reinvest_price: reinvest ? parsePriceInput(reinvestPrice) : 0,
+          reinvest_id: isEditing && type==='dividend' ? (editingTx?.reinvest_id ?? null) : undefined,
         });
       }
       onClose();

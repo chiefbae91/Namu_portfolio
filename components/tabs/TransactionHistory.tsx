@@ -44,6 +44,15 @@ const TYPE_COLORS: Record<string, string> = {
   transfer_deposit: '#34d399', transfer_withdraw: '#f87171',
 };
 
+function txLabel(tx: { type: string; subtype?: string | null }): string {
+  if (tx.subtype === 'DIVIDEND_REINVEST') return '배당재투자';
+  return TYPE_LABELS[tx.type] || tx.type;
+}
+function txColor(tx: { type: string; subtype?: string | null }): string {
+  if (tx.subtype === 'DIVIDEND_REINVEST') return '#34d399';
+  return TYPE_COLORS[tx.type] || 'var(--muted)';
+}
+
 interface ConfirmModalProps {
   count: number;
   onConfirm: () => void;
@@ -88,6 +97,7 @@ const TYPE_FILTER_OPTIONS = [
   { value: 'buy', label: '매수 (BUY)' },
   { value: 'sell', label: '매도 (SELL)' },
   { value: 'dividend', label: '배당 (DIVIDEND)' },
+  { value: 'dividend_reinvest', label: '배당재투자' },
   { value: 'transfer_deposit', label: '입금 (DEPOSIT)' },
   { value: 'transfer_withdraw', label: '출금 (WITHDRAW)' },
 ];
@@ -116,7 +126,12 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
   const tickers = [...new Set(transactions.map(t => t.ticker).filter(Boolean))].sort();
   const filtered = transactions
     .filter(t => !tickerFilter || t.ticker === tickerFilter)
-    .filter(t => !typeFilter || t.type === typeFilter);
+    .filter(t => {
+      if (!typeFilter) return true;
+      if (typeFilter === 'dividend_reinvest') return t.subtype === 'DIVIDEND_REINVEST';
+      if (typeFilter === 'buy') return t.type === 'buy' && t.subtype !== 'DIVIDEND_REINVEST';
+      return t.type === typeFilter;
+    });
   const filteredIds = filtered.map(t => t.id);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -244,8 +259,8 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
                     </div>
                   </td>
                   <td>
-                    <span style={{ color: TYPE_COLORS[tx.type] || 'var(--muted)', fontWeight: 500 }}>
-                      {TYPE_LABELS[tx.type] || tx.type}
+                    <span style={{ color: txColor(tx), fontWeight: 500 }}>
+                      {txLabel(tx)}
                     </span>
                   </td>
                   <td style={{ textAlign: 'right' }}>{tx.quantity > 0 ? tx.quantity : '-'}</td>
@@ -253,7 +268,7 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
                   <td style={{ textAlign: 'right' }}>{fmt(total)}</td>
                   <td style={{ textAlign: 'right' }} className="muted">{tx.fee > 0 ? fmt(tx.fee) : '-'}</td>
                   <td style={{ display: 'flex', gap: 6 }}>
-                    {tx.type !== 'transfer_deposit' && tx.type !== 'transfer_withdraw' && (
+                    {tx.type !== 'transfer_deposit' && tx.type !== 'transfer_withdraw' && tx.subtype !== 'DIVIDEND_REINVEST' && (
                       <button style={{ background: 'none', color: 'var(--accent)', padding: 4 }}
                         onClick={() => onEdit(tx)} title="수정"><Pencil size={13} /></button>
                     )}

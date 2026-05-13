@@ -8,9 +8,11 @@ export async function GET(req: NextRequest) {
   const ticker = searchParams.get('ticker');
 
   let sql = `
-    SELECT t.*, a.name as account_name
+    SELECT t.*, a.name as account_name,
+      ri.id as reinvest_id, ri.quantity as reinvest_qty, ri.price as reinvest_price
     FROM transactions t
     JOIN accounts a ON t.account_id = a.id
+    LEFT JOIN transactions ri ON ri.dividend_id = t.id AND ri.subtype = 'DIVIDEND_REINVEST'
     WHERE a.hidden = 0
   `;
   const args: any[] = [];
@@ -41,8 +43,8 @@ export async function POST(req: NextRequest) {
   }
 
   const insertTx = db.prepare(`
-    INSERT INTO transactions (account_id, date, ticker, type, quantity, price, fee, currency, notes, lot_method)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO transactions (account_id, date, ticker, type, quantity, price, fee, currency, notes, lot_method, subtype, dividend_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const insertLotAssignment = db.prepare(`
@@ -56,7 +58,8 @@ export async function POST(req: NextRequest) {
       account_id, date, ticker || '', type,
       quantity || 0, price || 0, fee || 0,
       currency || 'USD', notes || '',
-      type === 'sell' ? (lot_method || 'average_cost') : null
+      type === 'sell' ? (lot_method || 'average_cost') : null,
+      null, null
     );
     const newId = result.lastInsertRowid;
     created.push(db.prepare('SELECT * FROM transactions WHERE id = ?').get(newId));
@@ -70,12 +73,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Auto-create buy record for reinvested dividends
+    // Auto-create DIVIDEND_REINVEST buy record
     if (type === 'dividend' && reinvest && reinvest_qty && reinvest_price) {
       const r2 = insertTx.run(
         account_id, date, ticker || '', 'buy',
         reinvest_qty, reinvest_price, 0, currency || 'USD',
-        'Dividend reinvestment', null
+        'Dividend reinvestment', null,
+        'DIVIDEND_REINVEST', newId
       );
       created.push(db.prepare('SELECT * FROM transactions WHERE id = ?').get(r2.lastInsertRowid));
     }
