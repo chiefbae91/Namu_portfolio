@@ -194,10 +194,10 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
           <button className="btn-secondary btn-sm" onClick={() => { setTickerFilter(''); setTypeFilter(''); setSelected(new Set()); }}>Reset</button>
         )}
 
-        <span className="muted" style={{ fontSize: 12 }}>{filtered.length}건</span>
+        <span className="muted" style={{ fontSize: 12 }}>{filtered.length} records</span>
         {filtered.length > 0 && (
           <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-            {pageStart + 1}–{pageEnd} / {filtered.length}
+            {pageStart + 1}–{pageEnd} of {filtered.length}
           </span>
         )}
 
