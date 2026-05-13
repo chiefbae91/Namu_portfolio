@@ -57,8 +57,8 @@ export async function GET(req: NextRequest) {
 
     // Transactions for chart overlay and history table
     const transactions = db.prepare(`
-      SELECT t.id, t.date, t.type, t.quantity, t.price, t.fee, t.ticker,
-             a.name as account_name
+      SELECT t.id, t.date, t.type, t.subtype, t.quantity, t.price, t.fee, t.ticker,
+             t.notes, a.name as account_name
       FROM transactions t
       JOIN accounts a ON t.account_id = a.id
       WHERE t.ticker = ? AND t.type IN ('buy','sell','dividend')

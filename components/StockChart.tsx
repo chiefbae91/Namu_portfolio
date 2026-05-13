@@ -6,11 +6,13 @@ export interface TxRow {
   id: number;
   date: string;
   type: string;
+  subtype?: string | null;
   quantity: number;
   price: number;
   fee: number;
   ticker: string;
   account_name: string;
+  notes?: string | null;
 }
 
 export interface Holding {
@@ -54,7 +56,7 @@ const StockChart = memo(function StockChart({ ticker, period, interval, onLoaded
         const newTxs: TxRow[] = data.transactions ?? [];
         const ri: string = data.resolvedInterval ?? interval;
         setCandles(newCandles);
-        setChartTxs(newTxs.map(tx => ({ date: tx.date, type: tx.type, price: tx.price, quantity: tx.quantity })));
+        setChartTxs(newTxs.map(tx => ({ date: tx.date, type: tx.type, subtype: tx.subtype, price: tx.price, quantity: tx.quantity, notes: tx.notes })));
         setResolvedInterval(ri);
         onLoadedRef.current?.({ price: data.price ?? 0, transactions: newTxs, resolvedInterval: ri, holdings: data.holdings ?? [] });
       })
