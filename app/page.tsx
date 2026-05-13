@@ -291,6 +291,8 @@ export default function Home() {
       {analysisTicker && (
         <TradeAnalysisModal
           ticker={analysisTicker}
+          currency={currency}
+          rates={rates}
           onClose={() => setAnalysisTicker(null)}
           onAddTransaction={() => handleAddTransactionFromAnalysis(analysisTicker)}
         />

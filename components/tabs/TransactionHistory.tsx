@@ -1,6 +1,6 @@
 'use client';
-import { useState } from 'react';
-import { Pencil, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Pencil, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Transaction, Currency, ExchangeRates } from '@/lib/types';
 import { formatCurrency } from '@/lib/format';
 
@@ -46,16 +46,39 @@ function ConfirmModal({ count, onConfirm, onCancel }: ConfirmModalProps) {
   );
 }
 
+const PAGE_SIZE = 50;
+
+function getPageNums(current: number, total: number): (number | null)[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const result: (number | null)[] = [];
+  const left = Math.max(2, current - 1);
+  const right = Math.min(total - 1, current + 1);
+  result.push(1);
+  if (left > 2) result.push(null);
+  for (let i = left; i <= right; i++) result.push(i);
+  if (right < total - 1) result.push(null);
+  result.push(total);
+  return result;
+}
+
 export default function TransactionHistory({ transactions, currency, rates, onEdit, onDelete, onDeleteMany }: Props) {
   const [tickerFilter, setTickerFilter] = useState('');
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [page, setPage] = useState(1);
+
+  useEffect(() => { setPage(1); }, [tickerFilter]);
 
   const fmt = (usd: number) => formatCurrency(usd, currency, rates);
 
   const tickers = [...new Set(transactions.map(t => t.ticker).filter(Boolean))].sort();
   const filtered = tickerFilter ? transactions.filter(t => t.ticker === tickerFilter) : transactions;
   const filteredIds = filtered.map(t => t.id);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageStart = (page - 1) * PAGE_SIZE;
+  const pageEnd = Math.min(pageStart + PAGE_SIZE, filtered.length);
+  const paginated = filtered.slice(pageStart, pageEnd);
 
   const allChecked = filteredIds.length > 0 && filteredIds.every(id => selected.has(id));
   const someChecked = filteredIds.some(id => selected.has(id));
@@ -103,6 +126,11 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
         )}
 
         <span className="muted" style={{ fontSize: 12 }}>{filtered.length}건</span>
+        {filtered.length > 0 && (
+          <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+            {pageStart + 1}–{pageEnd} / {filtered.length}
+          </span>
+        )}
 
         {selectedCount > 0 && (
           <>
@@ -143,7 +171,7 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
             </tr>
           </thead>
           <tbody>
-            {filtered.map(tx => {
+            {paginated.map(tx => {
               const isTransfer = tx.type === 'transfer_deposit' || tx.type === 'transfer_withdraw';
               const total = (tx.type === 'cash' || isTransfer) ? tx.price : tx.quantity * tx.price;
               const isSelected = selected.has(tx.id);
@@ -181,6 +209,30 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
           <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)' }}>거래 내역 없음</div>
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 14 }}>
+          <button
+            onClick={() => setPage(p => p - 1)} disabled={page === 1}
+            style={{ padding: '5px 12px', background: 'var(--border)', color: page === 1 ? 'var(--muted)' : 'var(--text)', borderRadius: 4, fontSize: 12, display: 'flex', alignItems: 'center', gap: 2 }}>
+            <ChevronLeft size={12} /> 이전
+          </button>
+          {getPageNums(page, totalPages).map((p, i) =>
+            p === null
+              ? <span key={`e${i}`} style={{ padding: '5px 6px', color: 'var(--muted)', fontSize: 12 }}>…</span>
+              : <button key={p} onClick={() => setPage(p)}
+                  style={{ padding: '5px 12px', borderRadius: 4, fontSize: 12, fontWeight: p === page ? 700 : 400, background: p === page ? 'var(--accent)' : 'var(--border)', color: p === page ? 'white' : 'var(--text)' }}>
+                  {p}
+                </button>
+          )}
+          <button
+            onClick={() => setPage(p => p + 1)} disabled={page === totalPages}
+            style={{ padding: '5px 12px', background: 'var(--border)', color: page === totalPages ? 'var(--muted)' : 'var(--text)', borderRadius: 4, fontSize: 12, display: 'flex', alignItems: 'center', gap: 2 }}>
+            다음 <ChevronRight size={12} />
+          </button>
+        </div>
+      )}
 
       {confirmOpen && (
         <ConfirmModal

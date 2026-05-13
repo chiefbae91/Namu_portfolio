@@ -39,9 +39,12 @@ export async function GET(req: NextRequest) {
     if (from) {
       const db = getDb();
       const transactions = db.prepare(`
-        SELECT date, type, quantity, price FROM transactions
-        WHERE ticker = ? AND type IN ('buy','sell','dividend')
-        ORDER BY date ASC
+        SELECT t.id, t.date, t.type, t.quantity, t.price, t.fee, t.ticker,
+               a.name as account_name
+        FROM transactions t
+        JOIN accounts a ON t.account_id = a.id
+        WHERE t.ticker = ? AND t.type IN ('buy','sell','dividend')
+        ORDER BY t.date DESC, t.id DESC
       `).all(ticker);
       return NextResponse.json({ price, history, transactions });
     }

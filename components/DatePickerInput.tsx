@@ -97,25 +97,25 @@ export default function DatePickerInput({ value, onChange, error, inputWidth = 1
           top: dropPos.top,
           left: dropPos.left,
           zIndex: 10000,
-          background: 'var(--card)',
-          border: '1px solid var(--border)',
+          background: '#1a1d27',
+          border: '1px solid #2a2d3a',
           borderRadius: 8,
           padding: 12,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
           minWidth: 230,
           userSelect: 'none',
         }}>
           {/* Month nav */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <button type="button" onClick={prevMonth}
-              style={{ background: 'none', color: 'var(--text)', padding: '2px 6px' }}>
+              style={{ background: 'none', color: '#e2e8f0', padding: '2px 6px' }}>
               <ChevronLeft size={14} />
             </button>
-            <span style={{ fontSize: 13, fontWeight: 600 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>
               {MONTHS[viewMonth]} {viewYear}
             </span>
             <button type="button" onClick={nextMonth}
-              style={{ background: 'none', color: 'var(--text)', padding: '2px 6px' }}>
+              style={{ background: 'none', color: '#e2e8f0', padding: '2px 6px' }}>
               <ChevronRight size={14} />
             </button>
           </div>
@@ -123,7 +123,7 @@ export default function DatePickerInput({ value, onChange, error, inputWidth = 1
           {/* Day-of-week headers */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 4 }}>
             {DAYS.map(d => (
-              <div key={d} style={{ textAlign: 'center', fontSize: 11, color: 'var(--muted)', padding: '2px 0' }}>{d}</div>
+              <div key={d} style={{ textAlign: 'center', fontSize: 11, color: '#64748b', padding: '2px 0' }}>{d}</div>
             ))}
           </div>
 
@@ -147,8 +147,8 @@ export default function DatePickerInput({ value, onChange, error, inputWidth = 1
                   fontSize: 12,
                   borderRadius: 4,
                   cursor: 'pointer',
-                  background: isSel ? 'var(--accent)' : isToday ? 'rgba(99,102,241,0.18)' : 'transparent',
-                  color: isSel ? 'white' : isToday ? 'var(--accent)' : 'var(--text)',
+                  background: isSel ? '#6366f1' : isToday ? 'rgba(99,102,241,0.25)' : 'transparent',
+                  color: isSel ? '#ffffff' : isToday ? '#818cf8' : '#e2e8f0',
                   fontWeight: isSel || isToday ? 600 : 400,
                 }}>
                   {day}
