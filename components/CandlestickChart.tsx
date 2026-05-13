@@ -78,7 +78,6 @@ export default function CandlestickChart({ candles, transactions = [], resolvedI
     .map((c, i) => ({ i, label: formatXLabel(c.date, resolvedInterval) }))
     .filter((_, i) => i % xStep === 0);
 
-  // Tx lookup by date, only show on first candle of each day for intraday
   const txByDate: Record<string, ChartTx[]> = {};
   for (const tx of transactions) {
     const k = tx.date.slice(0, 10);
@@ -98,12 +97,7 @@ export default function CandlestickChart({ candles, transactions = [], resolvedI
     const mx = e.clientX - rect.left - PAD.left;
     const idx = Math.floor(mx / slot);
     if (idx >= 0 && idx < candles.length) {
-      setTooltip({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
-        candle: candles[idx],
-        txs: candleTxs[idx],
-      });
+      setTooltip({ x: e.clientX - rect.left, y: e.clientY - rect.top, candle: candles[idx], txs: candleTxs[idx] });
     } else {
       setTooltip(null);
     }
@@ -114,8 +108,7 @@ export default function CandlestickChart({ candles, transactions = [], resolvedI
   return (
     <div ref={containerRef} style={{ width: '100%', position: 'relative', userSelect: 'none' }}>
       <svg
-        width={width}
-        height={H}
+        width={width} height={H}
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setTooltip(null)}
         style={{ cursor: 'crosshair', display: 'block' }}
@@ -148,31 +141,51 @@ export default function CandlestickChart({ candles, transactions = [], resolvedI
           const bodyY2 = PAD.top + toY(Math.min(c.open, c.close));
           const bh = Math.max(1, bodyY2 - bodyY1);
           const txs = candleTxs[i];
+          const txXOffset = (j: number) => txs.length > 1 ? (j - (txs.length - 1) / 2) * 13 : 0;
 
           return (
             <g key={i}>
               <line x1={cx} y1={PAD.top + toY(c.high)} x2={cx} y2={PAD.top + toY(c.low)} stroke={color} strokeWidth={1} />
               <rect x={cx - bodyW / 2} y={bodyY1} width={bodyW} height={bh} fill={color} />
-              {txs.map((tx, j) => (
-                <circle
-                  key={j}
-                  cx={cx + (j - (txs.length - 1) / 2) * 7}
-                  cy={PAD.top + ch + 30}
-                  r={3.5}
-                  fill={TX_COLORS[tx.type] ?? '#94a3b8'}
-                />
-              ))}
+              {txs.map((tx, j) => {
+                const txX = cx + txXOffset(j);
+                let txY: number;
+
+                if (tx.type === 'dividend') {
+                  txY = PAD.top + toY(c.close);
+                } else {
+                  if (tx.price < yMin || tx.price > yMax) return null;
+                  txY = PAD.top + toY(tx.price);
+                }
+                // Clamp inside chart area
+                txY = Math.max(PAD.top + 8, Math.min(PAD.top + ch - 8, txY));
+
+                if (tx.type === 'buy') {
+                  return (
+                    <polygon key={j}
+                      points={`${txX},${txY - 7} ${txX - 5},${txY + 4} ${txX + 5},${txY + 4}`}
+                      fill="#00e676" opacity={0.9}
+                    />
+                  );
+                } else if (tx.type === 'sell') {
+                  return (
+                    <polygon key={j}
+                      points={`${txX - 5},${txY - 4} ${txX + 5},${txY - 4} ${txX},${txY + 7}`}
+                      fill="#ff5252" opacity={0.9}
+                    />
+                  );
+                } else {
+                  return <circle key={j} cx={txX} cy={txY} r={4.5} fill="#f59e0b" opacity={0.9} />;
+                }
+              })}
             </g>
           );
         })}
 
         {/* Crosshair */}
         {tooltip && (
-          <line
-            x1={tooltip.x} y1={PAD.top}
-            x2={tooltip.x} y2={PAD.top + ch}
-            stroke="rgba(255,255,255,0.2)" strokeWidth={1} strokeDasharray="4,4"
-          />
+          <line x1={tooltip.x} y1={PAD.top} x2={tooltip.x} y2={PAD.top + ch}
+            stroke="rgba(255,255,255,0.2)" strokeWidth={1} strokeDasharray="4,4" />
         )}
       </svg>
 

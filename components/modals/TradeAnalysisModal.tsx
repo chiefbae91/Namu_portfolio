@@ -1,9 +1,9 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { X, PlusCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Currency, ExchangeRates } from '@/lib/types';
 import { formatCurrency } from '@/lib/format';
-import CandlestickChart, { OHLCPoint, ChartTx } from '@/components/CandlestickChart';
+import StockChart, { StockChartData, TxRow, Holding } from '@/components/StockChart';
 
 type Period = '5d' | '1mo' | '3mo' | '6mo' | '1y';
 type Interval = '1m' | '15m' | '1d' | '1wk';
@@ -41,17 +41,6 @@ function getPageNums(current: number, total: number): (number | null)[] {
   return result;
 }
 
-interface TxRow {
-  id: number;
-  date: string;
-  type: string;
-  quantity: number;
-  price: number;
-  fee: number;
-  ticker: string;
-  account_name: string;
-}
-
 interface Props {
   ticker: string;
   currency: Currency;
@@ -69,39 +58,30 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
     if (typeof window === 'undefined') return '1d';
     return (localStorage.getItem('chart_interval') as Interval) ?? '1d';
   });
-  const [candles, setCandles] = useState<OHLCPoint[]>([]);
-  const [transactions, setTransactions] = useState<TxRow[]>([]);
-  const [resolvedInterval, setResolvedInterval] = useState<string>('1d');
   const [currentPrice, setCurrentPrice] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [transactions, setTransactions] = useState<TxRow[]>([]);
+  const [holdings, setHoldings] = useState<Holding[]>([]);
+  const [resolvedInterval, setResolvedInterval] = useState('1d');
   const [page, setPage] = useState(1);
 
   const fmt = (v: number) => formatCurrency(v, currency, rates);
 
-  useEffect(() => { localStorage.setItem('chart_period', period); }, [period]);
-  useEffect(() => { localStorage.setItem('chart_interval', interval); }, [interval]);
+  const handleChartLoaded = useCallback((data: StockChartData) => {
+    setCurrentPrice(data.price);
+    setTransactions(data.transactions);
+    setHoldings(data.holdings);
+    setResolvedInterval(data.resolvedInterval);
+  }, []);
 
-  useEffect(() => {
-    setLoading(true);
-    setCandles([]);
-    fetch(`/api/market-price?ticker=${encodeURIComponent(ticker)}&range=${period}&interval=${interval}`)
-      .then(r => r.json())
-      .then(data => {
-        setCandles(data.candles ?? []);
-        setTransactions(data.transactions ?? []);
-        setCurrentPrice(data.price ?? 0);
-        setResolvedInterval(data.resolvedInterval ?? interval);
-      })
-      .catch(() => { setCandles([]); setTransactions([]); })
-      .finally(() => setLoading(false));
-  }, [ticker, period, interval]);
+  const handlePeriod = (p: Period) => {
+    localStorage.setItem('chart_period', p);
+    setPeriod(p);
+  };
 
-  const chartTxs: ChartTx[] = transactions.map(tx => ({
-    date: tx.date,
-    type: tx.type,
-    price: tx.price,
-    quantity: tx.quantity,
-  }));
+  const handleInterval = (iv: Interval) => {
+    localStorage.setItem('chart_interval', iv);
+    setIntervalState(iv);
+  };
 
   const totalPages = Math.max(1, Math.ceil(transactions.length / PAGE_SIZE));
   const start = (page - 1) * PAGE_SIZE;
@@ -109,6 +89,9 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
   const paginated = transactions.slice(start, end);
 
   const intervalCorrected = resolvedInterval !== interval;
+
+  const totalQty = holdings.reduce((s, h) => s + h.quantity, 0);
+  const totalValue = holdings.reduce((s, h) => s + h.quantity * currentPrice, 0);
 
   const btnStyle = (active: boolean): React.CSSProperties => ({
     padding: '4px 10px', fontSize: 12, borderRadius: 4,
@@ -129,14 +112,41 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 900 }} onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>{ticker}</h2>
             {currentPrice > 0 && (
-              <span style={{ color: 'var(--muted)', fontSize: 13 }}>현재가 {fmt(currentPrice)}</span>
+              <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 2 }}>현재가 {fmt(currentPrice)}</div>
+            )}
+
+            {/* Per-account holdings */}
+            {holdings.length > 0 && currentPrice > 0 && (
+              <div style={{ marginTop: 8, fontSize: 12, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {holdings.map(h => (
+                  <div key={h.account_id} style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
+                    <span style={{ minWidth: 90, fontWeight: 500, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 130 }}>
+                      {h.account_name}
+                    </span>
+                    <span style={{ color: 'var(--muted)' }}>{h.quantity.toLocaleString('en-US')}주</span>
+                    <span style={{ color: '#64748b' }}>@ {fmt(h.avg_cost)}</span>
+                    <span style={{ color: '#64748b' }}>=</span>
+                    <span style={{ fontWeight: 600, color: 'var(--text)' }}>{fmt(h.quantity * currentPrice)}</span>
+                  </div>
+                ))}
+                {holdings.length > 1 && (
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'baseline', borderTop: '1px solid var(--border)', paddingTop: 3, marginTop: 1 }}>
+                    <span style={{ minWidth: 90, fontWeight: 600, color: 'var(--text)' }}>합계</span>
+                    <span style={{ color: 'var(--muted)', fontWeight: 600 }}>{totalQty.toLocaleString('en-US')}주</span>
+                    <span style={{ color: '#64748b' }}></span>
+                    <span style={{ color: '#64748b' }}>=</span>
+                    <span style={{ fontWeight: 700, color: 'var(--text)' }}>{fmt(totalValue)}</span>
+                  </div>
+                )}
+              </div>
             )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             <button onClick={onAddTransaction}
               style={{ background: 'var(--accent)', color: 'white', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 600, borderRadius: 6 }}>
               <PlusCircle size={14} /> 거래 입력
@@ -149,7 +159,7 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
         <div style={{ display: 'flex', gap: 12, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ display: 'flex', gap: 4 }}>
             {PERIODS.map(p => (
-              <button key={p.value} onClick={() => setPeriod(p.value)} style={btnStyle(period === p.value)}>
+              <button key={p.value} onClick={() => handlePeriod(p.value)} style={btnStyle(period === p.value)}>
                 {p.label}
               </button>
             ))}
@@ -157,7 +167,7 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
           <div style={{ width: 1, height: 18, background: 'var(--border)' }} />
           <div style={{ display: 'flex', gap: 4 }}>
             {INTERVALS.map(iv => (
-              <button key={iv.value} onClick={() => setIntervalState(iv.value)} style={ivBtnStyle(interval === iv.value)}>
+              <button key={iv.value} onClick={() => handleInterval(iv.value)} style={ivBtnStyle(interval === iv.value)}>
                 {iv.label}
               </button>
             ))}
@@ -167,16 +177,11 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
           )}
         </div>
 
-        {/* Chart */}
-        <div style={{ minHeight: 320 }}>
-          {loading
-            ? <div style={{ textAlign: 'center', padding: 60, color: 'var(--muted)' }}>로딩 중...</div>
-            : <CandlestickChart candles={candles} transactions={chartTxs} resolvedInterval={resolvedInterval} />
-          }
-        </div>
+        {/* Chart — owns its own loading state, no modal flicker */}
+        <StockChart ticker={ticker} period={period} interval={interval} onLoaded={handleChartLoaded} />
 
         {/* Transaction History */}
-        {!loading && transactions.length > 0 && (
+        {transactions.length > 0 && (
           <div style={{ marginTop: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>거래 히스토리</h3>
