@@ -74,13 +74,23 @@ function getPageNums(current: number, total: number): (number | null)[] {
   return result;
 }
 
+const TYPE_FILTER_OPTIONS = [
+  { value: '', label: '전체 유형' },
+  { value: 'buy', label: '매수 (BUY)' },
+  { value: 'sell', label: '매도 (SELL)' },
+  { value: 'dividend', label: '배당 (DIVIDEND)' },
+  { value: 'transfer_deposit', label: '입금 (DEPOSIT)' },
+  { value: 'transfer_withdraw', label: '출금 (WITHDRAW)' },
+];
+
 export default function TransactionHistory({ transactions, currency, rates, onEdit, onDelete, onDeleteMany }: Props) {
   const [tickerFilter, setTickerFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [page, setPage] = useState(1);
 
-  useEffect(() => { setPage(1); }, [tickerFilter]);
+  useEffect(() => { setPage(1); }, [tickerFilter, typeFilter]);
 
   // When the transactions list changes (e.g. account switch), reset filter if the
   // selected ticker no longer exists in the new data, and clear all selections.
@@ -95,7 +105,9 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
   const fmt = (usd: number) => formatCurrency(usd, currency, rates);
 
   const tickers = [...new Set(transactions.map(t => t.ticker).filter(Boolean))].sort();
-  const filtered = tickerFilter ? transactions.filter(t => t.ticker === tickerFilter) : transactions;
+  const filtered = transactions
+    .filter(t => !tickerFilter || t.ticker === tickerFilter)
+    .filter(t => !typeFilter || t.type === typeFilter);
   const filteredIds = filtered.map(t => t.id);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -139,13 +151,16 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
   return (
     <div>
       {/* Toolbar */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
-        <select value={tickerFilter} onChange={e => { setTickerFilter(e.target.value); setSelected(new Set()); }} style={{ minWidth: 140 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+        <select value={tickerFilter} onChange={e => { setTickerFilter(e.target.value); setSelected(new Set()); }} style={{ minWidth: 130 }}>
           <option value="">전체 종목</option>
           {tickers.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
-        {tickerFilter && (
-          <button className="btn-secondary btn-sm" onClick={() => { setTickerFilter(''); setSelected(new Set()); }}>초기화</button>
+        <select value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setSelected(new Set()); }} style={{ minWidth: 160 }}>
+          {TYPE_FILTER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        {(tickerFilter || typeFilter) && (
+          <button className="btn-secondary btn-sm" onClick={() => { setTickerFilter(''); setTypeFilter(''); setSelected(new Set()); }}>초기화</button>
         )}
 
         <span className="muted" style={{ fontSize: 12 }}>{filtered.length}건</span>
