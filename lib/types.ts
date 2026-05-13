@@ -54,6 +54,7 @@ export interface PortfolioPosition {
   quantity: number;
   avg_cost: number;
   current_price: number;
+  prev_close: number;
   value: number;
   cost: number;
   return_pct: number;

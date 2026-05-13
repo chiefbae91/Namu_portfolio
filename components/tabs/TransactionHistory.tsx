@@ -69,6 +69,16 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
 
   useEffect(() => { setPage(1); }, [tickerFilter]);
 
+  // When the transactions list changes (e.g. account switch), reset filter if the
+  // selected ticker no longer exists in the new data, and clear all selections.
+  useEffect(() => {
+    if (tickerFilter && !transactions.some(t => t.ticker === tickerFilter)) {
+      setTickerFilter('');
+    }
+    setSelected(new Set());
+    setPage(1);
+  }, [transactions]);
+
   const fmt = (usd: number) => formatCurrency(usd, currency, rates);
 
   const tickers = [...new Set(transactions.map(t => t.ticker).filter(Boolean))].sort();

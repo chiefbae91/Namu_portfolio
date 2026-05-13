@@ -102,7 +102,7 @@ export default function SummaryCards({ cash, stockValue, accountBreakdown, krwRa
       color: '#60a5fa',
     },
     {
-      label: '주식 평가금액',
+      label: '평가금액',
       total: stockValue,
       accounts: accountBreakdown.map(a => ({ name: a.account_name, value: a.stock_value })),
       color: '#6366f1',

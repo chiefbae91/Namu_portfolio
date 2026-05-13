@@ -13,14 +13,18 @@ interface Lot {
   remaining: number;
 }
 
-async function fetchPrice(ticker: string): Promise<number> {
+async function fetchPriceData(ticker: string): Promise<{ price: number; prevClose: number }> {
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`;
     const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, next: { revalidate: 60 } });
-    if (!res.ok) return 0;
+    if (!res.ok) return { price: 0, prevClose: 0 };
     const data = await res.json();
-    return data?.chart?.result?.[0]?.meta?.regularMarketPrice ?? 0;
-  } catch { return 0; }
+    const meta = data?.chart?.result?.[0]?.meta;
+    return {
+      price: meta?.regularMarketPrice ?? 0,
+      prevClose: meta?.chartPreviousClose ?? 0,
+    };
+  } catch { return { price: 0, prevClose: 0 }; }
 }
 
 export async function GET(req: NextRequest) {
@@ -99,14 +103,19 @@ export async function GET(req: NextRequest) {
   }
 
   const activeTickers = Object.keys(posMap);
-  const prices = await Promise.all(activeTickers.map(fetchPrice));
+  const priceDataArr = await Promise.all(activeTickers.map(fetchPriceData));
   const priceMap: Record<string, number> = {};
-  activeTickers.forEach((t, i) => { priceMap[t] = prices[i]; });
+  const prevCloseMap: Record<string, number> = {};
+  activeTickers.forEach((t, i) => {
+    priceMap[t] = priceDataArr[i].price;
+    prevCloseMap[t] = priceDataArr[i].prevClose;
+  });
 
   const positions = activeTickers.map(ticker => {
     const pos = posMap[ticker];
     const avg_cost = pos.qty > 0 ? pos.cost / pos.qty : 0;
     const current_price = priceMap[ticker] || 0;
+    const prev_close = prevCloseMap[ticker] || 0;
     const value = pos.qty * current_price;
     const return_amount = value - pos.cost;
     const return_pct = pos.cost > 0 ? (return_amount / pos.cost) * 100 : 0;
@@ -115,6 +124,7 @@ export async function GET(req: NextRequest) {
       quantity: Math.round(pos.qty * 10000) / 10000,
       avg_cost: Math.round(avg_cost * 100) / 100,
       current_price,
+      prev_close,
       value: Math.round(value * 100) / 100,
       cost: Math.round(pos.cost * 100) / 100,
       return_pct: Math.round(return_pct * 100) / 100,
