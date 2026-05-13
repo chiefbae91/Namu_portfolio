@@ -13,6 +13,19 @@ interface Props {
   onDeleteMany: (ids: number[]) => Promise<void>;
 }
 
+// Deterministic color from account name
+const BADGE_COLORS = ['#00e676', '#40c4ff', '#ff9100', '#e040fb', '#ffea00', '#69f0ae', '#ff6e40', '#f48fb1'];
+function getAccountColor(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return BADGE_COLORS[Math.abs(h) % BADGE_COLORS.length];
+}
+function getAccountInitials(name: string): string {
+  const words = name.trim().split(/\s+/);
+  if (words.length === 1) return name.slice(0, 3).toUpperCase();
+  return words.map(w => w[0]).join('').toUpperCase().slice(0, 4);
+}
+
 const TYPE_LABELS: Record<string, string> = {
   buy: '매수', sell: '매도', dividend: '배당', cash: '현금',
   transfer_deposit: 'Transfer - 입금', transfer_withdraw: 'Transfer - 출금',
@@ -172,7 +185,7 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
                   style={{ cursor: 'pointer' }}
                 />
               </th>
-              <th>날짜</th><th>계좌</th><th>종목</th><th>유형</th>
+              <th>날짜</th><th>종목</th><th>유형</th>
               <th style={{ textAlign: 'right' }}>수량</th>
               <th style={{ textAlign: 'right' }}>단가</th>
               <th style={{ textAlign: 'right' }}>총액</th>
@@ -191,8 +204,22 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
                     <input type="checkbox" checked={isSelected} onChange={() => toggleOne(tx.id)} style={{ cursor: 'pointer' }} />
                   </td>
                   <td className="muted">{tx.date}</td>
-                  <td>{tx.account_name}</td>
-                  <td style={{ fontWeight: 500 }}>{tx.ticker || '-'}</td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {tx.account_name && (
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
+                          background: getAccountColor(tx.account_name) + '22',
+                          color: getAccountColor(tx.account_name),
+                          border: `1px solid ${getAccountColor(tx.account_name)}55`,
+                          letterSpacing: '0.03em', flexShrink: 0,
+                        }}>
+                          {getAccountInitials(tx.account_name)}
+                        </span>
+                      )}
+                      <span style={{ fontWeight: 500 }}>{tx.ticker || '-'}</span>
+                    </div>
+                  </td>
                   <td>
                     <span style={{ color: TYPE_COLORS[tx.type] || 'var(--muted)', fontWeight: 500 }}>
                       {TYPE_LABELS[tx.type] || tx.type}
