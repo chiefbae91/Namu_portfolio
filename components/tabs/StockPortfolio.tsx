@@ -10,7 +10,7 @@ interface Props {
   onTickerClick: (ticker: string) => void;
 }
 
-type SortKey = 'ticker' | 'value' | 'weight' | 'return_amount' | 'return_pct';
+type SortKey = 'ticker' | 'current_price' | 'quantity' | 'avg_cost' | 'value' | 'cost' | 'weight' | 'return_amount' | 'return_pct';
 type SortDir = 'asc' | 'desc';
 
 function SortIndicator({ active, dir }: { active: boolean; dir: SortDir }) {
@@ -18,6 +18,20 @@ function SortIndicator({ active, dir }: { active: boolean; dir: SortDir }) {
     <span style={{ marginLeft: 3, fontSize: 9, color: active ? 'var(--accent)' : '#334155' }}>
       {active ? (dir === 'asc' ? '▲' : '▼') : '↕'}
     </span>
+  );
+}
+
+function PriceChange({ current, prev }: { current: number; prev: number }) {
+  if (!current || !prev) return null;
+  const diff = current - prev;
+  const pct = (diff / prev) * 100;
+  if (Math.abs(diff) < 0.001) return <div style={{ fontSize: 11, color: '#666' }}>→ 0.00 (0.00%)</div>;
+  const up = diff > 0;
+  const color = up ? '#00e676' : '#ff5252';
+  return (
+    <div style={{ fontSize: 11, color, marginTop: 2 }}>
+      {up ? '▲' : '▼'} {up ? '+' : ''}${Math.abs(diff).toFixed(2)} ({up ? '+' : ''}{pct.toFixed(2)}%)
+    </div>
   );
 }
 
@@ -54,17 +68,24 @@ export default function StockPortfolio({ positions, currency, rates, onTickerCli
       return sortDir === 'asc' ? cmp : -cmp;
     }
     const valueOf = (p: PortfolioPosition): number => {
-      if (p.current_price === 0) return -Infinity;
-      if (sortKey === 'value' || sortKey === 'weight') return p.value;
-      if (sortKey === 'return_amount') return p.return_amount;
-      if (sortKey === 'return_pct') return p.return_pct;
-      return 0;
+      if (p.current_price === 0 && sortKey !== 'quantity' && sortKey !== 'avg_cost' && sortKey !== 'cost') return -Infinity;
+      switch (sortKey) {
+        case 'current_price': return p.current_price;
+        case 'quantity':      return p.quantity;
+        case 'avg_cost':      return p.avg_cost;
+        case 'value':         return p.value;
+        case 'cost':          return p.cost;
+        case 'weight':        return p.value;
+        case 'return_amount': return p.return_amount;
+        case 'return_pct':    return p.return_pct;
+        default: return 0;
+      }
     };
     const diff = valueOf(a) - valueOf(b);
     return sortDir === 'asc' ? diff : -diff;
   });
 
-  const thProps = (key: SortKey, align: 'left' | 'right' = 'right') => ({
+  const th = (key: SortKey, align: 'left' | 'right' = 'right') => ({
     style: {
       textAlign: align as 'left' | 'right',
       cursor: 'pointer' as const,
@@ -79,21 +100,15 @@ export default function StockPortfolio({ positions, currency, rates, onTickerCli
       <table>
         <thead>
           <tr>
-            <th {...thProps('ticker', 'left')}>
-              종목 <SortIndicator active={sortKey === 'ticker'} dir={sortDir} />
-            </th>
-            <th {...thProps('value')}>
-              평가금액 <SortIndicator active={sortKey === 'value'} dir={sortDir} />
-            </th>
-            <th {...thProps('weight')}>
-              비중 <SortIndicator active={sortKey === 'weight'} dir={sortDir} />
-            </th>
-            <th {...thProps('return_amount')}>
-              손익 <SortIndicator active={sortKey === 'return_amount'} dir={sortDir} />
-            </th>
-            <th {...thProps('return_pct')}>
-              수익률 <SortIndicator active={sortKey === 'return_pct'} dir={sortDir} />
-            </th>
+            <th {...th('ticker', 'left')}>종목 <SortIndicator active={sortKey === 'ticker'} dir={sortDir} /></th>
+            <th {...th('current_price')}>현재가 <SortIndicator active={sortKey === 'current_price'} dir={sortDir} /></th>
+            <th {...th('quantity')}>수량 <SortIndicator active={sortKey === 'quantity'} dir={sortDir} /></th>
+            <th {...th('avg_cost')}>평균단가 <SortIndicator active={sortKey === 'avg_cost'} dir={sortDir} /></th>
+            <th {...th('value')}>평가금액 <SortIndicator active={sortKey === 'value'} dir={sortDir} /></th>
+            <th {...th('cost')}>코스트 <SortIndicator active={sortKey === 'cost'} dir={sortDir} /></th>
+            <th {...th('weight')}>비중 <SortIndicator active={sortKey === 'weight'} dir={sortDir} /></th>
+            <th {...th('return_amount')}>손익 <SortIndicator active={sortKey === 'return_amount'} dir={sortDir} /></th>
+            <th {...th('return_pct')}>수익률 <SortIndicator active={sortKey === 'return_pct'} dir={sortDir} /></th>
           </tr>
         </thead>
         <tbody>
@@ -103,7 +118,6 @@ export default function StockPortfolio({ positions, currency, rates, onTickerCli
             const barPct = maxWeight > 0 ? (weight / maxWeight) * 100 : 0;
             return (
               <tr key={p.ticker}>
-                {/* 종목 */}
                 <td>
                   <button
                     onClick={() => onTickerClick(p.ticker)}
@@ -111,37 +125,32 @@ export default function StockPortfolio({ positions, currency, rates, onTickerCli
                   >
                     {p.ticker}
                   </button>
-                  {hasPrice && (
-                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>{fmt(p.current_price)}</div>
-                  )}
                 </td>
-
-                {/* 평가금액 */}
                 <td style={{ textAlign: 'right' }}>
-                  {hasPrice ? fmt(p.value) : <span className="muted">-</span>}
+                  {hasPrice ? (
+                    <>
+                      <div>{fmt(p.current_price)}</div>
+                      <PriceChange current={p.current_price} prev={p.prev_close} />
+                    </>
+                  ) : <span className="muted">-</span>}
                 </td>
-
-                {/* 비중 */}
+                <td style={{ textAlign: 'right' }}>{p.quantity.toLocaleString()}</td>
+                <td style={{ textAlign: 'right' }}>{fmt(p.avg_cost)}</td>
+                <td style={{ textAlign: 'right' }}>{hasPrice ? fmt(p.value) : <span className="muted">-</span>}</td>
+                <td style={{ textAlign: 'right' }}>{fmt(p.cost)}</td>
                 <td style={{ textAlign: 'right' }}>
                   {hasPrice && totalValue > 0 ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
                       <div style={{ width: 52, height: 3, background: 'var(--border)', borderRadius: 2, flexShrink: 0 }}>
-                        <div style={{
-                          width: `${barPct}%`, height: '100%',
-                          background: 'var(--accent)', borderRadius: 2, opacity: 0.75,
-                        }} />
+                        <div style={{ width: `${barPct}%`, height: '100%', background: 'var(--accent)', borderRadius: 2, opacity: 0.75 }} />
                       </div>
                       <span style={{ minWidth: 42, textAlign: 'right' }}>{weight.toFixed(1)}%</span>
                     </div>
                   ) : <span className="muted">-</span>}
                 </td>
-
-                {/* 손익 */}
                 <td style={{ textAlign: 'right' }} className={hasPrice ? (p.return_amount >= 0 ? 'positive' : 'negative') : ''}>
                   {hasPrice ? `${p.return_amount >= 0 ? '+' : ''}${fmt(p.return_amount)}` : <span className="muted">-</span>}
                 </td>
-
-                {/* 수익률 */}
                 <td style={{ textAlign: 'right' }} className={hasPrice ? (p.return_pct >= 0 ? 'positive' : 'negative') : ''}>
                   {hasPrice ? `${p.return_pct >= 0 ? '+' : ''}${p.return_pct.toFixed(2)}%` : <span className="muted">-</span>}
                 </td>
