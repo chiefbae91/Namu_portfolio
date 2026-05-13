@@ -242,7 +242,7 @@ export default function Home() {
           {showEur && <span>€{rates.EUR.toFixed(4)}/USD</span>}
           {ratesUpdatedAt && (
             <span style={{ opacity: 0.5, fontSize: 10 }}>
-              {ratesUpdatedAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              {ratesUpdatedAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'America/New_York', timeZoneName: 'short' })}
             </span>
           )}
           <button
