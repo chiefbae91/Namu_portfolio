@@ -59,7 +59,7 @@ export default function AccountSettingsModal({ accounts, onClose, onAddAccount, 
               ) : (
                 <>
                   <span style={{ flex: 1, fontWeight: 500, opacity: acc.hidden ? 0.4 : 1 }}>{acc.name}</span>
-                  {acc.hidden && <span style={{ fontSize: 11, color: 'var(--muted)', background: 'var(--border)', padding: '2px 6px', borderRadius: 4 }}>Hidden</span>}
+                  {!!acc.hidden && <span style={{ fontSize: 11, color: 'var(--muted)', background: 'var(--border)', padding: '2px 6px', borderRadius: 4 }}>Hidden</span>}
                   <button style={{ background: 'none', color: 'var(--muted)', padding: 4 }}
                     onClick={() => { setEditingId(acc.id); setEditName(acc.name); }}><Edit2 size={14} /></button>
                   <button style={{ background: 'none', color: 'var(--muted)', padding: 4 }}
