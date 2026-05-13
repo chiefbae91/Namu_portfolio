@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { X, Calendar } from 'lucide-react';
 
 const HINT_TYPES = [
@@ -74,37 +74,24 @@ export default function TradingHintModal({ onClose, onSaved }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const dateInputRef = useRef<HTMLInputElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isBuyStop = type === 'buy_stop';
   const isNoteOnly = type === 'note_only';
   const priceDisabled = isBuyStop || isNoteOnly;
   const cpDisabled = isNoteOnly;
 
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    const t = ticker.trim();
-    const validDate = /^\d{2}\/\d{2}\/\d{4}$/.test(hintDate);
-    if (!t || !validDate || cpDisabled) {
-      if (!t) setCurrentPriceStr('');
-      return;
-    }
-    debounceRef.current = setTimeout(async () => {
-      setPriceFetching(true);
-      setPriceError('');
-      try {
-        const isoDate = mmddyyyyToISO(hintDate);
-        const res = await fetch(`/api/historical-price?ticker=${encodeURIComponent(t)}&date=${isoDate}`);
-        const data = await res.json();
-        if (data.error) {
-          setPriceError('No price data for this date');
-        } else if (data.price > 0) {
-          setCurrentPriceStr(fmtPrice(String(data.price)));
-        }
-      } catch { setPriceError('Failed to fetch price'); }
-      finally { setPriceFetching(false); }
-    }, 600);
-  }, [ticker, hintDate, cpDisabled]);
+  const fetchPrice = async (t: string, d: string) => {
+    if (!t.trim() || !/^\d{2}\/\d{2}\/\d{4}$/.test(d) || cpDisabled) return;
+    setPriceFetching(true);
+    setPriceError('');
+    try {
+      const res = await fetch(`/api/historical-price?ticker=${encodeURIComponent(t.trim())}&date=${mmddyyyyToISO(d)}`);
+      const data = await res.json();
+      if (data.error) setPriceError('No price data for this date');
+      else if (data.price > 0) setCurrentPriceStr(fmtPrice(String(data.price)));
+    } catch { setPriceError('Failed to fetch price'); }
+    finally { setPriceFetching(false); }
+  };
 
   const handleSave = async () => {
     if (!ticker.trim()) { setError('Ticker is required'); return; }
@@ -137,6 +124,8 @@ export default function TradingHintModal({ onClose, onSaved }: Props) {
     }
   };
 
+  const cpLabel = hintDate === todayFormatted() ? 'Current Price' : `${hintDate} Price`;
+
   const disabledStyle: React.CSSProperties = {
     width: '100%', background: 'var(--border)', color: 'var(--muted)', cursor: 'not-allowed',
   };
@@ -157,6 +146,7 @@ export default function TradingHintModal({ onClose, onSaved }: Props) {
               type="text"
               value={ticker}
               onChange={e => setTicker(e.target.value.toUpperCase())}
+              onBlur={() => fetchPrice(ticker, hintDate)}
               style={{ width: '100%' }}
               autoFocus
             />
@@ -176,6 +166,7 @@ export default function TradingHintModal({ onClose, onSaved }: Props) {
                   const sanitized = sanitizeISO(mmddyyyyToISO(val));
                   const formatted = isoToMMDDYYYY(sanitized);
                   if (formatted !== val) setHintDate(formatted);
+                  fetchPrice(ticker, formatted);
                 }}
                 style={{ flex: 1 }}
               />
@@ -194,7 +185,9 @@ export default function TradingHintModal({ onClose, onSaved }: Props) {
                 style={{ display: 'none' }}
                 onChange={e => {
                   if (!e.target.value) return;
-                  setHintDate(isoToMMDDYYYY(sanitizeISO(e.target.value)));
+                  const formatted = isoToMMDDYYYY(sanitizeISO(e.target.value));
+                  setHintDate(formatted);
+                  fetchPrice(ticker, formatted);
                 }}
               />
             </div>
@@ -227,8 +220,8 @@ export default function TradingHintModal({ onClose, onSaved }: Props) {
           {/* Current Price */}
           <div className="form-group">
             <label>
-              Current Price
-              {priceFetching && <span style={{ color: 'var(--muted)', fontSize: 11, marginLeft: 6 }}>Loading...</span>}
+              {cpLabel}
+              {priceFetching && <span style={{ color: 'var(--muted)', fontSize: 11, marginLeft: 6 }}>Fetching price...</span>}
             </label>
             <input
               type="text"
