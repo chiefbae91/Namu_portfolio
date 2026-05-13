@@ -49,8 +49,8 @@ export default function Home() {
     }
   }, []);
 
-  const fetchPortfolio = useCallback(async () => {
-    setPortfolioLoading(true);
+  const fetchPortfolio = useCallback(async (showLoader = true) => {
+    if (showLoader) setPortfolioLoading(true);
     const q = selectedAccountId !== 'all' ? `?account_id=${selectedAccountId}` : '';
     try {
       const res = await fetch(`/api/portfolio${q}`);
@@ -67,7 +67,7 @@ export default function Home() {
       setAccountBreakdown(data.account_breakdown || []);
     } catch (err) {
       console.error('fetchPortfolio failed:', err);
-    } finally { setPortfolioLoading(false); }
+    } finally { if (showLoader) setPortfolioLoading(false); }
   }, [selectedAccountId]);
 
   const fetchTransactions = useCallback(async () => {
@@ -100,11 +100,18 @@ export default function Home() {
 
   useEffect(() => { fetchAccounts(); fetchRates(); }, []);
 
-  // Auto-refresh rates every 10 seconds
+  // Auto-refresh rates every 5 minutes
   useEffect(() => {
     const id = setInterval(fetchRates, 300_000);
     return () => clearInterval(id);
   }, [fetchRates]);
+
+  // Auto-refresh portfolio prices every 60s (silent, no loading spinner)
+  useEffect(() => {
+    const id = setInterval(() => fetchPortfolio(false), 60_000);
+    return () => clearInterval(id);
+  }, [fetchPortfolio]);
+
   useEffect(() => { fetchPortfolio(); fetchTransactions(); }, [selectedAccountId]);
 
   const refreshAll = () => { fetchPortfolio(); fetchTransactions(); };
