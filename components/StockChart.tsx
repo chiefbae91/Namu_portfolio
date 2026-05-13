@@ -70,7 +70,7 @@ const StockChart = memo(function StockChart({ ticker, period, interval, onLoaded
   }, [ticker, period, interval]);
 
   return (
-    <div style={{ position: 'relative', minHeight: 320 }}>
+    <div style={{ position: 'relative', width: '100%', minHeight: 320 }}>
       <CandlestickChart candles={candles} transactions={chartTxs} resolvedInterval={resolvedInterval} />
       {loading && candles.length > 0 && (
         <div style={{
