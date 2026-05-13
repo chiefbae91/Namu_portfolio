@@ -1,35 +1,30 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { X, PlusCircle, ChevronLeft, ChevronRight } from 'lucide-react';
-import {
-  LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
-  ResponsiveContainer, Legend,
-} from 'recharts';
 import { Currency, ExchangeRates } from '@/lib/types';
 import { formatCurrency } from '@/lib/format';
+import CandlestickChart, { OHLCPoint, ChartTx } from '@/components/CandlestickChart';
 
-interface Props {
-  ticker: string;
-  currency: Currency;
-  rates: ExchangeRates;
-  onClose: () => void;
-  onAddTransaction: () => void;
-}
+type Period = '5d' | '1mo' | '3mo' | '6mo' | '1y';
+type Interval = '1m' | '15m' | '1d' | '1wk';
 
-interface HistoryPoint { date: string; close: number; }
-interface TxRow {
-  id: number;
-  date: string;
-  type: string;
-  quantity: number;
-  price: number;
-  fee: number;
-  ticker: string;
-  account_name: string;
-}
+const PERIODS: { value: Period; label: string }[] = [
+  { value: '5d', label: '5일' },
+  { value: '1mo', label: '1개월' },
+  { value: '3mo', label: '3개월' },
+  { value: '6mo', label: '6개월' },
+  { value: '1y', label: '1년' },
+];
+
+const INTERVALS: { value: Interval; label: string }[] = [
+  { value: '1m', label: '1분' },
+  { value: '15m', label: '15분' },
+  { value: '1d', label: '일봉' },
+  { value: '1wk', label: '주봉' },
+];
 
 const TYPE_LABELS: Record<string, string> = { buy: '매수', sell: '매도', dividend: '배당' };
-const TYPE_COLORS: Record<string, string> = { buy: '#10b981', sell: '#ef4444', dividend: '#f59e0b' };
+const TYPE_COLORS: Record<string, string> = { buy: '#00e676', sell: '#ff5252', dividend: '#f59e0b' };
 
 const PAGE_SIZE = 10;
 
@@ -46,61 +41,95 @@ function getPageNums(current: number, total: number): (number | null)[] {
   return result;
 }
 
-function CustomDot({ type, color, cx, cy, payload }: { type: string; color: string; cx?: number; cy?: number; payload?: any }) {
-  if (!payload || payload[type] === null || payload[type] === undefined) return null;
-  return <circle cx={cx} cy={cy} r={5} fill={color} stroke="white" strokeWidth={1.5} />;
+interface TxRow {
+  id: number;
+  date: string;
+  type: string;
+  quantity: number;
+  price: number;
+  fee: number;
+  ticker: string;
+  account_name: string;
+}
+
+interface Props {
+  ticker: string;
+  currency: Currency;
+  rates: ExchangeRates;
+  onClose: () => void;
+  onAddTransaction: () => void;
 }
 
 export default function TradeAnalysisModal({ ticker, currency, rates, onClose, onAddTransaction }: Props) {
-  const [history, setHistory] = useState<HistoryPoint[]>([]);
+  const [period, setPeriod] = useState<Period>(() => {
+    if (typeof window === 'undefined') return '1mo';
+    return (localStorage.getItem('chart_period') as Period) ?? '1mo';
+  });
+  const [interval, setIntervalState] = useState<Interval>(() => {
+    if (typeof window === 'undefined') return '1d';
+    return (localStorage.getItem('chart_interval') as Interval) ?? '1d';
+  });
+  const [candles, setCandles] = useState<OHLCPoint[]>([]);
   const [transactions, setTransactions] = useState<TxRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [resolvedInterval, setResolvedInterval] = useState<string>('1d');
   const [currentPrice, setCurrentPrice] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
 
   const fmt = (v: number) => formatCurrency(v, currency, rates);
 
-  useEffect(() => {
-    const from = new Date();
-    from.setFullYear(from.getFullYear() - 2);
-    const fromStr = from.toISOString().slice(0, 10);
+  useEffect(() => { localStorage.setItem('chart_period', period); }, [period]);
+  useEffect(() => { localStorage.setItem('chart_interval', interval); }, [interval]);
 
-    fetch(`/api/market-price?ticker=${encodeURIComponent(ticker)}&from=${fromStr}`)
+  useEffect(() => {
+    setLoading(true);
+    setCandles([]);
+    fetch(`/api/market-price?ticker=${encodeURIComponent(ticker)}&range=${period}&interval=${interval}`)
       .then(r => r.json())
       .then(data => {
-        setHistory(data.history || []);
-        setTransactions(data.transactions || []);
-        setCurrentPrice(data.price || 0);
+        setCandles(data.candles ?? []);
+        setTransactions(data.transactions ?? []);
+        setCurrentPrice(data.price ?? 0);
+        setResolvedInterval(data.resolvedInterval ?? interval);
       })
+      .catch(() => { setCandles([]); setTransactions([]); })
       .finally(() => setLoading(false));
-  }, [ticker]);
+  }, [ticker, period, interval]);
 
-  // Chart: group by date for overlay dots (use earliest buy/sell/div of that date)
-  const txByDate = transactions.reduce<Record<string, TxRow[]>>((acc, tx) => {
-    if (!acc[tx.date]) acc[tx.date] = [];
-    acc[tx.date].push(tx);
-    return acc;
-  }, {});
-
-  const chartData = history.map(h => ({
-    date: h.date,
-    close: h.close,
-    buy: txByDate[h.date]?.find(t => t.type === 'buy')?.price ?? null,
-    sell: txByDate[h.date]?.find(t => t.type === 'sell')?.price ?? null,
-    dividend: txByDate[h.date]?.find(t => t.type === 'dividend')?.price ?? null,
+  const chartTxs: ChartTx[] = transactions.map(tx => ({
+    date: tx.date,
+    type: tx.type,
+    price: tx.price,
+    quantity: tx.quantity,
   }));
 
-  // Pagination for history table
   const totalPages = Math.max(1, Math.ceil(transactions.length / PAGE_SIZE));
   const start = (page - 1) * PAGE_SIZE;
   const end = Math.min(start + PAGE_SIZE, transactions.length);
   const paginated = transactions.slice(start, end);
 
+  const intervalCorrected = resolvedInterval !== interval;
+
+  const btnStyle = (active: boolean): React.CSSProperties => ({
+    padding: '4px 10px', fontSize: 12, borderRadius: 4,
+    background: active ? 'var(--accent)' : 'var(--border)',
+    color: active ? 'white' : 'var(--text)',
+    fontWeight: active ? 600 : 400,
+  });
+
+  const ivBtnStyle = (active: boolean): React.CSSProperties => ({
+    padding: '4px 10px', fontSize: 12, borderRadius: 4,
+    background: active ? '#334155' : 'var(--border)',
+    color: active ? '#e2e8f0' : 'var(--muted)',
+    fontWeight: active ? 600 : 400,
+    border: active ? '1px solid #475569' : '1px solid transparent',
+  });
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 900 }} onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>{ticker}</h2>
             {currentPrice > 0 && (
@@ -116,49 +145,49 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
           </div>
         </div>
 
+        {/* Controls */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {PERIODS.map(p => (
+              <button key={p.value} onClick={() => setPeriod(p.value)} style={btnStyle(period === p.value)}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <div style={{ width: 1, height: 18, background: 'var(--border)' }} />
+          <div style={{ display: 'flex', gap: 4 }}>
+            {INTERVALS.map(iv => (
+              <button key={iv.value} onClick={() => setIntervalState(iv.value)} style={ivBtnStyle(interval === iv.value)}>
+                {iv.label}
+              </button>
+            ))}
+          </div>
+          {intervalCorrected && (
+            <span style={{ fontSize: 11, color: 'var(--muted)' }}>→ {resolvedInterval} (자동 조정)</span>
+          )}
+        </div>
+
         {/* Chart */}
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: 60, color: 'var(--muted)' }}>로딩 중...</div>
-        ) : history.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 60, color: 'var(--muted)' }}>가격 데이터 없음</div>
-        ) : (
-          <ResponsiveContainer width="100%" height={360}>
-            <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={d => d.slice(5)} />
-              <YAxis tick={{ fontSize: 11, fill: '#64748b' }} domain={['auto', 'auto']} />
-              <Tooltip
-                contentStyle={{ background: '#1a1d27', border: '1px solid #2a2d3a', borderRadius: 8, fontSize: 12 }}
-                labelStyle={{ color: '#94a3b8' }}
-                itemStyle={{ color: '#e2e8f0' }}
-              />
-              <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-              <Line type="monotone" dataKey="close" stroke="#6366f1" dot={false} strokeWidth={2} name="종가" />
-              <Line type="monotone" dataKey="buy" stroke="#10b981" dot={<CustomDot type="buy" color="#10b981" />} activeDot={false} strokeOpacity={0} name="매수" />
-              <Line type="monotone" dataKey="sell" stroke="#ef4444" dot={<CustomDot type="sell" color="#ef4444" />} activeDot={false} strokeOpacity={0} name="매도" />
-              <Line type="monotone" dataKey="dividend" stroke="#f59e0b" dot={<CustomDot type="dividend" color="#f59e0b" />} activeDot={false} strokeOpacity={0} name="배당" />
-            </LineChart>
-          </ResponsiveContainer>
-        )}
+        <div style={{ minHeight: 320 }}>
+          {loading
+            ? <div style={{ textAlign: 'center', padding: 60, color: 'var(--muted)' }}>로딩 중...</div>
+            : <CandlestickChart candles={candles} transactions={chartTxs} resolvedInterval={resolvedInterval} />
+          }
+        </div>
 
         {/* Transaction History */}
         {!loading && transactions.length > 0 && (
-          <div style={{ marginTop: 24 }}>
+          <div style={{ marginTop: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>거래 히스토리</h3>
-              <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-                {start + 1}–{end} / {transactions.length}건
-              </span>
+              <span style={{ fontSize: 12, color: 'var(--muted)' }}>{start + 1}–{end} / {transactions.length}건</span>
             </div>
 
             <div style={{ overflowX: 'auto' }}>
               <table>
                 <thead>
                   <tr>
-                    <th>날짜</th>
-                    <th>계좌</th>
-                    <th>종목</th>
-                    <th>유형</th>
+                    <th>날짜</th><th>계좌</th><th>종목</th><th>유형</th>
                     <th style={{ textAlign: 'right' }}>수량</th>
                     <th style={{ textAlign: 'right' }}>단가</th>
                     <th style={{ textAlign: 'right' }}>총액</th>
@@ -189,11 +218,9 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
               </table>
             </div>
 
-            {/* Pagination */}
             {totalPages > 1 && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 12 }}>
-                <button
-                  onClick={() => setPage(p => p - 1)} disabled={page === 1}
+                <button onClick={() => setPage(p => p - 1)} disabled={page === 1}
                   style={{ padding: '4px 10px', background: 'var(--border)', color: page === 1 ? 'var(--muted)' : 'var(--text)', borderRadius: 4, fontSize: 12, display: 'flex', alignItems: 'center', gap: 2 }}>
                   <ChevronLeft size={12} /> 이전
                 </button>
@@ -205,8 +232,7 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
                         {p}
                       </button>
                 )}
-                <button
-                  onClick={() => setPage(p => p + 1)} disabled={page === totalPages}
+                <button onClick={() => setPage(p => p + 1)} disabled={page === totalPages}
                   style={{ padding: '4px 10px', background: 'var(--border)', color: page === totalPages ? 'var(--muted)' : 'var(--text)', borderRadius: 4, fontSize: 12, display: 'flex', alignItems: 'center', gap: 2 }}>
                   다음 <ChevronRight size={12} />
                 </button>
