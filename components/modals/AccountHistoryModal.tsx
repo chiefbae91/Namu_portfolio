@@ -143,6 +143,13 @@ export default function AccountHistoryModal({ accountId, accountName, onClose }:
                 axisLine={false}
                 tickLine={false}
                 width={56}
+                domain={(() => {
+                  const vals = data.map(d => d.value);
+                  const min = Math.min(...vals);
+                  const max = Math.max(...vals);
+                  const pad = (max - min) * 0.1 || max * 0.05;
+                  return [min - pad, max + pad];
+                })()}
               />
               <Tooltip
                 contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
