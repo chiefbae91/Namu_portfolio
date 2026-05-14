@@ -28,7 +28,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) {
-    return NextResponse.notFound();
+    return new NextResponse(null, { status: 404 });
   }
 
   const isPublic =

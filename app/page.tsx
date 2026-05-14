@@ -493,6 +493,7 @@ export default function Home() {
         <SummaryCards
           cash={summary.cash}
           stockValue={summary.stock}
+          prevCloseStockValue={positions.reduce((sum, p) => sum + p.prev_close * p.quantity, 0)}
           accountBreakdown={accountBreakdown}
           krwRate={rates.KRW}
           eurRate={rates.EUR}
