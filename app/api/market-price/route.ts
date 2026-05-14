@@ -65,11 +65,14 @@ export async function GET(req: NextRequest) {
       .order('transaction_date', { ascending: false })
       .order('id', { ascending: false });
 
+    const unknownTxIds = [...new Set((txData || []).map((t: any) => t.account_id).filter((id: string) => !accountNameMap[id]))].sort() as string[];
+    const txAcctLabel: Record<string, string> = Object.fromEntries(unknownTxIds.map((id, i) => [id, `Acct ${i + 1}`]));
+
     const transactions = (txData || []).map((t: any) => ({
       ...t,
       date: t.transaction_date,
       notes: t.note,
-      account_name: accountNameMap[t.account_id],
+      account_name: accountNameMap[t.account_id] ?? txAcctLabel[t.account_id] ?? '—',
     }));
 
     if (!isIntraday && price > 0 && candles.length > 0) {

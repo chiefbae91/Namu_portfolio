@@ -10,7 +10,8 @@ export async function GET(req: NextRequest) {
 
   const { data: accounts } = await supabase.from('accounts').select('id, name, hidden');
   const visibleAccounts = (accounts || []).filter((a: any) => !a.hidden);
-  const nameMap: Record<string, string> = Object.fromEntries(visibleAccounts.map((a: any) => [a.id, a.name]));
+  // Include all accounts (hidden too) so old imported UUIDs can still resolve
+  const nameMap: Record<string, string> = Object.fromEntries((accounts || []).map((a: any) => [a.id, a.name]));
 
   let query = supabase
     .from('transactions')
@@ -23,7 +24,11 @@ export async function GET(req: NextRequest) {
   const { data: txData, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const result = (txData || []).map(tx => ({
+  // Stable short names for unrecognised UUIDs: sort them, assign "Acct 1", "Acct 2", …
+  const unknownIds = [...new Set((txData || []).map((tx: any) => tx.account_id).filter((id: string) => !nameMap[id]))].sort() as string[];
+  const acctLabel: Record<string, string> = Object.fromEntries(unknownIds.map((id, i) => [id, `Acct ${i + 1}`]));
+
+  const result = (txData || []).map((tx: any) => ({
     ...tx,
     date: tx.transaction_date,
     notes: tx.note,
@@ -34,7 +39,7 @@ export async function GET(req: NextRequest) {
     reinvest_id: null,
     reinvest_qty: null,
     reinvest_price: null,
-    account_name: nameMap[tx.account_id],
+    account_name: nameMap[tx.account_id] ?? acctLabel[tx.account_id] ?? '—',
   }));
 
   return NextResponse.json(result);

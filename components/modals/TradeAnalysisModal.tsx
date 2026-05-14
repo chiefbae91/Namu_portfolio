@@ -26,6 +26,40 @@ const INTERVALS: { value: Interval; label: string }[] = [
 const TX_TYPE_LABELS: Record<string, string> = { buy: 'Buy', sell: 'Sell', dividend: 'Dividend' };
 const TX_TYPE_COLORS: Record<string, string> = { buy: '#00e676', sell: '#ff5252', dividend: '#f59e0b' };
 
+const BADGE_COLORS: [string, string][] = [
+  ['robinhood', '#00c853'], ['chase', '#1e88e5'], ['fidelity', '#f59e0b'],
+  ['schwab', '#8b5cf6'], ['etrade', '#06b6d4'], ['webull', '#ef4444'],
+  ['tdameritrade', '#fb923c'],
+];
+function badgeColor(name: string): string {
+  const l = name.toLowerCase();
+  for (const [key, color] of BADGE_COLORS) { if (l.includes(key)) return color; }
+  return '#666';
+}
+const BROKER_ABBR_MODAL: Record<string, string> = {
+  robinhood: 'RH', fidelity: 'FI', schwab: 'SC',
+  etrade: 'ET', webull: 'WB', tdameritrade: 'TD',
+};
+function badgeLabel(name: string): string {
+  const lower = name.toLowerCase();
+  for (const [key, abbr] of Object.entries(BROKER_ABBR_MODAL)) {
+    if (lower.includes(key)) return abbr;
+  }
+  const acct = name.match(/^Acct\s+(\d+)$/i);
+  if (acct) return `A${acct[1]}`;
+  const words = name.trim().split(/\s+/);
+  if (words.length > 1) return words.map(w => w[0]).join('').toUpperCase().slice(0, 3);
+  return name.slice(0, 2).toUpperCase();
+}
+function AccountBadge({ name }: { name?: string }) {
+  if (!name) return null;
+  return (
+    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 5px', borderRadius: 3, background: badgeColor(name), color: 'white', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
+      {badgeLabel(name)}
+    </span>
+  );
+}
+
 const HINT_TYPE_LABELS: Record<string, string> = {
   resistance:      '벽 (Resistance)',
   support:         '지지 (Support)',
@@ -54,9 +88,9 @@ const HINT_TYPE_COLORS: Record<string, string> = {
 
 const PAGE_SIZE = 10;
 
-function fmtHintPrice(p: string | null): string {
-  if (!p) return '—';
-  return p.trim().split(/\s+/).map(part => {
+function fmtHintPrice(p: string | number | null): string {
+  if (p == null || p === '') return '—';
+  return String(p).trim().split(/\s+/).map(part => {
     const n = parseFloat(part.replace(/,/g, ''));
     return isNaN(n) ? part : `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }).join(' ');
@@ -307,11 +341,11 @@ export default function TradeAnalysisModal({
                           return (
                             <tr key={tx.id ?? i}>
                               <td className="muted">{tx.date}</td>
-                              <td>{tx.account_name}</td>
+                              <td><AccountBadge name={tx.account_name} /></td>
                               <td style={{ fontWeight: 500 }}>{tx.ticker}</td>
                               <td>
-                                <span style={{ color: TX_TYPE_COLORS[tx.type] || 'var(--muted)', fontWeight: 500 }}>
-                                  {TX_TYPE_LABELS[tx.type] || tx.type}
+                                <span style={{ color: TX_TYPE_COLORS[tx.type?.toLowerCase()] || 'var(--muted)', fontWeight: 500 }}>
+                                  {TX_TYPE_LABELS[tx.type?.toLowerCase()] || tx.type}
                                 </span>
                               </td>
                               <td style={{ textAlign: 'right' }}>{tx.quantity > 0 ? tx.quantity.toLocaleString('en-US') : '-'}</td>

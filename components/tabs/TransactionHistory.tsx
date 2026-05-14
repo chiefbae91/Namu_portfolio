@@ -34,10 +34,20 @@ function getAccountBadgeColor(name: string): string {
   }
   return '#666';
 }
+const BROKER_ABBR: Record<string, string> = {
+  robinhood: 'RH', fidelity: 'FI', schwab: 'SC',
+  etrade: 'ET', webull: 'WB', tdameritrade: 'TD',
+};
 function getAccountInitials(name: string): string {
+  const lower = name.toLowerCase();
+  for (const [key, abbr] of Object.entries(BROKER_ABBR)) {
+    if (lower.includes(key)) return abbr;
+  }
+  const acct = name.match(/^Acct\s+(\d+)$/i);
+  if (acct) return `A${acct[1]}`;
   const words = name.trim().split(/\s+/);
-  if (words.length === 1) return name.slice(0, 3).toUpperCase();
-  return words.map(w => w[0]).join('').toUpperCase().slice(0, 4);
+  if (words.length > 1) return words.map(w => w[0]).join('').toUpperCase().slice(0, 3);
+  return name.slice(0, 2).toUpperCase();
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -51,11 +61,11 @@ const TYPE_COLORS: Record<string, string> = {
 
 function txLabel(tx: { type: string; subtype?: string | null }): string {
   if (tx.subtype === 'DIVIDEND_REINVEST') return 'Div. Reinvest';
-  return TYPE_LABELS[tx.type] || tx.type;
+  return TYPE_LABELS[tx.type.toLowerCase()] || tx.type;
 }
 function txColor(tx: { type: string; subtype?: string | null }): string {
   if (tx.subtype === 'DIVIDEND_REINVEST') return '#34d399';
-  return TYPE_COLORS[tx.type] || 'var(--muted)';
+  return TYPE_COLORS[tx.type.toLowerCase()] || 'var(--muted)';
 }
 
 interface ConfirmModalProps {

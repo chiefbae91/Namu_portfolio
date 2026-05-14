@@ -26,14 +26,14 @@ export interface ChartHint {
   note: string | null;
 }
 
-function parsePrices(p: string | null): number[] {
-  if (!p) return [];
-  return p.trim().split(/\s+/).map(s => parseFloat(s.replace(/,/g, ''))).filter(n => !isNaN(n));
+function parsePrices(p: string | number | null): number[] {
+  if (p == null || p === '') return [];
+  return String(p).trim().split(/\s+/).map(s => parseFloat(s.replace(/,/g, ''))).filter(n => !isNaN(n));
 }
 
-function fmtHintPrice(p: string | null): string | null {
-  if (!p) return null;
-  return p.trim().split(/\s+/).map(part => {
+function fmtHintPrice(p: string | number | null): string | null {
+  if (p == null || p === '') return null;
+  return String(p).trim().split(/\s+/).map(part => {
     const n = parseFloat(part.replace(/,/g, ''));
     return isNaN(n) ? part : `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }).join(' ');
