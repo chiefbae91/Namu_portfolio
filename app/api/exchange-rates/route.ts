@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const FALLBACK: Record<string, number> = { USD: 1, KRW: 1380, EUR: 0.92 };
+const FALLBACK: Record<string, number> = { USD: 1, KRW: 1380, EUR: 0.92, DXY: 104 };
 
 async function yahooRate(symbol: string): Promise<number | null> {
   try {
@@ -20,14 +20,16 @@ async function yahooRate(symbol: string): Promise<number | null> {
 export async function GET() {
   // USDKRW=X → 1 USD = X KRW (direct)
   // EURUSD=X → 1 EUR = X USD → invert to get USD→EUR rate
-  const [krw, eurusd] = await Promise.all([
+  const [krw, eurusd, dxy] = await Promise.all([
     yahooRate('USDKRW=X'),
     yahooRate('EURUSD=X'),
+    yahooRate('DX-Y.NYB'),
   ]);
 
   return NextResponse.json({
     USD: 1,
     KRW: krw ?? FALLBACK.KRW,
     EUR: eurusd != null ? Math.round((1 / eurusd) * 10000) / 10000 : FALLBACK.EUR,
+    DXY: dxy ?? FALLBACK.DXY,
   });
 }

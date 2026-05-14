@@ -367,7 +367,7 @@ export default function TradeAnalysisModal({
                               {HINT_TYPE_LABELS[h.type] ?? h.type}
                             </span>
                           </td>
-                          <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                          <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                             {fmtHintPrice(h.price)}
                           </td>
                           <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>

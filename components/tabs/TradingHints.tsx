@@ -277,7 +277,7 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, o
                     {TYPE_LABELS[hint.type] ?? hint.type}
                   </span>
                 </td>
-                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                   {fmtPrice(hint.price) ?? <span className="muted">—</span>}
                 </td>
                 <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>

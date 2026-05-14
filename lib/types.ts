@@ -88,6 +88,7 @@ export interface ExchangeRates {
   USD: number;
   KRW: number;
   EUR: number;
+  DXY: number;
 }
 
 export interface SummaryData {

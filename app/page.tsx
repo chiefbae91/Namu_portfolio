@@ -17,7 +17,7 @@ const TRANSFER_OFFSET = 1_000_000;
 export default function Home() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
-  const [rates, setRates] = useState<ExchangeRates>({ USD: 1, KRW: 1380, EUR: 0.92 });
+  const [rates, setRates] = useState<ExchangeRates>({ USD: 1, KRW: 1380, EUR: 0.92, DXY: 104 });
   const [showKrw, setShowKrw] = useState(false);
   const [showEur, setShowEur] = useState(false);
   const [activeTab, setActiveTab] = useState<'portfolio' | 'history' | 'hints'>('portfolio');
@@ -309,22 +309,13 @@ export default function Home() {
           </label>
         </div>
 
-        <div style={{ fontSize: 11, color: 'var(--muted)', display: 'flex', gap: 8, alignItems: 'center' }}>
-          {showKrw && <span>₩{Math.round(rates.KRW).toLocaleString('en-US')}/USD</span>}
-          {showEur && <span>€{rates.EUR.toFixed(4)}/USD</span>}
-          {ratesUpdatedAt && (
-            <span style={{ opacity: 0.5, fontSize: 10 }}>
-              {ratesUpdatedAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'America/New_York', timeZoneName: 'short' })}
-            </span>
-          )}
-          <button
-            onClick={fetchRates}
-            title="Refresh Rates"
-            style={{ background: 'none', color: 'var(--muted)', padding: 2, display: 'flex', alignItems: 'center' }}
-          >
-            <RefreshCw size={11} style={{ animation: ratesRefreshing ? 'spin 0.6s linear infinite' : 'none' }} />
-          </button>
-        </div>
+        <button
+          onClick={fetchRates}
+          title="Refresh Rates"
+          style={{ background: 'none', color: 'var(--muted)', padding: 2, display: 'flex', alignItems: 'center' }}
+        >
+          <RefreshCw size={13} style={{ animation: ratesRefreshing ? 'spin 0.6s linear infinite' : 'none' }} />
+        </button>
 
         <button onClick={() => { setEditingTx(null); setTxModalOpen(true); }}
           style={{ background: 'var(--accent)', color: 'white', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}>
@@ -343,6 +334,39 @@ export default function Home() {
       </div>
 
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: '20px 20px 0' }}>
+        {/* FX Rate Bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 24, marginBottom: 16, padding: '10px 16px', background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>DXY</span>
+            <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
+              {rates.DXY.toFixed(2)}
+            </span>
+          </div>
+          {showKrw && <div style={{ width: 1, height: 28, background: 'var(--border)' }} />}
+          {showKrw && (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+              <span style={{ fontSize: 22, fontWeight: 700, color: '#fbbf24', fontVariantNumeric: 'tabular-nums' }}>
+                ₩{Math.round(rates.KRW).toLocaleString('en-US')}
+              </span>
+              <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 500 }}>/USD</span>
+            </div>
+          )}
+          {showEur && <div style={{ width: 1, height: 28, background: 'var(--border)' }} />}
+          {showEur && (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+              <span style={{ fontSize: 22, fontWeight: 700, color: '#34d399', fontVariantNumeric: 'tabular-nums' }}>
+                €{rates.EUR.toFixed(4)}
+              </span>
+              <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 500 }}>/USD</span>
+            </div>
+          )}
+          {ratesUpdatedAt && (
+            <span style={{ fontSize: 11, color: 'var(--muted)', opacity: 0.6, marginLeft: 'auto' }}>
+              {ratesUpdatedAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'America/New_York', timeZoneName: 'short' })}
+            </span>
+          )}
+        </div>
+
         {/* Summary Cards */}
         <SummaryCards
           cash={summary.cash}
