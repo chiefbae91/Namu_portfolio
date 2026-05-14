@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import { Account, Transaction, Currency, LotInfo, LotSelection, TaxLotMethod } from '@/lib/types';
 import { formatPriceInput, parsePriceInput } from '@/lib/format';
 import DatePickerInput from '@/components/DatePickerInput';
+import TickerTypeahead from '@/components/TickerTypeahead';
 
 interface Props {
   accounts: Account[];
@@ -13,6 +14,7 @@ interface Props {
   onClose: () => void;
   prefillTicker?: string;
   prefillAccountId?: number;
+  tickerSuggestions?: string[];
 }
 
 const TX_TYPES = [
@@ -187,7 +189,7 @@ function TaxLotPanel({ ticker, accountId, sellQty, sellPrice, method, onMethodCh
 }
 
 // ─── Modal ────────────────────────────────────────────────────────
-export default function TransactionModal({ accounts, currency, editingTx, onSubmit, onClose, prefillTicker, prefillAccountId }: Props) {
+export default function TransactionModal({ accounts, currency, editingTx, onSubmit, onClose, prefillTicker, prefillAccountId, tickerSuggestions = [] }: Props) {
   const visible = accounts.filter(a => !a.hidden);
   const sym = SYM[currency];
   const isEditing = !!editingTx;
@@ -374,9 +376,17 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
               {type !== 'transfer' && (
                 <div className="form-group" style={{ flex:1 }}>
                   <label>Symbol</label>
-                  <input value={ticker} onChange={e => !prefillTicker && setTicker(e.target.value.toUpperCase())}
-                    placeholder="AAPL" style={{ width:'100%', opacity: prefillTicker ? 0.7 : 1 }}
-                    readOnly={!!prefillTicker} required />
+                  {prefillTicker ? (
+                    <input value={ticker} readOnly style={{ width: '100%', opacity: 0.7 }} />
+                  ) : (
+                    <TickerTypeahead
+                      value={ticker}
+                      onChange={val => setTicker(val.toUpperCase())}
+                      suggestions={tickerSuggestions}
+                      placeholder="Type ticker to search"
+                      style={{ width: '100%' }}
+                    />
+                  )}
                 </div>
               )}
             </div>

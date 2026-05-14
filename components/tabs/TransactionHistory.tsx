@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Pencil, PlusCircle, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Transaction, Currency, ExchangeRates } from '@/lib/types';
 import { formatCurrency } from '@/lib/format';
+import TickerTypeahead from '@/components/TickerTypeahead';
 
 interface Props {
   transactions: Transaction[];
@@ -136,7 +137,7 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
 
   const tickers = [...new Set(transactions.map(t => t.ticker).filter(Boolean))].sort();
   const filtered = transactions
-    .filter(t => !tickerFilter || t.ticker === tickerFilter)
+    .filter(t => !tickerFilter || (t.ticker && t.ticker.toUpperCase().includes(tickerFilter.toUpperCase())))
     .filter(t => {
       if (!typeFilter) return true;
       if (typeFilter === 'dividend_reinvest') return t.subtype === 'DIVIDEND_REINVEST';
@@ -193,10 +194,13 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
     <div>
       {/* Toolbar */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
-        <select value={tickerFilter} onChange={e => { setTickerFilter(e.target.value); setSelected(new Set()); }} style={{ minWidth: 130 }}>
-          <option value="">All Symbols</option>
-          {tickers.map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
+        <TickerTypeahead
+          value={tickerFilter}
+          onChange={val => { setTickerFilter(val); setSelected(new Set()); }}
+          suggestions={tickers}
+          placeholder="Type ticker to search"
+          style={{ minWidth: 130 }}
+        />
         <select value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setSelected(new Set()); }} style={{ minWidth: 160 }}>
           {TYPE_FILTER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>

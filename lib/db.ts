@@ -125,6 +125,14 @@ function initSchema(db: Database.Database) {
     }
   } catch { /* migration failed or already done */ }
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+    INSERT OR IGNORE INTO settings (key, value) VALUES ('app_name', 'Namu Portfolio');
+  `);
+
   // Safe migrations for existing DBs
   const migrations = [
     "ALTER TABLE transactions ADD COLUMN notes TEXT DEFAULT ''",
@@ -138,6 +146,15 @@ function initSchema(db: Database.Database) {
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* already exists */ }
   }
+}
+
+export function getSetting(key: string): string | null {
+  const row = getDb().prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined;
+  return row?.value ?? null;
+}
+
+export function setSetting(key: string, value: string): void {
+  getDb().prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, value);
 }
 
 export default getDb;

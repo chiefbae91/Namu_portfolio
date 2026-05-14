@@ -41,6 +41,9 @@ export default function Home() {
   const [portfolioLoading, setPortfolioLoading] = useState(false);
   const [ratesUpdatedAt, setRatesUpdatedAt] = useState<Date | null>(null);
   const [ratesRefreshing, setRatesRefreshing] = useState(false);
+  const [appName, setAppName] = useState('Namu Portfolio');
+  const [appNameEditing, setAppNameEditing] = useState(false);
+  const [appNameInput, setAppNameInput] = useState('');
 
   const fetchTradingHints = useCallback(async () => {
     const res = await fetch('/api/trading-hints');
@@ -113,7 +116,12 @@ export default function Home() {
     setTransactions(combined);
   }, [selectedAccountId]);
 
-  useEffect(() => { fetchAccounts(); fetchRates(); fetchTradingHints(); }, []);
+  useEffect(() => {
+    fetchAccounts(); fetchRates(); fetchTradingHints();
+    fetch('/api/settings?key=app_name')
+      .then(r => r.json())
+      .then(d => { if (d.value) { setAppName(d.value); document.title = d.value; } });
+  }, []);
 
   // Auto-refresh rates every 5 minutes
   useEffect(() => {
@@ -250,7 +258,28 @@ export default function Home() {
     <div style={{ minHeight: '100vh', padding: '0 0 40px' }}>
       {/* Header */}
       <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <h1 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--accent)', marginRight: 8 }}>Namu Portfolio</h1>
+        {appNameEditing ? (
+          <input
+            autoFocus
+            value={appNameInput}
+            onChange={e => setAppNameInput(e.target.value)}
+            onBlur={async () => {
+              const name = appNameInput.trim() || appName;
+              setAppName(name);
+              document.title = name;
+              setAppNameEditing(false);
+              await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'app_name', value: name }) });
+            }}
+            onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') { setAppNameEditing(false); } }}
+            style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)', background: 'transparent', border: 'none', borderBottom: '2px solid var(--accent)', outline: 'none', marginRight: 8, width: Math.max(120, appNameInput.length * 11) }}
+          />
+        ) : (
+          <h1
+            title="Click to rename"
+            onClick={() => { setAppNameInput(appName); setAppNameEditing(true); }}
+            style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--accent)', marginRight: 8, cursor: 'pointer' }}
+          >{appName}</h1>
+        )}
 
         <select value={selectedAccountId} onChange={e => setSelectedAccountId(e.target.value)} style={{ minWidth: 140 }}>
           <option value="all">All Accounts</option>
@@ -374,6 +403,10 @@ export default function Home() {
           onClose={closeTransactionModal}
           prefillTicker={txPrefill?.ticker}
           prefillAccountId={txPrefill?.accountId}
+          tickerSuggestions={[...new Set([
+            ...positions.map(p => p.ticker),
+            ...transactions.map(t => t.ticker).filter(Boolean),
+          ])].sort()}
         />
       )}
 
