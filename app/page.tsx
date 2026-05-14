@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, Settings, FileUp, PlusCircle, RefreshCw, LogOut } from 'lucide-react';
+import { ChevronDown, Settings, FileUp, RefreshCw, LogOut } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { Account, AccountBreakdown, ExchangeRates, PortfolioPosition, SummaryData, Transaction, TradingHint } from '@/lib/types';
 import StockPortfolio from '@/components/tabs/StockPortfolio';
@@ -399,15 +399,6 @@ export default function Home() {
           <RefreshCw size={13} style={{ animation: ratesRefreshing ? 'spin 0.6s linear infinite' : 'none' }} />
         </button>
 
-        <button onClick={() => { setEditingTx(null); setTxModalOpen(true); }}
-          style={{ background: 'var(--accent)', color: 'white', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}>
-          <PlusCircle size={15} /> Add Trading History
-        </button>
-
-        <button onClick={() => { setEditingHint(null); setTradingHintOpen(true); }}
-          style={{ background: 'var(--accent)', color: 'white', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}>
-          <PlusCircle size={15} /> Add Trading Hint
-        </button>
 
         <button onClick={() => setCsvImportOpen(true)}
           style={{ background: 'var(--border)', color: 'var(--muted)', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
