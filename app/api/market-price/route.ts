@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=${resolvedInterval}&range=${rangeParam}`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, cache: 'no-store' });
 
     if (!res.ok) return NextResponse.json({ price: 0, candles: [], resolvedInterval, transactions: [], holdings: [] });
     const data = await res.json();
@@ -64,6 +64,28 @@ export async function GET(req: NextRequest) {
       WHERE t.ticker = ? AND t.type IN ('buy','sell','dividend')
       ORDER BY t.date DESC, t.id DESC
     `).all(ticker);
+
+    // For daily charts, Yahoo Finance often omits the current trading day from historical
+    // responses. Synthesize a flat candle at the current price for any transaction date
+    // within the chart range that has no matching candle.
+    // Intraday intervals are excluded: Yahoo Finance includes live intraday candles when
+    // the market is open, and adding a synthetic one pre-market would use the previous
+    // close price, which is misleading.
+    if (!isIntraday && price > 0 && candles.length > 0) {
+      const rangeStart = candles[0].date;
+      const candleDates = new Set(candles.map(c => c.date));
+      const missingDates = new Set<string>();
+      for (const tx of transactions as any[]) {
+        const d = (tx.date as string).slice(0, 10);
+        if (d >= rangeStart && !candleDates.has(d)) missingDates.add(d);
+      }
+      for (const d of missingDates) {
+        // 20:00 UTC ≈ 4pm ET (market close), ensures correct date in both UTC and ET
+        const ts = Math.floor(new Date(d + 'T20:00:00Z').getTime() / 1000);
+        candles.push({ time: ts, date: d, open: price, high: price, low: price, close: price });
+      }
+      if (missingDates.size > 0) candles.sort((a, b) => a.time - b.time);
+    }
 
     // Per-account holdings via FIFO lot calculation
     const hLotRows = db.prepare(`
