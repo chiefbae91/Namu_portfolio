@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import getDb from '@/lib/db';
+import { getAuthUser, unauthorized } from '@/lib/auth';
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+  if (!await getAuthUser()) return unauthorized();
   const db = getDb();
   const id = Number(params.id);
   const body = await req.json();
@@ -24,6 +26,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  if (!await getAuthUser()) return unauthorized();
   const db = getDb();
   const id = Number(params.id);
   db.prepare('DELETE FROM option_closes WHERE option_id = ?').run(id);

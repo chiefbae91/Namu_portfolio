@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, Settings, FileUp, PlusCircle, RefreshCw } from 'lucide-react';
+import { ChevronDown, Settings, FileUp, PlusCircle, RefreshCw, LogOut } from 'lucide-react';
+import { createClient } from '@/lib/supabase';
 import { Account, AccountBreakdown, ExchangeRates, PortfolioPosition, SummaryData, Transaction, TradingHint } from '@/lib/types';
 import StockPortfolio from '@/components/tabs/StockPortfolio';
 import TransactionHistory from '@/components/tabs/TransactionHistory';
@@ -51,6 +52,7 @@ export default function Home() {
   const [appNameInput, setAppNameInput] = useState('');
   const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([]);
   const alertStateRef = useRef<Record<string, 'up' | 'down' | null>>({});
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   const fetchTradingHints = useCallback(async () => {
     const res = await fetch('/api/trading-hints');
@@ -145,6 +147,10 @@ export default function Home() {
   }, [accountFilter]);
 
   useEffect(() => {
+    createClient().auth.getUser().then(({ data: { user } }) => {
+      if (!user) { window.location.href = '/login'; return; }
+      setUserEmail(user.email ?? null);
+    });
     fetchAccounts(); fetchRates(); fetchTradingHints();
     fetch('/api/settings?key=app_name')
       .then(r => r.json())
@@ -406,6 +412,23 @@ export default function Home() {
         <button onClick={() => setCsvImportOpen(true)}
           style={{ background: 'var(--border)', color: 'var(--muted)', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
           <FileUp size={14} /> CSV Import
+        </button>
+
+        {userEmail && (
+          <span style={{ fontSize: 11, color: 'var(--muted)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {userEmail}
+          </span>
+        )}
+
+        <button
+          onClick={async () => {
+            await createClient().auth.signOut();
+            window.location.href = '/login';
+          }}
+          title="Sign out"
+          style={{ background: 'none', color: 'var(--muted)', padding: '6px 8px', display: 'flex', alignItems: 'center' }}
+        >
+          <LogOut size={15} />
         </button>
       </div>
 

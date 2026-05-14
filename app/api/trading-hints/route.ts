@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import getDb from '@/lib/db';
+import { getAuthUser, unauthorized } from '@/lib/auth';
 
 export async function GET() {
+  if (!await getAuthUser()) return unauthorized();
   const db = getDb();
   const rows = db.prepare(
     `SELECT * FROM trading_hints ORDER BY hint_date DESC, created_at DESC`
@@ -10,6 +12,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  if (!await getAuthUser()) return unauthorized();
   const db = getDb();
   const { ticker, hint_date, type, price, current_price, note } = await req.json();
   if (!ticker || !hint_date || !type) {

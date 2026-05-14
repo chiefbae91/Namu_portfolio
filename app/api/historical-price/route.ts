@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getAuthUser, unauthorized } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
+  if (!await getAuthUser()) return unauthorized();
   const { searchParams } = new URL(req.url);
   const ticker = searchParams.get('ticker');
   const date = searchParams.get('date'); // YYYY-MM-DD

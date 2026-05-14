@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import getDb from '@/lib/db';
 import Papa from 'papaparse';
 import { CsvPreviewRow, TransactionType } from '@/lib/types';
+import { getAuthUser, unauthorized } from '@/lib/auth';
 
 const ROBINHOOD_CODE_MAP: Record<string, TransactionType | 'skip'> = {
   'Buy': 'buy', 'BTO': 'buy', 'BTC': 'buy',
@@ -175,6 +176,7 @@ function parseNewRows(rows: Record<string, string>[], ticker: string, accountId:
 }
 
 export async function POST(req: NextRequest) {
+  if (!await getAuthUser()) return unauthorized();
   const formData = await req.formData();
   const file = formData.get('file') as File | null;
   const accountId = formData.get('account_id');

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import getDb from '@/lib/db';
+import { getAuthUser, unauthorized } from '@/lib/auth';
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+  if (!await getAuthUser()) return unauthorized();
   const db = getDb();
   const { name, hidden } = await req.json();
   const id = Number(params.id);
@@ -23,6 +25,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  if (!await getAuthUser()) return unauthorized();
   const db = getDb();
   const id = Number(params.id);
   const txCount = (db.prepare('SELECT COUNT(*) as c FROM transactions WHERE account_id = ?').get(id) as any).c;

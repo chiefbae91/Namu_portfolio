@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import getDb from '@/lib/db';
+import { getAuthUser, unauthorized } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
+  if (!await getAuthUser()) return unauthorized();
   const db = getDb();
   const { searchParams } = new URL(req.url);
   const accountIdsParam = searchParams.get('account_ids');
@@ -25,6 +27,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  if (!await getAuthUser()) return unauthorized();
   const db = getDb();
   const { account_id, date, amount, type, description } = await req.json();
 

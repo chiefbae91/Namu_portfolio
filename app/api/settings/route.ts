@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getSetting, setSetting } from '@/lib/db';
+import { getAuthUser, unauthorized } from '@/lib/auth';
 
 export async function GET(req: Request) {
+  if (!await getAuthUser()) return unauthorized();
   const { searchParams } = new URL(req.url);
   const key = searchParams.get('key');
   if (!key) return NextResponse.json({ error: 'key required' }, { status: 400 });
@@ -9,6 +11,7 @@ export async function GET(req: Request) {
 }
 
 export async function PUT(req: Request) {
+  if (!await getAuthUser()) return unauthorized();
   const { key, value } = await req.json();
   if (!key || typeof value !== 'string') return NextResponse.json({ error: 'key and value required' }, { status: 400 });
   setSetting(key, value);

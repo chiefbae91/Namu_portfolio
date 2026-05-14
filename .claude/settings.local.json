@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"c:\\\\Projects\\\\Namu_portfolio\" -Recurse -Force)",
+      "Bash(Select-Object -First 50)",
+      "Bash(Format-Table FullName)",
+      "Bash(npx tsc *)",
+      "Bash(npx next *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(cat \"/mnt/c/Users/namuk/AppData/Local/Temp/claude/c--Projects-Namu-portfolio/40605174-70e6-4f9a-9bec-9887278d1b29/tasks/b40vmt4a3.output\" 2>&1 | tail -15)",
+      "Read(//mnt/c/Users/namuk/AppData/Local/Temp/claude/c--Projects-Namu-portfolio/40605174-70e6-4f9a-9bec-9887278d1b29/tasks/**)",
+      "Bash(npx kill-port *)",
+      "Bash(mkdir -p \"c:\\\\Projects\\\\Namu_portfolio\\\\app\\\\api\\\\transfers\\\\[id]\")",
+      "Bash(git commit *)",
+      "Bash(Copy-Item \"c:\\\\Projects\\\\Namu_portfolio\\\\data\\\\portfolio.db\" \"c:\\\\Projects\\\\Namu_portfolio\\\\data\\\\portfolio_backup_20260513.db\")",
+      "PowerShell(Copy-Item \"c:\\\\Projects\\\\Namu_portfolio\\\\data\\\\portfolio.db\" \"c:\\\\Projects\\\\Namu_portfolio\\\\data\\\\portfolio_backup_20260513.db\")",
+      "Bash(New-Item -ItemType Directory -Force -Path \"c:\\\\Projects\\\\Namu_portfolio\\\\app\\\\api\\\\historical-price\")",
+      "Bash(Out-Null)",
+      "Bash(Write-Output \"ok\")",
+      "Bash(mkdir -p \"c:/Projects/Namu_portfolio/app/api/trading-hints/[id]\")",
+      "Bash(node -e ' *)",
+      "Bash(New-Item -ItemType Directory -Force \"c:\\\\Projects\\\\Namu_portfolio\\\\app\\\\api\\\\settings\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"c:\\\\Projects\\\\Namu_portfolio\\\\app\\\\api\\\\settings\")",
+      "PowerShell(\"ok\")",
+      "PowerShell(Copy-Item \"c:\\\\Projects\\\\Namu_portfolio\\\\data\\\\portfolio.db\" \"c:\\\\Projects\\\\Namu_portfolio\\\\data\\\\portfolio_backup_20260514.db\")",
+      "PowerShell(\\(Get-Item \"c:\\\\Projects\\\\Namu_portfolio\\\\data\\\\portfolio_backup_20260514.db\"\\).Length / 1KB)",
+      "Bash(curl -s \"https://query1.finance.yahoo.com/v8/finance/chart/KORU?interval=1d&range=1d\" -H \"User-Agent: Mozilla/5.0\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); m=d['chart']['result'][0]['meta']; print\\(json.dumps\\({k:m[k] for k in ['symbol','shortName','longName','quoteType','instrumentType','exchangeName','currency'] if k in m}, indent=2\\)\\)\")"
+    ],
+    "additionalDirectories": [
+      "c:\\Projects\\Namu_portfolio\\app\\api\\transfers",
+      "c:\\Projects\\Namu_portfolio\\app\\api\\trading-hints"
+    ]
+  }
+}

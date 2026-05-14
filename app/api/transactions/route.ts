@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import getDb from '@/lib/db';
+import { getAuthUser, unauthorized } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
+  if (!await getAuthUser()) return unauthorized();
   const db = getDb();
   const { searchParams } = new URL(req.url);
   const ticker = searchParams.get('ticker');
@@ -35,6 +37,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  if (!await getAuthUser()) return unauthorized();
   const db = getDb();
   const body = await req.json();
   const { account_id, date, ticker, type, quantity, price, fee, currency, notes,

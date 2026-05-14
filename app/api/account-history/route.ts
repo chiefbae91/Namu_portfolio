@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import getDb from '@/lib/db';
+import { getAuthUser, unauthorized } from '@/lib/auth';
 
 const RANGE_CONFIG: Record<string, { yfRange: string; interval: string }> = {
   '1W': { yfRange: '5d',  interval: '1d' },
@@ -12,6 +13,7 @@ const RANGE_CONFIG: Record<string, { yfRange: string; interval: string }> = {
 };
 
 export async function GET(req: NextRequest) {
+  if (!await getAuthUser()) return unauthorized();
   const { searchParams } = new URL(req.url);
   const accountIdStr = searchParams.get('account_id');
   const range = searchParams.get('range') ?? '1M';

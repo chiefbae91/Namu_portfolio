@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import getDb from '@/lib/db';
+import { getAuthUser, unauthorized } from '@/lib/auth';
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+  if (!await getAuthUser()) return unauthorized();
   const db = getDb();
   const id = Number(params.id);
   const { ticker, hint_date, type, price, current_price, note } = await req.json();
@@ -12,6 +14,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  if (!await getAuthUser()) return unauthorized();
   const db = getDb();
   db.prepare('DELETE FROM trading_hints WHERE id = ?').run(Number(params.id));
   return NextResponse.json({ ok: true });

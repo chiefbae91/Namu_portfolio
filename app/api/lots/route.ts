@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import getDb from '@/lib/db';
 import { LotInfo, LotSelection, TaxLotMethod } from '@/lib/types';
+import { getAuthUser, unauthorized } from '@/lib/auth';
 
 interface RawLot {
   id: number;
@@ -100,6 +101,7 @@ function selectLots(lots: RawLot[], sellQty: number, method: TaxLotMethod): LotS
 }
 
 export async function GET(req: NextRequest) {
+  if (!await getAuthUser()) return unauthorized();
   const { searchParams } = new URL(req.url);
   const ticker = searchParams.get('ticker');
   const accountId = searchParams.get('account_id');

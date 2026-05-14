@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import getDb from '@/lib/db';
+import { getAuthUser, unauthorized } from '@/lib/auth';
 
 type Interval = '1m' | '15m' | '1d' | '1wk';
 type Range = '5d' | '1mo' | '3mo' | '6mo' | '1y';
@@ -16,6 +17,7 @@ function coerceInterval(interval: Interval, range: Range): Interval {
 }
 
 export async function GET(req: NextRequest) {
+  if (!await getAuthUser()) return unauthorized();
   const { searchParams } = new URL(req.url);
   const ticker = searchParams.get('ticker');
   const rangeParam = (searchParams.get('range') ?? '1mo') as Range;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import getDb from '@/lib/db';
 import { TaxLotMethod } from '@/lib/types';
+import { getAuthUser, unauthorized } from '@/lib/auth';
 
 interface Lot {
   id: number;
@@ -49,6 +50,7 @@ async function fetchPriceData(ticker: string): Promise<{ price: number; prevClos
 }
 
 export async function GET(req: NextRequest) {
+  if (!await getAuthUser()) return unauthorized();
   const db = getDb();
   const { searchParams } = new URL(req.url);
   const accountIdsParam = searchParams.get('account_ids');

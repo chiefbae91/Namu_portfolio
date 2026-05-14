@@ -1,0 +1,592 @@
+[
+  {
+    "id": 2,
+    "ticker": "INTC",
+    "hint_date": "2026-05-12",
+    "type": "long_target",
+    "price": "130.0",
+    "current_price": 120.61,
+    "note": null,
+    "created_at": "2026-05-13 19:52:25"
+  },
+  {
+    "id": 3,
+    "ticker": "MU",
+    "hint_date": "2026-05-12",
+    "type": "long_target",
+    "price": "800.0",
+    "current_price": 766.58,
+    "note": null,
+    "created_at": "2026-05-13 19:52:42"
+  },
+  {
+    "id": 4,
+    "ticker": "NBIS",
+    "hint_date": "2026-05-12",
+    "type": "resistance",
+    "price": "180.0",
+    "current_price": 179.11,
+    "note": null,
+    "created_at": "2026-05-13 19:52:56"
+  },
+  {
+    "id": 5,
+    "ticker": "NBIS",
+    "hint_date": "2026-05-12",
+    "type": "long_target",
+    "price": "210.0",
+    "current_price": 179.11,
+    "note": null,
+    "created_at": "2026-05-13 19:53:09"
+  },
+  {
+    "id": 7,
+    "ticker": "PL",
+    "hint_date": "2026-05-13",
+    "type": "resistance",
+    "price": "43.00 52.00",
+    "current_price": 40.74,
+    "note": null,
+    "created_at": "2026-05-13 19:59:14"
+  },
+  {
+    "id": 8,
+    "ticker": "POET",
+    "hint_date": "2026-05-13",
+    "type": "resistance",
+    "price": "15.50",
+    "current_price": 14.37,
+    "note": null,
+    "created_at": "2026-05-13 20:23:49"
+  },
+  {
+    "id": 9,
+    "ticker": "POET",
+    "hint_date": "2026-05-13",
+    "type": "supply_level",
+    "price": "12.80 13.50",
+    "current_price": 14.37,
+    "note": null,
+    "created_at": "2026-05-13 20:24:04"
+  },
+  {
+    "id": 10,
+    "ticker": "NBIS",
+    "hint_date": "2026-05-13",
+    "type": "resistance",
+    "price": "210.00 220.00 250.00",
+    "current_price": 207.27,
+    "note": null,
+    "created_at": "2026-05-13 20:48:05"
+  },
+  {
+    "id": 11,
+    "ticker": "TSM",
+    "hint_date": "2026-05-11",
+    "type": "supply_level",
+    "price": "390.00",
+    "current_price": 404.54,
+    "note": null,
+    "created_at": "2026-05-14 08:35:39"
+  },
+  {
+    "id": 12,
+    "ticker": "AXTI",
+    "hint_date": "2026-05-11",
+    "type": "supply_level",
+    "price": "110.00 115.00",
+    "current_price": 125.81,
+    "note": null,
+    "created_at": "2026-05-14 08:36:08"
+  },
+  {
+    "id": 13,
+    "ticker": "UNH",
+    "hint_date": "2026-05-11",
+    "type": "resistance",
+    "price": "380.00",
+    "current_price": 384.44,
+    "note": null,
+    "created_at": "2026-05-14 08:36:50"
+  },
+  {
+    "id": 14,
+    "ticker": "IREN",
+    "hint_date": "2026-05-11",
+    "type": "supply_level",
+    "price": "50.00 51.00",
+    "current_price": 55.15,
+    "note": null,
+    "created_at": "2026-05-14 08:38:33"
+  },
+  {
+    "id": 15,
+    "ticker": "POET",
+    "hint_date": "2026-05-11",
+    "type": "supply_level",
+    "price": "11.00 10.00",
+    "current_price": 13.9,
+    "note": null,
+    "created_at": "2026-05-14 09:29:24"
+  },
+  {
+    "id": 16,
+    "ticker": "YINN",
+    "hint_date": "2026-05-11",
+    "type": "resistance",
+    "price": "38.00",
+    "current_price": 36.59,
+    "note": null,
+    "created_at": "2026-05-14 09:37:22"
+  },
+  {
+    "id": 17,
+    "ticker": "AMZN",
+    "hint_date": "2026-05-11",
+    "type": "supply_level",
+    "price": "265.00 260.00",
+    "current_price": 268.99,
+    "note": null,
+    "created_at": "2026-05-14 09:37:52"
+  },
+  {
+    "id": 18,
+    "ticker": "IONQ",
+    "hint_date": "2026-05-11",
+    "type": "resistance",
+    "price": "60.00",
+    "current_price": 56.89,
+    "note": null,
+    "created_at": "2026-05-14 09:38:05"
+  },
+  {
+    "id": 19,
+    "ticker": "MARA",
+    "hint_date": "2026-05-11",
+    "type": "resistance",
+    "price": "15.00 16.00",
+    "current_price": 13.39,
+    "note": null,
+    "created_at": "2026-05-14 09:38:21"
+  },
+  {
+    "id": 20,
+    "ticker": "KORU",
+    "hint_date": "2026-05-11",
+    "type": "resistance",
+    "price": "990.00 1,000.00",
+    "current_price": 983.09,
+    "note": null,
+    "created_at": "2026-05-14 09:38:40"
+  },
+  {
+    "id": 21,
+    "ticker": "COHR",
+    "hint_date": "2026-05-11",
+    "type": "resistance",
+    "price": "385.00",
+    "current_price": 379.69,
+    "note": null,
+    "created_at": "2026-05-14 09:39:02"
+  },
+  {
+    "id": 22,
+    "ticker": "APLD",
+    "hint_date": "2026-05-11",
+    "type": "resistance",
+    "price": "55.00",
+    "current_price": 44.59,
+    "note": null,
+    "created_at": "2026-05-14 09:39:19"
+  },
+  {
+    "id": 23,
+    "ticker": "ASTS",
+    "hint_date": "2026-05-11",
+    "type": "long_target",
+    "price": "100.00",
+    "current_price": 82.55,
+    "note": null,
+    "created_at": "2026-05-14 09:39:48"
+  },
+  {
+    "id": 24,
+    "ticker": "ASTS",
+    "hint_date": "2026-05-11",
+    "type": "resistance",
+    "price": "82.00 83.00",
+    "current_price": null,
+    "note": "단기 벽",
+    "created_at": "2026-05-14 09:40:10"
+  },
+  {
+    "id": 25,
+    "ticker": "OSCR",
+    "hint_date": "2026-05-11",
+    "type": "resistance",
+    "price": "23.00",
+    "current_price": 22,
+    "note": null,
+    "created_at": "2026-05-14 09:40:29"
+  },
+  {
+    "id": 26,
+    "ticker": "COIN",
+    "hint_date": "2026-05-11",
+    "type": "supply_level",
+    "price": "208.00",
+    "current_price": 216.6,
+    "note": null,
+    "created_at": "2026-05-14 09:40:49"
+  },
+  {
+    "id": 27,
+    "ticker": "RGTI",
+    "hint_date": "2026-05-11",
+    "type": "note_only",
+    "price": null,
+    "current_price": null,
+    "note": "하락폭은 안보이고\n하락하더라도 횡보가 보이고\n23, 29까지 열릴 수 있습니다.",
+    "created_at": "2026-05-14 09:41:10"
+  },
+  {
+    "id": 28,
+    "ticker": "GLW",
+    "hint_date": "2026-05-13",
+    "type": "trailing_supply",
+    "price": "200.00 203.00",
+    "current_price": 206.51,
+    "note": null,
+    "created_at": "2026-05-14 09:46:38"
+  },
+  {
+    "id": 29,
+    "ticker": "LITE",
+    "hint_date": "2026-05-13",
+    "type": "trailing_supply",
+    "price": "998.00",
+    "current_price": 1030.37,
+    "note": null,
+    "created_at": "2026-05-14 09:46:56"
+  },
+  {
+    "id": 30,
+    "ticker": "SOXL",
+    "hint_date": "2026-05-13",
+    "type": "supply_level",
+    "price": "180.00",
+    "current_price": 184.24,
+    "note": "단타 매물대",
+    "created_at": "2026-05-14 09:47:30"
+  },
+  {
+    "id": 31,
+    "ticker": "SOXL",
+    "hint_date": "2026-05-13",
+    "type": "resistance",
+    "price": "185.00 191.00 192.00",
+    "current_price": 184.24,
+    "note": null,
+    "created_at": "2026-05-14 09:48:07"
+  },
+  {
+    "id": 32,
+    "ticker": "EOSE",
+    "hint_date": "2026-05-13",
+    "type": "resistance",
+    "price": "12.50 14.50",
+    "current_price": 8.28,
+    "note": null,
+    "created_at": "2026-05-14 09:48:50"
+  },
+  {
+    "id": 33,
+    "ticker": "MU",
+    "hint_date": "2026-05-13",
+    "type": "resistance",
+    "price": "800.00",
+    "current_price": 803.63,
+    "note": null,
+    "created_at": "2026-05-14 09:52:52"
+  },
+  {
+    "id": 34,
+    "ticker": "ANET",
+    "hint_date": "2026-05-13",
+    "type": "support",
+    "price": "130.00",
+    "current_price": 140.69,
+    "note": "중요 지지 자리",
+    "created_at": "2026-05-14 09:53:29"
+  },
+  {
+    "id": 35,
+    "ticker": "COIN",
+    "hint_date": "2026-05-13",
+    "type": "supply_level",
+    "price": "200.00 205.00",
+    "current_price": 201.8,
+    "note": null,
+    "created_at": "2026-05-14 09:54:06"
+  },
+  {
+    "id": 36,
+    "ticker": "COIN",
+    "hint_date": "2026-05-13",
+    "type": "resistance",
+    "price": "215.00",
+    "current_price": 201.8,
+    "note": "중요 벽",
+    "created_at": "2026-05-14 09:54:22"
+  },
+  {
+    "id": 37,
+    "ticker": "TSLA",
+    "hint_date": "2026-05-13",
+    "type": "faded_supply",
+    "price": "415.00",
+    "current_price": 445.27,
+    "note": null,
+    "created_at": "2026-05-14 09:54:54"
+  },
+  {
+    "id": 38,
+    "ticker": "MSFT",
+    "hint_date": "2026-05-13",
+    "type": "faded_supply",
+    "price": "400.00",
+    "current_price": 405.21,
+    "note": null,
+    "created_at": "2026-05-14 09:55:17"
+  },
+  {
+    "id": 39,
+    "ticker": "GOOGL",
+    "hint_date": "2026-05-13",
+    "type": "trailing_supply",
+    "price": "385.00",
+    "current_price": 402.62,
+    "note": null,
+    "created_at": "2026-05-14 09:55:35"
+  },
+  {
+    "id": 40,
+    "ticker": "AMZN",
+    "hint_date": "2026-05-13",
+    "type": "trailing_supply",
+    "price": "255.00 260.00",
+    "current_price": 270.13,
+    "note": null,
+    "created_at": "2026-05-14 09:55:58"
+  },
+  {
+    "id": 41,
+    "ticker": "QCOM",
+    "hint_date": "2026-05-13",
+    "type": "supply_level",
+    "price": "190.00",
+    "current_price": 213.17,
+    "note": null,
+    "created_at": "2026-05-14 09:56:15"
+  },
+  {
+    "id": 42,
+    "ticker": "NVDA",
+    "hint_date": "2026-05-13",
+    "type": "resistance",
+    "price": "230.00",
+    "current_price": 225.83,
+    "note": null,
+    "created_at": "2026-05-14 09:56:40"
+  },
+  {
+    "id": 43,
+    "ticker": "INTC",
+    "hint_date": "2026-05-13",
+    "type": "trailing_supply",
+    "price": "110.00",
+    "current_price": 120.29,
+    "note": null,
+    "created_at": "2026-05-14 09:56:51"
+  },
+  {
+    "id": 44,
+    "ticker": "CME",
+    "hint_date": "2026-05-13",
+    "type": "supply_level",
+    "price": "265.00",
+    "current_price": 297.13,
+    "note": null,
+    "created_at": "2026-05-14 09:57:15"
+  },
+  {
+    "id": 45,
+    "ticker": "CME",
+    "hint_date": "2026-05-13",
+    "type": "supply_level",
+    "price": "275.00 280.00",
+    "current_price": 297.13,
+    "note": "단타 매물대",
+    "created_at": "2026-05-14 09:57:38"
+  },
+  {
+    "id": 46,
+    "ticker": "YINN",
+    "hint_date": "2026-05-13",
+    "type": "resistance",
+    "price": "42.00",
+    "current_price": 38.86,
+    "note": null,
+    "created_at": "2026-05-14 09:58:07"
+  },
+  {
+    "id": 47,
+    "ticker": "ARM",
+    "hint_date": "2026-05-13",
+    "type": "resistance",
+    "price": "240.00",
+    "current_price": 221.21,
+    "note": "무조건 넘어야 하는 벽입니다",
+    "created_at": "2026-05-14 09:58:36"
+  },
+  {
+    "id": 48,
+    "ticker": "COHR",
+    "hint_date": "2026-05-13",
+    "type": "supply_level",
+    "price": "420.00",
+    "current_price": 403.71,
+    "note": null,
+    "created_at": "2026-05-14 09:59:01"
+  },
+  {
+    "id": 49,
+    "ticker": "VST",
+    "hint_date": "2026-05-13",
+    "type": "last_buy_zone",
+    "price": "140.00 135.00",
+    "current_price": 142.61,
+    "note": null,
+    "created_at": "2026-05-14 10:00:03"
+  },
+  {
+    "id": 50,
+    "ticker": "TEM",
+    "hint_date": "2026-05-13",
+    "type": "last_buy_zone",
+    "price": "40.00 42.00",
+    "current_price": 45.9,
+    "note": null,
+    "created_at": "2026-05-14 10:00:15"
+  },
+  {
+    "id": 51,
+    "ticker": "UNH",
+    "hint_date": "2026-05-13",
+    "type": "resistance",
+    "price": "420.00",
+    "current_price": 401.16,
+    "note": null,
+    "created_at": "2026-05-14 10:00:29"
+  },
+  {
+    "id": 52,
+    "ticker": "CLS",
+    "hint_date": "2026-05-13",
+    "type": "faded_supply",
+    "price": "360.00",
+    "current_price": 372.55,
+    "note": null,
+    "created_at": "2026-05-14 10:00:53"
+  },
+  {
+    "id": 53,
+    "ticker": "CLS",
+    "hint_date": "2026-05-13",
+    "type": "supply_level",
+    "price": "330.00 325.00",
+    "current_price": 372.55,
+    "note": null,
+    "created_at": "2026-05-14 10:01:27"
+  },
+  {
+    "id": 56,
+    "ticker": "NVDA",
+    "hint_date": "2026-05-14",
+    "type": "resistance",
+    "price": "240.00",
+    "current_price": 232.51,
+    "note": null,
+    "created_at": "2026-05-14 14:18:54"
+  },
+  {
+    "id": 57,
+    "ticker": "MU",
+    "hint_date": "2026-05-14",
+    "type": "trailing_supply",
+    "price": "795.00",
+    "current_price": 800.78,
+    "note": "벽이기도 합니다. 올라갈거라 보는데 아직 800 위에가 보이는 상황이니 아니니 추격매물대는 조심하는게 좋을듯 합니다.",
+    "created_at": "2026-05-14 14:19:47"
+  },
+  {
+    "id": 58,
+    "ticker": "SNDK",
+    "hint_date": "2026-05-14",
+    "type": "trailing_supply",
+    "price": "1,390.00 1,300.00",
+    "current_price": 1418.49,
+    "note": "1600 위에가 잘 안보이는 상황입니다",
+    "created_at": "2026-05-14 14:20:25"
+  },
+  {
+    "id": 59,
+    "ticker": "OKTA",
+    "hint_date": "2026-05-14",
+    "type": "trailing_supply",
+    "price": "80.00 81.00",
+    "current_price": 81.65,
+    "note": null,
+    "created_at": "2026-05-14 16:20:24"
+  },
+  {
+    "id": 60,
+    "ticker": "IREN",
+    "hint_date": "2026-05-14",
+    "type": "supply_level",
+    "price": "58.00 59.00 60.00",
+    "current_price": 59.69,
+    "note": "60 넘기 전이 좋습니다.",
+    "created_at": "2026-05-14 16:21:02"
+  },
+  {
+    "id": 61,
+    "ticker": "ASTS",
+    "hint_date": "2026-05-14",
+    "type": "resistance",
+    "price": "82.00",
+    "current_price": 82.21,
+    "note": null,
+    "created_at": "2026-05-14 16:21:20"
+  },
+  {
+    "id": 62,
+    "ticker": "NBIS",
+    "hint_date": "2026-05-14",
+    "type": "resistance",
+    "price": "250.00",
+    "current_price": 231.95,
+    "note": null,
+    "created_at": "2026-05-14 16:21:39"
+  },
+  {
+    "id": 63,
+    "ticker": "SMCI",
+    "hint_date": "2026-05-14",
+    "type": "supply_level",
+    "price": "32.00 33.00",
+    "current_price": 33.14,
+    "note": "Sandy: 오늘 트럼프가 시진핑에게 H200을 하사하면서 엔비디아($NVDA) 주가가 다시한번 갭상승을 해서 그런데 한달전 슈마컴($SMCI)이 중국에 몰래 엔비디아 칩셋 팔아먹다가 주가가 폭락을 했는데 이제 중국에 팔 수 있으니까 슈마컴은 용서받을수있지 않을까싶어서 진입해보려하는데 SMCI 매물대 매수자리어떻게될까요..?\n\n대장님: 저는 거기까지는 관심을 크게 두지않고 복잡하게 생각안합니다. 지금은 반도체가가니 슈마컴도 갈거란게 해석이 1번인데 주가가 올라가니 지금 하신 해석이 맞다고 해석하는 주식의 방법은 갠적으로 모르겠다는 것으로 대신하겠습니다. Smci 33 32 매물대있습니다. 🙂 쉽게 주식합시다ㅎ",
+    "created_at": "2026-05-14 16:22:20"
+  }
+]

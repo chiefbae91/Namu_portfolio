@@ -1,0 +1,50 @@
+[
+  {
+    "id": 4,
+    "account_id": 1,
+    "date": "2020-05-11",
+    "amount": 227012.13,
+    "type": "DEPOSIT",
+    "description": ""
+  },
+  {
+    "id": 6,
+    "account_id": 2,
+    "date": "2018-05-11",
+    "amount": 934909.48,
+    "type": "DEPOSIT",
+    "description": ""
+  },
+  {
+    "id": 7,
+    "account_id": 1,
+    "date": "2020-05-11",
+    "amount": 43592.75,
+    "type": "DEPOSIT",
+    "description": ""
+  },
+  {
+    "id": 8,
+    "account_id": 2,
+    "date": "2018-05-11",
+    "amount": 3263.1,
+    "type": "DEPOSIT",
+    "description": ""
+  },
+  {
+    "id": 11,
+    "account_id": 1,
+    "date": "2020-05-13",
+    "amount": 153342.73,
+    "type": "DEPOSIT",
+    "description": ""
+  },
+  {
+    "id": 13,
+    "account_id": 1,
+    "date": "2020-05-13",
+    "amount": 78949.63,
+    "type": "DEPOSIT",
+    "description": ""
+  }
+]

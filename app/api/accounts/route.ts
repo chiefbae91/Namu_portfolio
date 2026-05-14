@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import getDb from '@/lib/db';
+import { getAuthUser, unauthorized } from '@/lib/auth';
 
 export async function GET() {
+  if (!await getAuthUser()) return unauthorized();
   const db = getDb();
   const accounts = db.prepare('SELECT * FROM accounts ORDER BY id').all();
   return NextResponse.json(accounts);
 }
 
 export async function POST(req: NextRequest) {
+  if (!await getAuthUser()) return unauthorized();
   const db = getDb();
   const { name } = await req.json();
   if (!name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 });
