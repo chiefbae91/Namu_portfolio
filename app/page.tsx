@@ -7,6 +7,7 @@ import TransactionHistory from '@/components/tabs/TransactionHistory';
 import TradingHints from '@/components/tabs/TradingHints';
 import TransactionModal from '@/components/modals/TransactionModal';
 import AccountSettingsModal from '@/components/modals/AccountSettingsModal';
+import AccountHistoryModal from '@/components/modals/AccountHistoryModal';
 import TradeAnalysisModal from '@/components/modals/TradeAnalysisModal';
 import CsvImportModal from '@/components/modals/CsvImportModal';
 import TradingHintModal from '@/components/modals/TradingHintModal';
@@ -17,7 +18,7 @@ const TRANSFER_OFFSET = 1_000_000;
 export default function Home() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
-  const [rates, setRates] = useState<ExchangeRates>({ USD: 1, KRW: 1380, EUR: 0.92, DXY: 104, WTI: 78, GOLD: 2300 });
+  const [rates, setRates] = useState<ExchangeRates>({ USD: 1, KRW: 1380, EUR: 0.92, DXY: 104, WTI: 78, GOLD: 2300, ES: 5800, ES_PREV: 5800 });
   const [showKrw, setShowKrw] = useState(true);
   const [showEur, setShowEur] = useState(false);
   const [activeTab, setActiveTab] = useState<'portfolio' | 'history' | 'hints'>('portfolio');
@@ -28,6 +29,7 @@ export default function Home() {
   const [txModalOpen, setTxModalOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [analysisTicker, setAnalysisTicker] = useState<string | null>(null);
+  const [historyAccount, setHistoryAccount] = useState<{ id: number; name: string } | null>(null);
   const [txPrefill, setTxPrefill] = useState<{ ticker: string; accountId: number } | null>(null);
   const [historyDeepLink, setHistoryDeepLink] = useState<{ ticker: string; id: number } | null>(null);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
@@ -336,6 +338,24 @@ export default function Home() {
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: '20px 20px 0' }}>
         {/* FX Rate Bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 24, marginBottom: 16, padding: '10px 16px', background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)' }}>
+          {/* E-mini S&P 500 Futures */}
+          {(() => {
+            const esChange = rates.ES - rates.ES_PREV;
+            const esChangePct = rates.ES_PREV !== 0 ? (esChange / rates.ES_PREV) * 100 : 0;
+            const esColor = esChange >= 0 ? 'var(--green)' : 'var(--red)';
+            return (
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>ES</span>
+                <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
+                  {rates.ES.toFixed(2)}
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: esColor, fontVariantNumeric: 'tabular-nums' }}>
+                  {esChange >= 0 ? '+' : ''}{esChange.toFixed(2)} ({esChange >= 0 ? '+' : ''}{esChangePct.toFixed(2)}%)
+                </span>
+              </div>
+            );
+          })()}
+          <div style={{ width: 1, height: 28, background: 'var(--border)' }} />
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>WTI</span>
             <span style={{ fontSize: 22, fontWeight: 700, color: '#fb923c', fontVariantNumeric: 'tabular-nums' }}>
@@ -391,6 +411,7 @@ export default function Home() {
           showKrw={showKrw}
           showEur={showEur}
           loading={portfolioLoading}
+          onAccountClick={(id, name) => setHistoryAccount({ id, name })}
         />
 
         {/* Tabs */}
@@ -457,6 +478,13 @@ export default function Home() {
           onRename={handleRenameAccount}
           onToggleHidden={handleToggleHidden}
           onDelete={handleDeleteAccount}
+        />
+      )}
+      {historyAccount && (
+        <AccountHistoryModal
+          accountId={historyAccount.id}
+          accountName={historyAccount.name}
+          onClose={() => setHistoryAccount(null)}
         />
       )}
       {analysisTicker && (

@@ -10,6 +10,7 @@ interface Props {
   showKrw: boolean;
   showEur: boolean;
   loading?: boolean;
+  onAccountClick?: (id: number, name: string) => void;
 }
 
 function fmtUSD(v: number) {
@@ -25,16 +26,17 @@ function fmtEUR(usd: number, rate: number) {
 interface CardProps {
   label: string;
   total: number;
-  accounts: { name: string; value: number }[];
+  accounts: { id?: number; name: string; value: number }[];
   krwRate: number;
   eurRate: number;
   showKrw: boolean;
   showEur: boolean;
   color: string;
   loading?: boolean;
+  onAccountClick?: (id: number, name: string) => void;
 }
 
-function SummaryCard({ label, total, accounts, krwRate, eurRate, showKrw, showEur, color, loading }: CardProps) {
+function SummaryCard({ label, total, accounts, krwRate, eurRate, showKrw, showEur, color, loading, onAccountClick }: CardProps) {
   const hasExtra = showKrw || showEur;
 
   return (
@@ -68,9 +70,18 @@ function SummaryCard({ label, total, accounts, krwRate, eurRate, showKrw, showEu
           {accounts.map(acc => (
             <div key={acc.name}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
-                <span style={{ color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '50%' }}>
-                  {acc.name}
-                </span>
+                {onAccountClick && acc.id != null ? (
+                  <button
+                    onClick={() => onAccountClick(acc.id!, acc.name)}
+                    style={{ background: 'none', color: 'var(--accent)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '50%', padding: 0, textAlign: 'left', cursor: 'pointer', fontSize: 12 }}
+                  >
+                    {acc.name}
+                  </button>
+                ) : (
+                  <span style={{ color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '50%' }}>
+                    {acc.name}
+                  </span>
+                )}
                 <span style={{ fontWeight: 500, flexShrink: 0 }}>
                   {loading ? '—' : fmtUSD(acc.value)}
                 </span>
@@ -93,41 +104,31 @@ function SummaryCard({ label, total, accounts, krwRate, eurRate, showKrw, showEu
   );
 }
 
-export default function SummaryCards({ cash, stockValue, accountBreakdown, krwRate, eurRate, showKrw, showEur, loading }: Props) {
-  const cards = [
-    {
-      label: 'Cash',
-      total: cash,
-      accounts: accountBreakdown.map(a => ({ name: a.account_name, value: a.cash })),
-      color: '#60a5fa',
-    },
-    {
-      label: 'Market Value',
-      total: stockValue,
-      accounts: accountBreakdown.map(a => ({ name: a.account_name, value: a.stock_value })),
-      color: '#6366f1',
-    },
-    {
-      label: 'Total Assets',
-      total: cash + stockValue,
-      accounts: accountBreakdown.map(a => ({ name: a.account_name, value: a.cash + a.stock_value })),
-      color: '#e2e8f0',
-    },
-  ];
-
+export default function SummaryCards({ cash, stockValue, accountBreakdown, krwRate, eurRate, showKrw, showEur, loading, onAccountClick }: Props) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
-      {cards.map(card => (
-        <SummaryCard
-          key={card.label}
-          {...card}
-          krwRate={krwRate}
-          eurRate={eurRate}
-          showKrw={showKrw}
-          showEur={showEur}
-          loading={loading}
-        />
-      ))}
+      <SummaryCard
+        label="Cash"
+        total={cash}
+        accounts={accountBreakdown.map(a => ({ name: a.account_name, value: a.cash }))}
+        color="#60a5fa"
+        krwRate={krwRate} eurRate={eurRate} showKrw={showKrw} showEur={showEur} loading={loading}
+      />
+      <SummaryCard
+        label="Market Value"
+        total={stockValue}
+        accounts={accountBreakdown.map(a => ({ name: a.account_name, value: a.stock_value }))}
+        color="#6366f1"
+        krwRate={krwRate} eurRate={eurRate} showKrw={showKrw} showEur={showEur} loading={loading}
+      />
+      <SummaryCard
+        label="Total Assets"
+        total={cash + stockValue}
+        accounts={accountBreakdown.map(a => ({ id: a.account_id, name: a.account_name, value: a.cash + a.stock_value }))}
+        color="#e2e8f0"
+        krwRate={krwRate} eurRate={eurRate} showKrw={showKrw} showEur={showEur} loading={loading}
+        onAccountClick={onAccountClick}
+      />
     </div>
   );
 }

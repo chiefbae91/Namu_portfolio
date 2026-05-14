@@ -93,6 +93,8 @@ export interface ExchangeRates {
   DXY: number;
   WTI: number;
   GOLD: number;
+  ES: number;
+  ES_PREV: number;
 }
 
 export interface SummaryData {
