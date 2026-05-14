@@ -417,6 +417,7 @@ export default function Home() {
               onDeleteMany={handleDeleteMany}
               deepLink={historyDeepLink}
               onAddTradingHistory={() => { setEditingTx(null); setTxModalOpen(true); }}
+              onTickerClick={ticker => { setAnalysisInitialTab('history'); setAnalysisTicker(ticker); }}
             />
           )}
           {activeTab === 'hints' && (

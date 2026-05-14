@@ -14,6 +14,7 @@ interface Props {
   onDeleteMany: (ids: number[]) => Promise<void>;
   deepLink?: { ticker: string; id: number } | null;
   onAddTradingHistory?: () => void;
+  onTickerClick?: (ticker: string) => void;
 }
 
 const NAMED_BADGE_COLORS: [string, string][] = [
@@ -105,7 +106,7 @@ const TYPE_FILTER_OPTIONS = [
   { value: 'transfer_withdraw', label: 'Withdraw' },
 ];
 
-export default function TransactionHistory({ transactions, currency, rates, onEdit, onDelete, onDeleteMany, deepLink, onAddTradingHistory }: Props) {
+export default function TransactionHistory({ transactions, currency, rates, onEdit, onDelete, onDeleteMany, deepLink, onAddTradingHistory, onTickerClick }: Props) {
   const [tickerFilter, setTickerFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -288,7 +289,10 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
                           {getAccountInitials(tx.account_name)}
                         </span>
                       )}
-                      <span style={{ fontWeight: 500 }}>{tx.ticker || '-'}</span>
+                      {tx.ticker && onTickerClick
+                        ? <button style={{ background: 'none', color: 'var(--accent)', fontWeight: 500, padding: 0, cursor: 'pointer' }} onClick={() => onTickerClick(tx.ticker!)}>{tx.ticker}</button>
+                        : <span style={{ fontWeight: 500 }}>{tx.ticker || '-'}</span>
+                      }
                     </div>
                   </td>
                   <td>
