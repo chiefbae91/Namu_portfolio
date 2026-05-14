@@ -69,11 +69,11 @@ interface HintMarkerTooltipState {
 const PAD = { top: 16, right: 20, bottom: 36, left: 64 };
 const H = 320;
 
-const TX_COLORS: Record<string, string> = { buy: '#00e676', sell: '#ff5252', dividend: '#f59e0b' };
+const TX_COLORS: Record<string, string> = { buy: '#10b981', sell: '#ef4444', dividend: '#f59e0b' };
 const TX_LABELS: Record<string, string> = { buy: 'Buy', sell: 'Sell', dividend: 'Dividend' };
 
 const HINT_COLORS: Record<string, string> = {
-  resistance: '#ff5252', support: '#00e676', supply_level: '#f59e0b',
+  resistance: '#ef4444', support: '#10b981', supply_level: '#f59e0b',
   short_target: '#60a5fa', long_target: '#818cf8', buy_stop: '#ef4444',
   trailing_supply: '#fb923c', note_only: '#64748b',
   faded_supply: '#a78bfa', last_buy_zone: '#f43f5e',
@@ -221,7 +221,7 @@ export default function CandlestickChart({ candles, transactions = [], chartHint
           {candles.map((c, i) => {
             const cx = PAD.left + i * slot + slot / 2;
             const up = c.close >= c.open;
-            const color = up ? '#00e676' : '#ff5252';
+            const color = up ? '#10b981' : '#ef4444';
             const bodyY1 = PAD.top + toY(Math.max(c.open, c.close));
             const bodyY2 = PAD.top + toY(Math.min(c.open, c.close));
             const bh = Math.max(1, bodyY2 - bodyY1);
@@ -255,23 +255,23 @@ export default function CandlestickChart({ candles, transactions = [], chartHint
                   };
 
                   if (isDR) {
-                    return <circle key={j} cx={txX} cy={txY} r={5} fill="#f97316" opacity={0.9} {...markerHandlers} />;
+                    return <circle key={j} cx={txX} cy={txY} r={5} fill="#f97316" stroke="white" strokeWidth={2} opacity={0.9} {...markerHandlers} />;
                   } else if (tx.type === 'buy') {
                     return (
                       <polygon key={j}
                         points={`${txX},${txY - 7} ${txX - 5},${txY + 4} ${txX + 5},${txY + 4}`}
-                        fill="#00e676" opacity={0.9} {...markerHandlers}
+                        fill="#10b981" stroke="white" strokeWidth={2} opacity={0.9} {...markerHandlers}
                       />
                     );
                   } else if (tx.type === 'sell') {
                     return (
                       <polygon key={j}
                         points={`${txX - 5},${txY - 4} ${txX + 5},${txY - 4} ${txX},${txY + 7}`}
-                        fill="#ff5252" opacity={0.9} {...markerHandlers}
+                        fill="#ef4444" stroke="white" strokeWidth={2} opacity={0.9} {...markerHandlers}
                       />
                     );
                   } else {
-                    return <circle key={j} cx={txX} cy={txY} r={4.5} fill="#f59e0b" opacity={0.9} {...markerHandlers} />;
+                    return <circle key={j} cx={txX} cy={txY} r={4.5} fill="#f59e0b" stroke="white" strokeWidth={2} opacity={0.9} {...markerHandlers} />;
                   }
                 })}
               </g>
@@ -323,25 +323,25 @@ export default function CandlestickChart({ candles, transactions = [], chartHint
         <div style={{ display: 'flex', gap: 14, padding: '4px 8px 2px', fontSize: 11, color: '#64748b', flexWrap: 'wrap', alignItems: 'center' }}>
           <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
             <span style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <span style={{ width: 8, height: 5, background: '#00e676', display: 'inline-block', borderRadius: 1 }} />
-              <span style={{ width: 8, height: 5, background: '#ff5252', display: 'inline-block', borderRadius: 1 }} />
+              <span style={{ width: 8, height: 5, background: '#10b981', display: 'inline-block', borderRadius: 1 }} />
+              <span style={{ width: 8, height: 5, background: '#ef4444', display: 'inline-block', borderRadius: 1 }} />
             </span>
             OHLC
           </span>
           <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-            <svg width={10} height={12} style={{ display: 'block' }}><polygon points="5,1 0,11 10,11" fill="#00e676" opacity={0.9} /></svg>
+            <svg width={10} height={12} style={{ display: 'block' }}><polygon points="5,1 0,11 10,11" fill="#10b981" stroke="white" strokeWidth={2} opacity={0.9} /></svg>
             Buy
           </span>
           <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-            <svg width={10} height={12} style={{ display: 'block' }}><polygon points="0,1 10,1 5,11" fill="#ff5252" opacity={0.9} /></svg>
+            <svg width={10} height={12} style={{ display: 'block' }}><polygon points="0,1 10,1 5,11" fill="#ef4444" stroke="white" strokeWidth={2} opacity={0.9} /></svg>
             Sell
           </span>
           <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-            <svg width={10} height={10} style={{ display: 'block' }}><circle cx="5" cy="5" r="4.5" fill="#f59e0b" opacity={0.9} /></svg>
+            <svg width={10} height={10} style={{ display: 'block' }}><circle cx="5" cy="5" r="4.5" fill="#f59e0b" stroke="white" strokeWidth={2} opacity={0.9} /></svg>
             Dividend
           </span>
           <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-            <svg width={10} height={10} style={{ display: 'block' }}><circle cx="5" cy="5" r="4.5" fill="#f97316" opacity={0.9} /></svg>
+            <svg width={10} height={10} style={{ display: 'block' }}><circle cx="5" cy="5" r="4.5" fill="#f97316" stroke="white" strokeWidth={2} opacity={0.9} /></svg>
             Div. Reinvest
           </span>
         </div>
