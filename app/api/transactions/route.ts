@@ -4,7 +4,6 @@ import getDb from '@/lib/db';
 export async function GET(req: NextRequest) {
   const db = getDb();
   const { searchParams } = new URL(req.url);
-  const accountId = searchParams.get('account_id');
   const ticker = searchParams.get('ticker');
 
   let sql = `
@@ -17,9 +16,13 @@ export async function GET(req: NextRequest) {
   `;
   const args: any[] = [];
 
-  if (accountId && accountId !== 'all') {
-    sql += ' AND t.account_id = ?';
-    args.push(Number(accountId));
+  const accountIdsParam = searchParams.get('account_ids');
+  const accountIds = accountIdsParam
+    ? accountIdsParam.split(',').map(Number).filter(n => Number.isInteger(n) && n > 0)
+    : [];
+  if (accountIds.length > 0) {
+    sql += ` AND t.account_id IN (${accountIds.map(() => '?').join(',')})`;
+    args.push(...accountIds);
   }
   if (ticker) {
     sql += ' AND t.ticker = ?';

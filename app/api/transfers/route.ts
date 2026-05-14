@@ -4,7 +4,10 @@ import getDb from '@/lib/db';
 export async function GET(req: NextRequest) {
   const db = getDb();
   const { searchParams } = new URL(req.url);
-  const accountId = searchParams.get('account_id');
+  const accountIdsParam = searchParams.get('account_ids');
+  const accountIds = accountIdsParam
+    ? accountIdsParam.split(',').map(Number).filter(n => Number.isInteger(n) && n > 0)
+    : [];
 
   let sql = `
     SELECT cf.*, a.name as account_name
@@ -13,9 +16,9 @@ export async function GET(req: NextRequest) {
     WHERE a.hidden = 0
   `;
   const args: any[] = [];
-  if (accountId && accountId !== 'all') {
-    sql += ' AND cf.account_id = ?';
-    args.push(Number(accountId));
+  if (accountIds.length > 0) {
+    sql += ` AND cf.account_id IN (${accountIds.map(() => '?').join(',')})`;
+    args.push(...accountIds);
   }
   sql += ' ORDER BY cf.date DESC, cf.id DESC';
   return NextResponse.json(db.prepare(sql).all(...args));

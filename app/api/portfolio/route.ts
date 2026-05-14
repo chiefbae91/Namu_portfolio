@@ -51,11 +51,15 @@ async function fetchPriceData(ticker: string): Promise<{ price: number; prevClos
 export async function GET(req: NextRequest) {
   const db = getDb();
   const { searchParams } = new URL(req.url);
-  const accountId = searchParams.get('account_id');
-  const accFilter = accountId && accountId !== 'all' ? Number(accountId) : null;
-
-  const accWhere = accFilter ? 'AND t.account_id = ?' : '';
-  const accArgs = accFilter ? [accFilter] : [];
+  const accountIdsParam = searchParams.get('account_ids');
+  const accountIds = accountIdsParam
+    ? accountIdsParam.split(',').map(Number).filter(n => Number.isInteger(n) && n > 0)
+    : [];
+  const hasFilter = accountIds.length > 0;
+  const inClause = (col: string) => hasFilter ? `AND ${col} IN (${accountIds.map(() => '?').join(',')})` : '';
+  const accWhere = inClause('t.account_id');
+  const cfWhere = inClause('cf.account_id');
+  const accArgs = accountIds;
 
   // All buy lots
   const buyRows = db.prepare(`
@@ -80,8 +84,8 @@ export async function GET(req: NextRequest) {
     SELECT la.sell_tx_id, la.buy_tx_id, la.quantity FROM lot_assignments la
     JOIN transactions s ON la.sell_tx_id = s.id
     JOIN accounts a ON s.account_id = a.id
-    WHERE a.hidden = 0 ${accFilter ? 'AND s.account_id = ?' : ''}
-  `).all(...(accFilter ? [accFilter] : [])) as any[];
+    WHERE a.hidden = 0 ${inClause('s.account_id')}
+  `).all(...accArgs) as any[];
 
   const assignsBySell: Record<number, { buy_tx_id: number; quantity: number }[]> = {};
   for (const a of assignRows) {
@@ -174,7 +178,6 @@ export async function GET(req: NextRequest) {
   }
 
   // Cash balance from cash_flow (Transfer deposits/withdrawals)
-  const cfWhere = accFilter ? 'AND cf.account_id = ?' : '';
   const cashFlowRows = db.prepare(`
     SELECT cf.amount, cf.type FROM cash_flow cf
     JOIN accounts a ON cf.account_id = a.id WHERE a.hidden = 0 ${cfWhere}
@@ -187,8 +190,8 @@ export async function GET(req: NextRequest) {
 
   // ── Per-account breakdown ─────────────────────────────────────────
   const visAccounts = db.prepare(
-    `SELECT id, name FROM accounts WHERE hidden = 0${accFilter ? ' AND id = ?' : ''} ORDER BY name`
-  ).all(...(accFilter ? [accFilter] : [])) as any[];
+    `SELECT id, name FROM accounts WHERE hidden = 0 ${inClause('id')} ORDER BY name`
+  ).all(...accArgs) as any[];
 
   // Per-account tx cash
   const accTxRows = db.prepare(`

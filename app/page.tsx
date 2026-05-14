@@ -1,6 +1,6 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
-import { Settings, FileUp, PlusCircle, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronDown, Settings, FileUp, PlusCircle, RefreshCw } from 'lucide-react';
 import { Account, AccountBreakdown, ExchangeRates, PortfolioPosition, SummaryData, Transaction, TradingHint } from '@/lib/types';
 import StockPortfolio from '@/components/tabs/StockPortfolio';
 import TransactionHistory from '@/components/tabs/TransactionHistory';
@@ -12,12 +12,15 @@ import TradeAnalysisModal from '@/components/modals/TradeAnalysisModal';
 import CsvImportModal from '@/components/modals/CsvImportModal';
 import TradingHintModal from '@/components/modals/TradingHintModal';
 import SummaryCards from '@/components/SummaryCards';
+import PriceAlertToasts, { PriceAlert } from '@/components/PriceAlertToasts';
 
 const TRANSFER_OFFSET = 1_000_000;
 
 export default function Home() {
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
+  const [accountFilter, setAccountFilter] = useState<string>(''); // '' = all, '1,2,3' = subset
+  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
+  const accountDropdownRef = useRef<HTMLDivElement>(null);
   const [rates, setRates] = useState<ExchangeRates>({ USD: 1, KRW: 1380, EUR: 0.92, DXY: 104, WTI: 78, GOLD: 2300, ES: 5800, ES_PREV: 5800 });
   const [showKrw, setShowKrw] = useState(true);
   const [showEur, setShowEur] = useState(false);
@@ -46,6 +49,8 @@ export default function Home() {
   const [appName, setAppName] = useState('Namu Portfolio');
   const [appNameEditing, setAppNameEditing] = useState(false);
   const [appNameInput, setAppNameInput] = useState('');
+  const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([]);
+  const alertStateRef = useRef<Record<string, 'up' | 'down' | null>>({});
 
   const fetchTradingHints = useCallback(async () => {
     const res = await fetch('/api/trading-hints');
@@ -71,7 +76,7 @@ export default function Home() {
 
   const fetchPortfolio = useCallback(async (showLoader = true) => {
     if (showLoader) setPortfolioLoading(true);
-    const q = selectedAccountId !== 'all' ? `?account_id=${selectedAccountId}` : '';
+    const q = accountFilter ? `?account_ids=${accountFilter}` : '';
     try {
       const res = await fetch(`/api/portfolio${q}`);
       if (!res.ok) {
@@ -80,7 +85,28 @@ export default function Home() {
         return;
       }
       const data = await res.json();
-      setPositions(data.positions || []);
+      const newPositions: PortfolioPosition[] = data.positions || [];
+      setPositions(newPositions);
+
+      // Check 5% threshold crossings for price alerts
+      let nextId = Date.now();
+      const triggered: PriceAlert[] = [];
+      for (const pos of newPositions) {
+        if (!pos.prev_close || pos.prev_close === 0) continue;
+        const changePct = (pos.current_price - pos.prev_close) / pos.prev_close * 100;
+        const prev = alertStateRef.current[pos.ticker] ?? null;
+        if (changePct >= 5 && prev !== 'up') {
+          triggered.push({ id: nextId++, ticker: pos.ticker, changePct, direction: 'up' });
+          alertStateRef.current[pos.ticker] = 'up';
+        } else if (changePct <= -5 && prev !== 'down') {
+          triggered.push({ id: nextId++, ticker: pos.ticker, changePct, direction: 'down' });
+          alertStateRef.current[pos.ticker] = 'down';
+        } else if (changePct > -5 && changePct < 5) {
+          alertStateRef.current[pos.ticker] = null;
+        }
+      }
+      if (triggered.length > 0) setPriceAlerts(prev => [...prev, ...triggered]);
+
       const stock = data.stock_value ?? 0;
       const cash = data.cash ?? 0;
       setSummary({ cash, stock, options_pnl: 0, total: cash + stock });
@@ -88,10 +114,10 @@ export default function Home() {
     } catch (err) {
       console.error('fetchPortfolio failed:', err);
     } finally { if (showLoader) setPortfolioLoading(false); }
-  }, [selectedAccountId]);
+  }, [accountFilter]);
 
   const fetchTransactions = useCallback(async () => {
-    const q = selectedAccountId !== 'all' ? `?account_id=${selectedAccountId}` : '';
+    const q = accountFilter ? `?account_ids=${accountFilter}` : '';
     const [txRes, tfRes] = await Promise.all([
       fetch(`/api/transactions${q}`),
       fetch(`/api/transfers${q}`),
@@ -116,7 +142,7 @@ export default function Home() {
     const combined = [...txs, ...transfers]
       .sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
     setTransactions(combined);
-  }, [selectedAccountId]);
+  }, [accountFilter]);
 
   useEffect(() => {
     fetchAccounts(); fetchRates(); fetchTradingHints();
@@ -137,7 +163,18 @@ export default function Home() {
     return () => clearInterval(id);
   }, [fetchPortfolio]);
 
-  useEffect(() => { fetchPortfolio(); fetchTransactions(); }, [selectedAccountId]);
+  useEffect(() => { fetchPortfolio(); fetchTransactions(); }, [accountFilter]);
+
+  // Close account dropdown on outside click
+  useEffect(() => {
+    if (!accountDropdownOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (accountDropdownRef.current && !accountDropdownRef.current.contains(e.target as Node))
+        setAccountDropdownOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [accountDropdownOpen]);
 
   const refreshAll = () => { fetchPortfolio(); fetchTransactions(); };
 
@@ -255,6 +292,10 @@ export default function Home() {
   };
 
   const visibleAccounts = accounts.filter(a => !a.hidden);
+  const checkedIds: Set<number> = accountFilter === ''
+    ? new Set(visibleAccounts.map(a => a.id))
+    : new Set(accountFilter.split(',').map(Number));
+  const allChecked = visibleAccounts.length > 0 && visibleAccounts.every(a => checkedIds.has(a.id));
 
   return (
     <div style={{ minHeight: '100vh', padding: '0 0 40px' }}>
@@ -283,10 +324,43 @@ export default function Home() {
           >{appName}</h1>
         )}
 
-        <select value={selectedAccountId} onChange={e => setSelectedAccountId(e.target.value)} style={{ minWidth: 140 }}>
-          <option value="all">All Accounts</option>
-          {visibleAccounts.map(a => <option key={a.id} value={String(a.id)}>{a.name}</option>)}
-        </select>
+        <div ref={accountDropdownRef} style={{ position: 'relative' }}>
+          <button
+            onClick={() => setAccountDropdownOpen(o => !o)}
+            style={{ minWidth: 160, padding: '6px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 13 }}
+          >
+            <span>
+              {allChecked ? 'All Accounts' : checkedIds.size === 1
+                ? visibleAccounts.find(a => checkedIds.has(a.id))?.name ?? '1 Account'
+                : `${checkedIds.size} Accounts`}
+            </span>
+            <ChevronDown size={13} style={{ flexShrink: 0, transform: accountDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+          </button>
+          {accountDropdownOpen && (
+            <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, minWidth: 200, boxShadow: '0 4px 16px rgba(0,0,0,0.4)', padding: '4px 0' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', cursor: 'pointer', fontSize: 12, color: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
+                <input type="checkbox" checked={allChecked} onChange={() => setAccountFilter('')} style={{ cursor: 'pointer', accentColor: 'var(--accent)' }} />
+                All Accounts
+              </label>
+              {visibleAccounts.map(a => (
+                <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', cursor: 'pointer', fontSize: 13 }}>
+                  <input
+                    type="checkbox"
+                    checked={checkedIds.has(a.id)}
+                    style={{ cursor: 'pointer', accentColor: 'var(--accent)' }}
+                    onChange={e => {
+                      const next = new Set(checkedIds);
+                      if (e.target.checked) next.add(a.id); else next.delete(a.id);
+                      const nowAll = visibleAccounts.every(acc => next.has(acc.id));
+                      setAccountFilter(nowAll ? '' : [...next].sort((x, y) => x - y).join(','));
+                    }}
+                  />
+                  {a.name}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
         <button onClick={() => setAccountSettingsOpen(true)}
           style={{ background: 'var(--border)', color: 'var(--muted)', padding: '6px 10px' }}
           title="Manage Accounts"><Settings size={15} /></button>
@@ -514,6 +588,10 @@ export default function Home() {
           onSaved={fetchTradingHints}
         />
       )}
+      <PriceAlertToasts
+        alerts={priceAlerts}
+        onDismiss={id => setPriceAlerts(prev => prev.filter(a => a.id !== id))}
+      />
     </div>
   );
 }
