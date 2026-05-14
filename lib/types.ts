@@ -89,6 +89,8 @@ export interface ExchangeRates {
   KRW: number;
   EUR: number;
   DXY: number;
+  WTI: number;
+  GOLD: number;
 }
 
 export interface SummaryData {

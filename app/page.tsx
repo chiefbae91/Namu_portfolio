@@ -17,8 +17,8 @@ const TRANSFER_OFFSET = 1_000_000;
 export default function Home() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
-  const [rates, setRates] = useState<ExchangeRates>({ USD: 1, KRW: 1380, EUR: 0.92, DXY: 104 });
-  const [showKrw, setShowKrw] = useState(false);
+  const [rates, setRates] = useState<ExchangeRates>({ USD: 1, KRW: 1380, EUR: 0.92, DXY: 104, WTI: 78, GOLD: 2300 });
+  const [showKrw, setShowKrw] = useState(true);
   const [showEur, setShowEur] = useState(false);
   const [activeTab, setActiveTab] = useState<'portfolio' | 'history' | 'hints'>('portfolio');
   const [positions, setPositions] = useState<PortfolioPosition[]>([]);
@@ -336,6 +336,20 @@ export default function Home() {
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: '20px 20px 0' }}>
         {/* FX Rate Bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 24, marginBottom: 16, padding: '10px 16px', background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>WTI</span>
+            <span style={{ fontSize: 22, fontWeight: 700, color: '#fb923c', fontVariantNumeric: 'tabular-nums' }}>
+              ${rates.WTI.toFixed(2)}
+            </span>
+          </div>
+          <div style={{ width: 1, height: 28, background: 'var(--border)' }} />
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>GOLD</span>
+            <span style={{ fontSize: 22, fontWeight: 700, color: '#f59e0b', fontVariantNumeric: 'tabular-nums' }}>
+              ${rates.GOLD.toFixed(2)}
+            </span>
+          </div>
+          <div style={{ width: 1, height: 28, background: 'var(--border)' }} />
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>DXY</span>
             <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
