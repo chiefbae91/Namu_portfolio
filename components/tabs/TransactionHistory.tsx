@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Pencil, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Pencil, PlusCircle, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Transaction, Currency, ExchangeRates } from '@/lib/types';
 import { formatCurrency } from '@/lib/format';
 
@@ -12,6 +12,7 @@ interface Props {
   onDelete: (id: number) => Promise<void>;
   onDeleteMany: (ids: number[]) => Promise<void>;
   deepLink?: { ticker: string; id: number } | null;
+  onAddTradingHistory?: () => void;
 }
 
 const NAMED_BADGE_COLORS: [string, string][] = [
@@ -103,7 +104,7 @@ const TYPE_FILTER_OPTIONS = [
   { value: 'transfer_withdraw', label: 'Withdraw' },
 ];
 
-export default function TransactionHistory({ transactions, currency, rates, onEdit, onDelete, onDeleteMany, deepLink }: Props) {
+export default function TransactionHistory({ transactions, currency, rates, onEdit, onDelete, onDeleteMany, deepLink, onAddTradingHistory }: Props) {
   const [tickerFilter, setTickerFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -208,6 +209,17 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
           <span style={{ fontSize: 12, color: 'var(--muted)' }}>
             {pageStart + 1}–{pageEnd} of {filtered.length}
           </span>
+        )}
+
+        <div style={{ flex: 1 }} />
+
+        {onAddTradingHistory && (
+          <button
+            onClick={onAddTradingHistory}
+            style={{ background: 'var(--accent)', color: 'white', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, borderRadius: 6 }}
+          >
+            <PlusCircle size={14} /> Add Trading History
+          </button>
         )}
 
         {selectedCount > 0 && (

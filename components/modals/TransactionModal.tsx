@@ -253,15 +253,14 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isValidDate(date)) { setDateError('날짜 형식: MM/DD/YYYY'); return; }
+  const doSave = async (): Promise<boolean> => {
+    if (!isValidDate(date)) { setDateError('날짜 형식: MM/DD/YYYY'); return false; }
 
     if (type === 'sell' && lotMethod === 'specific') {
       const selQty = Object.values(specificSelections).reduce((s,v) => s+(parseFloat(v)||0), 0);
       if (Math.abs(selQty - (parseFloat(qty)||0)) > 0.0001) {
         alert(`선택 수량(${selQty})이 매도 수량(${qty})과 다릅니다.`);
-        return;
+        return false;
       }
     }
 
@@ -296,8 +295,22 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
           reinvest_id: isEditing && type==='dividend' ? (editingTx?.reinvest_id ?? null) : undefined,
         });
       }
-      onClose();
-    } finally { setLoading(false); }
+      return true;
+    } catch { return false; }
+    finally { setLoading(false); }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (await doSave()) onClose();
+  };
+
+  const handleSaveAndAdd = async () => {
+    if (await doSave()) {
+      setQty(''); setPrice(''); setFee(''); setNotes('');
+      setReinvest(false); setReinvestQty(''); setReinvestPrice('');
+      setLotMethod('average_cost'); setSpecificSelections({});
+    }
   };
 
   const sellQtyNum = parseFloat(qty||'0');
@@ -325,7 +338,7 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
           {/* Header */}
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
             <h2 style={{ margin:0, fontSize:17, fontWeight:700 }}>
-              {isEditing ? `Edit Trade #${editingTx!.id}` : 'Add Trade'}
+              {isEditing ? `Edit Trade #${editingTx!.id}` : 'Add Trading History'}
             </h2>
             <button type="button" onClick={onClose} style={{ background:'none', color:'var(--muted)', padding:4 }}>
               <X size={18} />
@@ -461,6 +474,11 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
           {/* Footer */}
           <div style={{ display:'flex', justifyContent:'flex-end', gap:10, marginTop:24, paddingTop:16, borderTop:'1px solid var(--border)' }}>
             <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+            {!isEditing && (
+              <button type="button" className="btn-secondary" disabled={loading} onClick={handleSaveAndAdd}>
+                {loading ? 'Saving...' : 'Save & Add Another'}
+              </button>
+            )}
             <button type="submit" className="btn-primary" disabled={loading} style={{ minWidth:90 }}>
               {loading ? 'Saving...' : isEditing ? 'Update' : 'Save'}
             </button>

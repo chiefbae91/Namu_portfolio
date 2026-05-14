@@ -3,11 +3,14 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 import { TradingHint } from '@/lib/types';
 import DatePickerInput from '@/components/DatePickerInput';
+import TickerTypeahead from '@/components/TickerTypeahead';
 
 const HINT_TYPES = [
   { value: 'resistance',      label: '벽 (Resistance)' },
   { value: 'support',         label: '지지 (Support)' },
   { value: 'supply_level',    label: '매물대 (Supply Level)' },
+  { value: 'faded_supply',    label: '흐린 매물대 (Faded Supply Zone)' },
+  { value: 'last_buy_zone',   label: '마지막 매물대 (Last Buy Zone)' },
   { value: 'short_target',    label: '단기 목표 주가 (Short-term Target)' },
   { value: 'long_target',     label: '장기 목표 주가 (Long-term Target)' },
   { value: 'buy_stop',        label: '매수 중지 (Buy Halt)' },
@@ -64,11 +67,12 @@ function fmtPrice(raw: string) {
 interface Props {
   editingHint?: TradingHint | null;
   prefillTicker?: string | null;
+  tickerSuggestions?: string[];
   onClose: () => void;
   onSaved: () => void;
 }
 
-export default function TradingHintModal({ editingHint, prefillTicker, onClose, onSaved }: Props) {
+export default function TradingHintModal({ editingHint, prefillTicker, tickerSuggestions = [], onClose, onSaved }: Props) {
   const [ticker, setTicker] = useState(() => editingHint?.ticker ?? prefillTicker ?? '');
   const [hintDate, setHintDate] = useState(() =>
     editingHint ? isoToMMDDYYYY(editingHint.hint_date) : todayFormatted()
@@ -104,10 +108,10 @@ export default function TradingHintModal({ editingHint, prefillTicker, onClose, 
     finally { setPriceFetching(false); }
   };
 
-  const handleSave = async () => {
-    if (!ticker.trim()) { setError('Ticker is required'); return; }
-    if (!hintDate.trim()) { setError('Date is required'); return; }
-    if (!type) { setError('Type is required'); return; }
+  const doSave = async (): Promise<boolean> => {
+    if (!ticker.trim()) { setError('Ticker is required'); return false; }
+    if (!hintDate.trim()) { setError('Date is required'); return false; }
+    if (!type) { setError('Type is required'); return false; }
     const price = priceDisabled ? null : (priceStr.trim() || null);
     const current_price = cpDisabled ? null : (parseFloat(currentPriceStr.replace(/,/g, '')) || null);
     setSaving(true);
@@ -127,16 +131,30 @@ export default function TradingHintModal({ editingHint, prefillTicker, onClose, 
         }),
       });
       if (!res.ok) throw new Error('Save failed');
-      onSaved();
-      onClose();
+      return true;
     } catch (e: any) {
       setError(e.message || 'Save failed');
+      return false;
     } finally {
       setSaving(false);
     }
   };
 
-  const cpLabel = hintDate === todayFormatted() ? 'Current Price' : `${hintDate} Price`;
+  const handleSave = async () => {
+    if (await doSave()) { onSaved(); onClose(); }
+  };
+
+  const handleSaveAndAdd = async () => {
+    if (await doSave()) {
+      onSaved();
+      setType('');
+      setPriceStr('');
+      setNote('');
+      setError('');
+    }
+  };
+
+  const cpLabel = 'Stock Price at Creation';
 
   const disabledStyle: React.CSSProperties = {
     width: '100%', background: 'var(--border)', color: 'var(--muted)', cursor: 'not-allowed',
@@ -154,13 +172,12 @@ export default function TradingHintModal({ editingHint, prefillTicker, onClose, 
           {/* Ticker */}
           <div className="form-group">
             <label>Ticker <span style={{ color: 'var(--red)' }}>*</span></label>
-            <input
-              type="text"
+            <TickerTypeahead
               value={ticker}
-              onChange={e => setTicker(e.target.value.toUpperCase())}
+              onChange={val => setTicker(val)}
+              suggestions={tickerSuggestions}
+              placeholder="Type ticker to search"
               onBlur={() => fetchPrice(ticker, hintDate)}
-              style={{ width: '100%' }}
-              autoFocus
             />
           </div>
 
@@ -238,8 +255,13 @@ export default function TradingHintModal({ editingHint, prefillTicker, onClose, 
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
             <button className="btn-secondary" onClick={onClose}>Cancel</button>
+            {!editingHint && (
+              <button className="btn-secondary" onClick={handleSaveAndAdd} disabled={saving}>
+                {saving ? 'Saving...' : 'Save & Add Another'}
+              </button>
+            )}
             <button className="btn-primary" onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving...' : 'Save'}
+              {saving ? 'Saving...' : editingHint ? 'Update' : 'Save'}
             </button>
           </div>
         </div>

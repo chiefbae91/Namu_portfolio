@@ -8,6 +8,8 @@ const TYPE_LABELS: Record<string, string> = {
   resistance:      '벽 (Resistance)',
   support:         '지지 (Support)',
   supply_level:    '매물대 (Supply Level)',
+  faded_supply:    '흐린 매물대 (Faded Supply Zone)',
+  last_buy_zone:   '마지막 매물대 (Last Buy Zone)',
   short_target:    '단기 목표주가 (Short Target)',
   long_target:     '장기 목표주가 (Long Target)',
   buy_stop:        '매수 중지 (Buy Halt)',
@@ -16,6 +18,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 const TYPE_COLORS: Record<string, string> = {
   resistance: '#ff5252', support: '#00e676', supply_level: '#f59e0b',
+  faded_supply: '#a78bfa', last_buy_zone: '#f43f5e',
   short_target: '#60a5fa', long_target: '#818cf8', buy_stop: '#ef4444',
   trailing_supply: '#fb923c', note_only: '#64748b',
 };
@@ -186,6 +189,7 @@ export default function HintAnalysisModal({ ticker, hints, onClose, onAddHint, o
           interval={interval}
           hideTransactions
           chartHints={chartHints}
+          svgOpacity={0.5}
           onLoaded={handleChartLoaded}
         />
 
@@ -197,7 +201,7 @@ export default function HintAnalysisModal({ ticker, hints, onClose, onAddHint, o
                 <th>Date</th>
                 <th>Type</th>
                 <th style={{ textAlign: 'right' }}>Price</th>
-                <th style={{ textAlign: 'right' }}>Current Price</th>
+                <th style={{ textAlign: 'right' }}>Stock Price at Creation</th>
                 <th>Note</th>
                 <th></th>
               </tr>

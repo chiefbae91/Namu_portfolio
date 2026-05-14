@@ -36,10 +36,11 @@ interface Props {
   interval: string;
   hideTransactions?: boolean;
   chartHints?: ChartHint[];
+  svgOpacity?: number;
   onLoaded?: (data: StockChartData) => void;
 }
 
-const StockChart = memo(function StockChart({ ticker, period, interval, hideTransactions, chartHints, onLoaded }: Props) {
+const StockChart = memo(function StockChart({ ticker, period, interval, hideTransactions, chartHints, svgOpacity, onLoaded }: Props) {
   const [candles, setCandles] = useState<OHLCPoint[]>([]);
   const [chartTxs, setChartTxs] = useState<ChartTx[]>([]);
   const [resolvedInterval, setResolvedInterval] = useState(interval);
@@ -76,7 +77,7 @@ const StockChart = memo(function StockChart({ ticker, period, interval, hideTran
 
   return (
     <div style={{ position: 'relative', width: '100%', minHeight: 320 }}>
-      <CandlestickChart candles={candles} transactions={hideTransactions ? [] : chartTxs} chartHints={chartHints} resolvedInterval={resolvedInterval} />
+      <CandlestickChart candles={candles} transactions={hideTransactions ? [] : chartTxs} chartHints={chartHints} resolvedInterval={resolvedInterval} svgOpacity={svgOpacity} />
       {loading && candles.length > 0 && (
         <div style={{
           position: 'absolute', inset: 0,

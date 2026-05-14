@@ -1,7 +1,8 @@
 'use client';
 import { useState } from 'react';
-import { Pencil, Trash2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
+import { Pencil, PlusCircle, Trash2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
 import { TradingHint } from '@/lib/types';
+import TickerTypeahead from '@/components/TickerTypeahead';
 
 type DateRangeMode = 'all' | 'last_day' | 'last_week' | 'last_month' | 'custom';
 
@@ -28,6 +29,8 @@ const TYPE_LABELS: Record<string, string> = {
   buy_stop:        '매수 중지 (Buy Halt)',
   trailing_supply: '추격 매물대 (Trailing Supply)',
   note_only:       '메모 (Note Only)',
+  faded_supply:    '흐린 매물대 (Faded Supply Zone)',
+  last_buy_zone:   '마지막 매물대 (Last Buy Zone)',
 };
 
 const TYPE_COLORS: Record<string, string> = {
@@ -39,10 +42,25 @@ const TYPE_COLORS: Record<string, string> = {
   buy_stop:        '#ef4444',
   trailing_supply: '#fb923c',
   note_only:       '#64748b',
+  faded_supply:    '#a78bfa',
+  last_buy_zone:   '#f43f5e',
 };
 
 const PAGE_SIZE = 50;
-type SortCol = 'hint_date' | 'price' | 'type';
+
+const TYPE_FILTER_OPTIONS = [
+  { value: '', label: 'All Types' },
+  { value: 'resistance',      label: '벽 (Resistance)' },
+  { value: 'support',         label: '지지 (Support)' },
+  { value: 'supply_level',    label: '매물대 (Supply Level)' },
+  { value: 'faded_supply',    label: '흐린 매물대 (Faded Supply Zone)' },
+  { value: 'last_buy_zone',   label: '마지막 매물대 (Last Buy Zone)' },
+  { value: 'short_target',    label: '단기 목표주가 (Short Target)' },
+  { value: 'long_target',     label: '장기 목표주가 (Long Target)' },
+  { value: 'buy_stop',        label: '매수 중지 (Buy Halt)' },
+  { value: 'trailing_supply', label: '추격 매물대 (Trailing Supply)' },
+  { value: 'note_only',       label: '메모 (Note Only)' },
+];
 
 function getPageNums(current: number, total: number): (number | null)[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -62,14 +80,15 @@ interface Props {
   onEdit: (hint: TradingHint) => void;
   onDelete: (id: number) => void;
   onSymbolClick?: (ticker: string) => void;
+  onAddHint?: () => void;
 }
 
-export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick }: Props) {
+export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, onAddHint }: Props) {
   const [tickerFilter, setTickerFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
   const [dateMode, setDateMode] = useState<DateRangeMode>('last_month');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
-  const [sortCol, setSortCol] = useState<SortCol>('hint_date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
 
@@ -82,21 +101,17 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick }:
     : getPresetRange(dateMode);
 
   const filtered = hints.filter(h => {
-    if (tickerFilter && h.ticker !== tickerFilter) return false;
+    if (tickerFilter && !h.ticker.toUpperCase().includes(tickerFilter.toUpperCase())) return false;
+    if (typeFilter && h.type !== typeFilter) return false;
     if (activeRange) {
       if (activeRange.from && h.hint_date < activeRange.from) return false;
       if (activeRange.to && h.hint_date > activeRange.to) return false;
     }
     return true;
   });
-  const firstPrice = (p: string | null) =>
-    p ? parseFloat(p.trim().split(/\s+/)[0].replace(/,/g, '')) : -Infinity;
 
   const sorted = [...filtered].sort((a, b) => {
-    let cmp = 0;
-    if (sortCol === 'hint_date') cmp = a.hint_date.localeCompare(b.hint_date);
-    else if (sortCol === 'price') cmp = firstPrice(a.price) - firstPrice(b.price);
-    else if (sortCol === 'type') cmp = a.type.localeCompare(b.type);
+    const cmp = a.hint_date.localeCompare(b.hint_date);
     return sortDir === 'asc' ? cmp : -cmp;
   });
 
@@ -105,16 +120,15 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick }:
   const pageEnd = Math.min(pageStart + PAGE_SIZE, sorted.length);
   const paginated = sorted.slice(pageStart, pageEnd);
 
-  const handleSort = (col: SortCol) => {
-    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    else { setSortCol(col); setSortDir('desc'); }
+  const toggleSort = () => {
+    setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     setPage(1);
   };
 
-  const SortIcon = ({ col }: { col: SortCol }) => {
-    if (sortCol !== col) return <span style={{ opacity: 0.3, fontSize: 10, marginLeft: 2 }}>↕</span>;
-    return sortDir === 'asc' ? <ChevronUp size={11} style={{ marginLeft: 2 }} /> : <ChevronDown size={11} style={{ marginLeft: 2 }} />;
-  };
+  const SortIcon = () =>
+    sortDir === 'asc'
+      ? <ChevronUp size={11} style={{ marginLeft: 2 }} />
+      : <ChevronDown size={11} style={{ marginLeft: 2 }} />;
 
   const fmtPrice = (p: string | null) => {
     if (!p) return null;
@@ -128,23 +142,22 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick }:
     <div>
       {/* Toolbar */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
-        <select
+        <TickerTypeahead
           value={tickerFilter}
-          onChange={e => { setTickerFilter(e.target.value); setPage(1); }}
+          onChange={val => { setTickerFilter(val); setPage(1); }}
+          suggestions={tickers}
+          placeholder="Type ticker to search"
           style={{ minWidth: 130 }}
-        >
-          <option value="">All Symbols</option>
-          {tickers.map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
+        />
 
         <select
           value={dateMode}
           onChange={e => { setDateMode(e.target.value as DateRangeMode); setPage(1); }}
           style={{ minWidth: 130 }}
         >
-          <option value="last_day">Last Day</option>
-          <option value="last_week">Last Week</option>
-          <option value="last_month">Last Month</option>
+          <option value="last_day">1 Day</option>
+          <option value="last_week">1 Week</option>
+          <option value="last_month">30 Days</option>
           <option value="custom">Custom</option>
         </select>
 
@@ -185,10 +198,19 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick }:
           </div>
         )}
 
-        {(tickerFilter || dateMode !== 'all') && (
+        <select
+          value={typeFilter}
+          onChange={e => { setTypeFilter(e.target.value); setPage(1); }}
+          style={{ minWidth: 160 }}
+        >
+          {TYPE_FILTER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+
+        {(tickerFilter || typeFilter || dateMode !== 'last_month' || customFrom || customTo) && (
           <button className="btn-secondary btn-sm" onClick={() => {
             setTickerFilter('');
-            setDateMode('all');
+            setTypeFilter('');
+            setDateMode('last_month');
             setCustomFrom('');
             setCustomTo('');
             setPage(1);
@@ -200,6 +222,17 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick }:
             {pageStart + 1}–{pageEnd} of {sorted.length}
           </span>
         )}
+
+        <div style={{ flex: 1 }} />
+
+        {onAddHint && (
+          <button
+            onClick={onAddHint}
+            style={{ background: 'var(--accent)', color: 'white', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, borderRadius: 6 }}
+          >
+            <PlusCircle size={14} /> Add Trading Hint
+          </button>
+        )}
       </div>
 
       {/* Table */}
@@ -207,32 +240,15 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick }:
         <table>
           <thead>
             <tr>
-              <th
-                style={{ cursor: 'pointer', userSelect: 'none' }}
-                onClick={() => handleSort('hint_date')}
-              >
+              <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={toggleSort}>
                 <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                  Hint Date <SortIcon col="hint_date" />
+                  Hint Date <SortIcon />
                 </span>
               </th>
               <th>Ticker</th>
-              <th
-                style={{ cursor: 'pointer', userSelect: 'none' }}
-                onClick={() => handleSort('type')}
-              >
-                <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                  Type <SortIcon col="type" />
-                </span>
-              </th>
-              <th style={{ textAlign: 'right' }}>Current Price</th>
-              <th
-                style={{ cursor: 'pointer', userSelect: 'none', textAlign: 'right' }}
-                onClick={() => handleSort('price')}
-              >
-                <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                  Hint Price <SortIcon col="price" />
-                </span>
-              </th>
+              <th>Type</th>
+              <th style={{ textAlign: 'right' }}>Hint Price</th>
+              <th style={{ textAlign: 'right' }}>Stock Price at Creation</th>
               <th>Note</th>
               <th></th>
             </tr>
@@ -262,12 +278,12 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick }:
                   </span>
                 </td>
                 <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                  {fmtPrice(hint.price) ?? <span className="muted">—</span>}
+                </td>
+                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                   {hint.current_price != null
                     ? `$${hint.current_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                     : <span className="muted">—</span>}
-                </td>
-                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                  {fmtPrice(hint.price) ?? <span className="muted">—</span>}
                 </td>
                 <td style={{ maxWidth: 220 }}>
                   {hint.note

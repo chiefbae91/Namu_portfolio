@@ -10,7 +10,6 @@ import AccountSettingsModal from '@/components/modals/AccountSettingsModal';
 import TradeAnalysisModal from '@/components/modals/TradeAnalysisModal';
 import CsvImportModal from '@/components/modals/CsvImportModal';
 import TradingHintModal from '@/components/modals/TradingHintModal';
-import HintAnalysisModal from '@/components/modals/HintAnalysisModal';
 import SummaryCards from '@/components/SummaryCards';
 
 const TRANSFER_OFFSET = 1_000_000;
@@ -37,7 +36,8 @@ export default function Home() {
   const [editingHint, setEditingHint] = useState<TradingHint | null>(null);
   const [hintPrefillTicker, setHintPrefillTicker] = useState<string | null>(null);
   const [tradingHints, setTradingHints] = useState<TradingHint[]>([]);
-  const [hintAnalysisTicker, setHintAnalysisTicker] = useState<string | null>(null);
+  const [analysisInitialTab, setAnalysisInitialTab] = useState<'history' | 'hints'>('history');
+  const [hintRefreshTrigger, setHintRefreshTrigger] = useState(0);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
   const [ratesUpdatedAt, setRatesUpdatedAt] = useState<Date | null>(null);
   const [ratesRefreshing, setRatesRefreshing] = useState(false);
@@ -45,6 +45,7 @@ export default function Home() {
   const fetchTradingHints = useCallback(async () => {
     const res = await fetch('/api/trading-hints');
     setTradingHints(await res.json());
+    setHintRefreshTrigger(t => t + 1);
   }, []);
 
   const fetchAccounts = useCallback(async () => {
@@ -298,12 +299,12 @@ export default function Home() {
 
         <button onClick={() => { setEditingTx(null); setTxModalOpen(true); }}
           style={{ background: 'var(--accent)', color: 'white', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}>
-          <PlusCircle size={15} /> Add Trade
+          <PlusCircle size={15} /> Add Trading History
         </button>
 
         <button onClick={() => { setEditingHint(null); setTradingHintOpen(true); }}
           style={{ background: 'var(--accent)', color: 'white', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}>
-          Trading Hint
+          <PlusCircle size={15} /> Add Trading Hint
         </button>
 
         <button onClick={() => setCsvImportOpen(true)}
@@ -337,7 +338,7 @@ export default function Home() {
         {/* Tab Content */}
         <div className="card" style={{ marginBottom: 20, overflowX: 'auto' }}>
           {activeTab === 'portfolio' && (
-            <StockPortfolio positions={positions} currency="USD" rates={rates} onTickerClick={setAnalysisTicker} />
+            <StockPortfolio positions={positions} currency="USD" rates={rates} onTickerClick={ticker => { setAnalysisInitialTab('history'); setAnalysisTicker(ticker); }} />
           )}
           {activeTab === 'history' && (
             <TransactionHistory
@@ -348,6 +349,7 @@ export default function Home() {
               onDelete={handleDeleteTx}
               onDeleteMany={handleDeleteMany}
               deepLink={historyDeepLink}
+              onAddTradingHistory={() => { setEditingTx(null); setTxModalOpen(true); }}
             />
           )}
           {activeTab === 'hints' && (
@@ -355,7 +357,8 @@ export default function Home() {
               hints={tradingHints}
               onEdit={handleEditHint}
               onDelete={handleDeleteHint}
-              onSymbolClick={setHintAnalysisTicker}
+              onSymbolClick={ticker => { setAnalysisInitialTab('hints'); setAnalysisTicker(ticker); }}
+              onAddHint={() => { setEditingHint(null); setTradingHintOpen(true); }}
             />
           )}
         </div>
@@ -389,9 +392,14 @@ export default function Home() {
           ticker={analysisTicker}
           currency="USD"
           rates={rates}
-          onClose={() => setAnalysisTicker(null)}
+          onClose={() => { setAnalysisTicker(null); setAnalysisInitialTab('history'); }}
           onAddTransaction={() => handleAddTransactionFromAnalysis(analysisTicker)}
           onShowHistory={handleShowHistoryForTicker}
+          initialTab={analysisInitialTab}
+          hintRefreshTrigger={hintRefreshTrigger}
+          onAddHint={handleAddHintFromAnalysis}
+          onEditHint={handleEditHint}
+          onDeleteHint={handleDeleteHint}
         />
       )}
       {csvImportOpen && (
@@ -401,18 +409,9 @@ export default function Home() {
         <TradingHintModal
           editingHint={editingHint}
           prefillTicker={hintPrefillTicker}
+          tickerSuggestions={[...new Set(tradingHints.map(h => h.ticker))].sort()}
           onClose={closeTradingHintModal}
-          onSaved={() => { fetchTradingHints(); closeTradingHintModal(); }}
-        />
-      )}
-      {hintAnalysisTicker && (
-        <HintAnalysisModal
-          ticker={hintAnalysisTicker}
-          hints={tradingHints.filter(h => h.ticker === hintAnalysisTicker)}
-          onClose={() => setHintAnalysisTicker(null)}
-          onAddHint={handleAddHintFromAnalysis}
-          onEditHint={handleEditHint}
-          onDeleteHint={handleDeleteHint}
+          onSaved={fetchTradingHints}
         />
       )}
     </div>

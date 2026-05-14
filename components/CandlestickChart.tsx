@@ -44,6 +44,7 @@ interface Props {
   transactions?: ChartTx[];
   chartHints?: ChartHint[];
   resolvedInterval?: string;
+  svgOpacity?: number;
 }
 
 interface TooltipState {
@@ -75,11 +76,13 @@ const HINT_COLORS: Record<string, string> = {
   resistance: '#ff5252', support: '#00e676', supply_level: '#f59e0b',
   short_target: '#60a5fa', long_target: '#818cf8', buy_stop: '#ef4444',
   trailing_supply: '#fb923c', note_only: '#64748b',
+  faded_supply: '#a78bfa', last_buy_zone: '#f43f5e',
 };
 const HINT_SHORT: Record<string, string> = {
   resistance: 'Res', support: 'Sup', supply_level: 'SL',
   short_target: 'ST', long_target: 'LT', buy_stop: 'BS',
   trailing_supply: 'TS', note_only: 'Note',
+  faded_supply: 'FS', last_buy_zone: 'LBZ',
 };
 const HINT_LABEL: Record<string, string> = {
   resistance:      '벽 (Resistance)',
@@ -90,6 +93,8 @@ const HINT_LABEL: Record<string, string> = {
   buy_stop:        '매수 중지 (Buy Halt)',
   trailing_supply: '추격 매물대 (Trailing Supply)',
   note_only:       '메모 (Note Only)',
+  faded_supply:    '흐린 매물대 (Faded Supply Zone)',
+  last_buy_zone:   '마지막 매물대 (Last Buy Zone)',
 };
 
 function getTxColor(tx: ChartTx): string {
@@ -102,12 +107,11 @@ function getTxLabel(tx: ChartTx): string {
   return TX_LABELS[tx.type] ?? tx.type;
 }
 
-function formatXLabel(date: string, interval: string): string {
-  if (interval === '1m' || interval === '15m') return date.slice(11, 16) || date.slice(5, 10);
-  return date.slice(5);
+function formatXLabel(date: string): string {
+  return date.slice(5, 10);
 }
 
-export default function CandlestickChart({ candles, transactions = [], chartHints, resolvedInterval = '1d' }: Props) {
+export default function CandlestickChart({ candles, transactions = [], chartHints, resolvedInterval = '1d', svgOpacity = 1 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(600);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
@@ -144,7 +148,7 @@ export default function CandlestickChart({ candles, transactions = [], chartHint
   const yTicks = Array.from({ length: 5 }, (_, i) => yMin + (ySpan * i) / 4);
   const xStep = Math.max(1, Math.ceil(candles.length / 6));
   const xTicks = candles
-    .map((c, i) => ({ i, label: formatXLabel(c.date, resolvedInterval) }))
+    .map((c, i) => ({ i, label: formatXLabel(c.date) }))
     .filter((_, i) => i % xStep === 0);
 
   const txByDate: Record<string, ChartTx[]> = {};
@@ -192,7 +196,7 @@ export default function CandlestickChart({ candles, transactions = [], chartHint
           width={width} height={H}
           onMouseMove={handleMouseMove}
           onMouseLeave={() => setTooltip(null)}
-          style={{ cursor: 'crosshair', display: 'block' }}
+          style={{ cursor: 'crosshair', display: 'block', opacity: svgOpacity }}
         >
           {/* Y grid + labels */}
           {yTicks.map((tick, i) => {
@@ -294,8 +298,8 @@ export default function CandlestickChart({ candles, transactions = [], chartHint
               <circle key={`hd-${i}`}
                 cx={cx} cy={dotY} r={4.5}
                 fill={dotColor}
-                stroke={isMulti ? '#94a3b8' : dotColor}
-                strokeWidth={isMulti ? 1 : 0}
+                stroke={isMulti ? '#ef4444' : 'white'}
+                strokeWidth={2}
                 opacity={0.9}
                 style={{ cursor: 'pointer' }}
                 onMouseEnter={e => {
@@ -316,48 +320,48 @@ export default function CandlestickChart({ candles, transactions = [], chartHint
         </svg>
 
         {/* Legend */}
-        {chartHints !== undefined ? (
-          <div style={{ display: 'flex', gap: 10, padding: '4px 8px 2px', fontSize: 11, color: '#64748b', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 14, padding: '4px 8px 2px', fontSize: 11, color: '#64748b', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <span style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <span style={{ width: 8, height: 5, background: '#00e676', display: 'inline-block', borderRadius: 1 }} />
+              <span style={{ width: 8, height: 5, background: '#ff5252', display: 'inline-block', borderRadius: 1 }} />
+            </span>
+            OHLC
+          </span>
+          <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+            <svg width={10} height={12} style={{ display: 'block' }}><polygon points="5,1 0,11 10,11" fill="#00e676" opacity={0.9} /></svg>
+            Buy
+          </span>
+          <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+            <svg width={10} height={12} style={{ display: 'block' }}><polygon points="0,1 10,1 5,11" fill="#ff5252" opacity={0.9} /></svg>
+            Sell
+          </span>
+          <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+            <svg width={10} height={10} style={{ display: 'block' }}><circle cx="5" cy="5" r="4.5" fill="#f59e0b" opacity={0.9} /></svg>
+            Dividend
+          </span>
+          <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+            <svg width={10} height={10} style={{ display: 'block' }}><circle cx="5" cy="5" r="4.5" fill="#f97316" opacity={0.9} /></svg>
+            Div. Reinvest
+          </span>
+        </div>
+
+        {chartHints !== undefined && chartHints.length > 0 && (
+          <div style={{ display: 'flex', gap: 10, padding: '2px 8px 4px', fontSize: 11, color: '#64748b', flexWrap: 'wrap', alignItems: 'center' }}>
             {[...new Map(chartHints.map(h => [h.type, h])).values()].map(h => (
               <span key={h.type} style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
                 <svg width={10} height={10} style={{ display: 'block' }}>
-                  <circle cx="5" cy="5" r="4" fill={HINT_COLORS[h.type] ?? '#64748b'} opacity={0.9} />
+                  <circle cx="5" cy="5" r="4" fill={HINT_COLORS[h.type] ?? '#64748b'} stroke="white" strokeWidth={1.5} opacity={0.9} />
                 </svg>
                 <span style={{ color: HINT_COLORS[h.type] ?? '#64748b' }}>{HINT_LABEL[h.type] ?? h.type}</span>
               </span>
             ))}
             {chartHints.some((h, _, arr) => arr.filter(x => x.date.slice(0, 10) === h.date.slice(0, 10)).length > 1) && (
               <span style={{ display: 'flex', gap: 5, alignItems: 'center', marginLeft: 4, paddingLeft: 8, borderLeft: '1px solid var(--border)' }}>
-                <svg width={10} height={10} style={{ display: 'block' }}><circle cx="5" cy="5" r="4" fill="white" stroke="#94a3b8" strokeWidth={1} opacity={0.9} /></svg>
+                <svg width={10} height={10} style={{ display: 'block' }}><circle cx="5" cy="5" r="4" fill="white" stroke="#ef4444" strokeWidth={1.5} opacity={0.9} /></svg>
                 Multiple
               </span>
             )}
-          </div>
-        ) : (
-          <div style={{ display: 'flex', gap: 14, padding: '4px 8px 2px', fontSize: 11, color: '#64748b', flexWrap: 'wrap', alignItems: 'center' }}>
-            <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              <span style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <span style={{ width: 8, height: 5, background: '#00e676', display: 'inline-block', borderRadius: 1 }} />
-                <span style={{ width: 8, height: 5, background: '#ff5252', display: 'inline-block', borderRadius: 1 }} />
-              </span>
-              OHLC
-            </span>
-            <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-              <svg width={10} height={12} style={{ display: 'block' }}><polygon points="5,1 0,11 10,11" fill="#00e676" opacity={0.9} /></svg>
-              Buy
-            </span>
-            <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-              <svg width={10} height={12} style={{ display: 'block' }}><polygon points="0,1 10,1 5,11" fill="#ff5252" opacity={0.9} /></svg>
-              Sell
-            </span>
-            <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-              <svg width={10} height={10} style={{ display: 'block' }}><circle cx="5" cy="5" r="4.5" fill="#f59e0b" opacity={0.9} /></svg>
-              Dividend
-            </span>
-            <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-              <svg width={10} height={10} style={{ display: 'block' }}><circle cx="5" cy="5" r="4.5" fill="#f97316" opacity={0.9} /></svg>
-              Div. Reinvest
-            </span>
           </div>
         )}
 
@@ -368,8 +372,8 @@ export default function CandlestickChart({ candles, transactions = [], chartHint
             left: toRight ? tooltip.x + 14 : undefined,
             right: toRight ? undefined : width - tooltip.x + 14,
             top: Math.max(4, tooltip.y - 56),
-            background: '#1a1d27',
-            border: '1px solid #2a2d3a',
+            background: 'white',
+            border: '1px solid #e2e8f0',
             borderRadius: 8,
             padding: '8px 12px',
             fontSize: 12,
@@ -377,15 +381,15 @@ export default function CandlestickChart({ candles, transactions = [], chartHint
             zIndex: 50,
             minWidth: 164,
           }}>
-            <div style={{ color: '#94a3b8', marginBottom: 5, fontSize: 11 }}>{tooltip.candle.date}</div>
+            <div style={{ color: '#64748b', marginBottom: 5, fontSize: 11 }}>{tooltip.candle.date}</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '2px 10px', fontVariantNumeric: 'tabular-nums' }}>
-              <span style={{ color: '#64748b' }}>O</span><span style={{ color: '#e2e8f0' }}>${tooltip.candle.open?.toFixed(2)}</span>
-              <span style={{ color: '#00e676' }}>H</span><span style={{ color: '#e2e8f0' }}>${tooltip.candle.high?.toFixed(2)}</span>
-              <span style={{ color: '#ff5252' }}>L</span><span style={{ color: '#e2e8f0' }}>${tooltip.candle.low?.toFixed(2)}</span>
-              <span style={{ color: '#94a3b8' }}>C</span><span style={{ color: '#e2e8f0' }}>${tooltip.candle.close?.toFixed(2)}</span>
+              <span style={{ color: '#94a3b8' }}>O</span><span style={{ color: '#1f2937' }}>${tooltip.candle.open?.toFixed(2)}</span>
+              <span style={{ color: '#00a854' }}>H</span><span style={{ color: '#1f2937' }}>${tooltip.candle.high?.toFixed(2)}</span>
+              <span style={{ color: '#ef4444' }}>L</span><span style={{ color: '#1f2937' }}>${tooltip.candle.low?.toFixed(2)}</span>
+              <span style={{ color: '#94a3b8' }}>C</span><span style={{ color: '#1f2937' }}>${tooltip.candle.close?.toFixed(2)}</span>
             </div>
             {tooltip.txs.length > 0 && (
-              <div style={{ marginTop: 6, borderTop: '1px solid #2a2d3a', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <div style={{ marginTop: 6, borderTop: '1px solid #e2e8f0', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {tooltip.txs.map((tx, i) => (
                   <div key={i} style={{ color: getTxColor(tx), fontSize: 11 }}>
                     {getTxLabel(tx)}{tx.quantity > 0 ? ` ×${tx.quantity}` : ''} @ ${tx.price?.toFixed(2)}
@@ -406,7 +410,7 @@ export default function CandlestickChart({ candles, transactions = [], chartHint
               left: mToRight ? markerTooltip.svgX + 12 : undefined,
               right: mToRight ? undefined : width - markerTooltip.svgX + 12,
               top: tipTop,
-              background: '#1a1d27',
+              background: 'white',
               border: `1px solid ${getTxColor(tx)}`,
               borderRadius: 8,
               padding: '8px 12px',
@@ -420,18 +424,18 @@ export default function CandlestickChart({ candles, transactions = [], chartHint
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 10px', fontVariantNumeric: 'tabular-nums' }}>
                 <span style={{ color: '#64748b' }}>Date</span>
-                <span style={{ color: '#e2e8f0' }}>{tx.date.slice(0, 10)}</span>
+                <span style={{ color: '#1f2937' }}>{tx.date.slice(0, 10)}</span>
                 {tx.price > 0 && <>
                   <span style={{ color: '#64748b' }}>Price</span>
-                  <span style={{ color: '#e2e8f0' }}>${tx.price.toFixed(2)}</span>
+                  <span style={{ color: '#1f2937' }}>${tx.price.toFixed(2)}</span>
                 </>}
                 {tx.quantity > 0 && <>
                   <span style={{ color: '#64748b' }}>Qty</span>
-                  <span style={{ color: '#e2e8f0' }}>{tx.quantity.toLocaleString('en-US')}</span>
+                  <span style={{ color: '#1f2937' }}>{tx.quantity.toLocaleString('en-US')}</span>
                 </>}
                 {tx.notes && <>
                   <span style={{ color: '#64748b' }}>Note</span>
-                  <span style={{ color: '#e2e8f0', maxWidth: 160, wordBreak: 'break-word' }}>{tx.notes}</span>
+                  <span style={{ color: '#1f2937', maxWidth: 160, wordBreak: 'break-word' }}>{tx.notes}</span>
                 </>}
               </div>
             </div>
@@ -448,8 +452,8 @@ export default function CandlestickChart({ candles, transactions = [], chartHint
               left: toRight2 ? svgX + 12 : undefined,
               right: toRight2 ? undefined : width - svgX + 12,
               top: Math.max(4, svgY + 10),
-              background: '#1a1d27',
-              border: '1px solid #3a3d4a',
+              background: 'white',
+              border: '1px solid #e2e8f0',
               borderRadius: 8,
               padding: '8px 12px',
               fontSize: 12,
@@ -458,7 +462,7 @@ export default function CandlestickChart({ candles, transactions = [], chartHint
               minWidth: 190,
               maxWidth: 260,
             }}>
-              <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 8, fontWeight: 600 }}>
+              <div style={{ color: '#64748b', fontSize: 11, marginBottom: 8, fontWeight: 600 }}>
                 {hints[0].date.slice(0, 10)}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -474,13 +478,13 @@ export default function CandlestickChart({ candles, transactions = [], chartHint
                         {HINT_LABEL[h.type] ?? h.type}
                       </span>
                       {h.price != null && (
-                        <span style={{ color: '#e2e8f0', fontVariantNumeric: 'tabular-nums', fontSize: 11, marginLeft: 'auto' }}>
+                        <span style={{ color: '#1f2937', fontVariantNumeric: 'tabular-nums', fontSize: 11, marginLeft: 'auto' }}>
                           {fmtHintPrice(h.price)}
                         </span>
                       )}
                     </div>
                     {h.note && (
-                      <div style={{ color: '#64748b', fontSize: 11, marginLeft: 14, marginTop: 2 }}>
+                      <div style={{ color: '#6b7280', fontSize: 11, marginLeft: 14, marginTop: 2 }}>
                         {h.note}
                       </div>
                     )}
