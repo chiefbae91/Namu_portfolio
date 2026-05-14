@@ -1,43 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
-import getDb from '@/lib/db';
+import { getAdminClient } from '@/lib/supabase-admin';
 import { getAuthUser, unauthorized } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   if (!await getAuthUser()) return unauthorized();
-  const db = getDb();
+  const supabase = getAdminClient();
   const { searchParams } = new URL(req.url);
   const accountIdsParam = searchParams.get('account_ids');
-  const accountIds = accountIdsParam
+  const filterIds = accountIdsParam
     ? accountIdsParam.split(',').map(Number).filter(n => Number.isInteger(n) && n > 0)
     : [];
 
-  let sql = `
-    SELECT cf.*, a.name as account_name
-    FROM cash_flow cf
-    JOIN accounts a ON cf.account_id = a.id
-    WHERE a.hidden = 0
-  `;
-  const args: any[] = [];
-  if (accountIds.length > 0) {
-    sql += ` AND cf.account_id IN (${accountIds.map(() => '?').join(',')})`;
-    args.push(...accountIds);
-  }
-  sql += ' ORDER BY cf.date DESC, cf.id DESC';
-  return NextResponse.json(db.prepare(sql).all(...args));
+  const { data: accounts } = await supabase.from('accounts').select('id, name, hidden');
+  const visibleAccounts = (accounts || []).filter((a: any) => !a.hidden);
+  const nameMap: Record<number, string> = Object.fromEntries(visibleAccounts.map((a: any) => [a.id, a.name]));
+  const visibleIds = visibleAccounts.map((a: any) => a.id);
+  const effectiveIds = filterIds.length ? filterIds.filter(id => visibleIds.includes(id)) : visibleIds;
+
+  if (!effectiveIds.length) return NextResponse.json([]);
+
+  const { data, error } = await supabase
+    .from('cash_flow')
+    .select('id, account_id, type, amount, flow_date')
+    .in('account_id', effectiveIds)
+    .order('flow_date', { ascending: false })
+    .order('id', { ascending: false });
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json((data || []).map(r => ({
+    ...r,
+    date: r.flow_date,
+    description: '',
+    account_name: nameMap[r.account_id],
+  })));
 }
 
 export async function POST(req: NextRequest) {
-  if (!await getAuthUser()) return unauthorized();
-  const db = getDb();
-  const { account_id, date, amount, type, description } = await req.json();
+  const user = await getAuthUser();
+  if (!user) return unauthorized();
+  const supabase = getAdminClient();
+  const { account_id, date, amount, type } = await req.json();
 
   if (!account_id || !date || !amount || !type) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
-  const result = db.prepare(
-    'INSERT INTO cash_flow (account_id, date, amount, type, description) VALUES (?, ?, ?, ?, ?)'
-  ).run(account_id, date, amount, type, description || '');
+  const { data, error } = await supabase
+    .from('cash_flow')
+    .insert({ account_id, flow_date: date, amount, type, user_id: user.id })
+    .select('id')
+    .single();
 
-  return NextResponse.json({ id: result.lastInsertRowid }, { status: 201 });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ id: data.id }, { status: 201 });
 }

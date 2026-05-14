@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import getDb from '@/lib/db';
+import { getAdminClient } from '@/lib/supabase-admin';
 import Papa from 'papaparse';
 import { CsvPreviewRow, TransactionType } from '@/lib/types';
 import { getAuthUser, unauthorized } from '@/lib/auth';
@@ -30,12 +30,8 @@ function parseDate(s: string): string {
 
 function detectFormat(headers: string[]): 'robinhood' | 'new' | 'webull' {
   const lower = headers.map(h => h.toLowerCase().trim());
-  // Webull: has 'side' + ('filled time' or 'placed time') — very specific to Webull order exports
-  if (lower.some(h => h === 'side') && lower.some(h => h === 'filled time' || h === 'placed time'))
-    return 'webull';
-  // Webull alternate: has 'side' + 'filled qty'
-  if (lower.some(h => h === 'side') && lower.some(h => h.includes('filled qty') || h === 'qty'))
-    return 'webull';
+  if (lower.some(h => h === 'side') && lower.some(h => h === 'filled time' || h === 'placed time')) return 'webull';
+  if (lower.some(h => h === 'side') && lower.some(h => h.includes('filled qty') || h === 'qty')) return 'webull';
   if (lower.some(h => h === 'costbasis' || h === 'cost basis')) return 'new';
   if (lower.some(h => h === 'trans code' || h === 'trans_code' || h === 'instrument')) return 'robinhood';
   if (lower.includes('type') && !lower.includes('trans code')) return 'new';
@@ -44,7 +40,6 @@ function detectFormat(headers: string[]): 'robinhood' | 'new' | 'webull' {
 
 function parseWebullDate(s: string): string {
   if (!s) return '';
-  // "MM/DD/YYYY HH:MM:SS EDT" → strip timezone, take date part
   const parts = s.trim().split(' ');
   const datePart = parts[0];
   if (datePart.includes('/')) {
@@ -54,51 +49,36 @@ function parseWebullDate(s: string): string {
   return datePart.slice(0, 10);
 }
 
-function parseWebullRows(rows: Record<string, string>[], accountId: number, db: ReturnType<typeof getDb>): CsvPreviewRow[] {
+function dupCheckSync(existing: any[], date: string, ticker: string, type: string, qty: number, price: number): boolean {
+  return existing.some(tx =>
+    tx.transaction_date === date && tx.ticker === ticker && tx.type === type &&
+    Math.abs(tx.quantity - qty) < 0.001 && Math.abs(tx.price - price) < 0.01
+  );
+}
+
+function parseWebullRows(rows: Record<string, string>[], accountId: string, existing: any[]): CsvPreviewRow[] {
   const preview: CsvPreviewRow[] = [];
   for (const row of rows) {
-    // Only import fully filled orders
     const status = (row['Status'] || row['status'] || '').trim().toLowerCase();
     if (status && status !== 'filled') continue;
-
     const side = (row['Side'] || row['side'] || '').trim().toLowerCase();
     if (side !== 'buy' && side !== 'sell') continue;
     const type: TransactionType = side === 'buy' ? 'buy' : 'sell';
-
-    // Prefer Filled Time (actual execution), fall back to Placed Time or Trade Time
     const rawDate = row['Filled Time'] || row['filled time'] || row['Trade Time'] || row['Order Time'] || row['trade time'] || row['order time'] || '';
     const date = parseWebullDate(rawDate);
     if (!date) continue;
-
     const ticker = (row['Symbol'] || row['symbol'] || row['Instrument'] || '').trim().toUpperCase();
     if (!ticker) continue;
-
-    // Quantity: Webull uses 'Filled' for actual filled shares
     const qty = Math.abs(parseAmount(row['Filled'] || row['filled'] || row['Filled Qty'] || row['filled qty'] || row['Qty'] || row['qty'] || '0'));
-    // Price: 'Avg Price' is actual fill price; 'Price' has "@" prefix (limit price)
     const price = Math.abs(parseAmount(row['Avg Price'] || row['avg price'] || (row['Price'] || '').replace('@', '') || '0'));
-    const amount = qty * price;
     const fee = Math.abs(parseAmount(row['Commission'] || row['commission'] || row['Fee'] || row['fee'] || '0'));
-
     const name = (row['Name'] || row['name'] || '').trim();
-    const duplicate = dupCheck(db, accountId, date, ticker, type, qty, price);
-    preview.push({
-      date, ticker, type,
-      quantity: qty, price, amount, fee,
-      notes: name || 'Webull',
-      skip: false, duplicate, raw_code: side,
-    });
+    preview.push({ date, ticker, type, quantity: qty, price, amount: qty * price, fee, notes: name || 'Webull', skip: false, duplicate: dupCheckSync(existing, date, ticker, type, qty, price), raw_code: side });
   }
   return preview;
 }
 
-function dupCheck(db: ReturnType<typeof getDb>, accountId: number, date: string, ticker: string, type: string, qty: number, price: number): boolean {
-  return !!(db.prepare(
-    `SELECT id FROM transactions WHERE account_id=? AND date=? AND ticker=? AND type=? AND ABS(quantity-?)<0.001 AND ABS(price-?)<0.01`
-  ).get(accountId, date, ticker, type, qty, price));
-}
-
-function parseRobinhoodRows(rows: Record<string, string>[], accountId: number, db: ReturnType<typeof getDb>): CsvPreviewRow[] {
+function parseRobinhoodRows(rows: Record<string, string>[], accountId: string, existing: any[]): CsvPreviewRow[] {
   const preview: CsvPreviewRow[] = [];
   for (const row of rows) {
     const code = (row['Trans Code'] || row['trans_code'] || '').trim();
@@ -109,30 +89,20 @@ function parseRobinhoodRows(rows: Record<string, string>[], accountId: number, d
     const price = Math.abs(parseAmount(row['Price'] || row['price'] || '0'));
     const amount = parseAmount(row['Amount'] || row['amount'] || '0');
     const notes = (row['Description'] || row['description'] || '').replace(/\n/g, ' ').trim();
-
     if (!type || !date) continue;
-
-    const duplicate = dupCheck(db, accountId, date, ticker, type === 'skip' ? 'skip' : type, qty, price);
-    preview.push({
-      date, ticker,
-      type: type === 'skip' ? 'skip' : type,
-      quantity: qty, price, amount, fee: 0, notes,
-      skip: type === 'skip', duplicate, raw_code: code,
-    });
+    preview.push({ date, ticker, type: type === 'skip' ? 'skip' : type, quantity: qty, price, amount, fee: 0, notes, skip: type === 'skip', duplicate: dupCheckSync(existing, date, ticker, type === 'skip' ? 'skip' : type, qty, price), raw_code: code });
   }
   return preview;
 }
 
-function parseNewRows(rows: Record<string, string>[], ticker: string, accountId: number, db: ReturnType<typeof getDb>): CsvPreviewRow[] {
+function parseNewRows(rows: Record<string, string>[], ticker: string, accountId: string, existing: any[]): CsvPreviewRow[] {
   const preview: CsvPreviewRow[] = [];
   for (const row of rows) {
     const rawType = (row['Type'] || row['type'] || '').trim();
     const mappedType = NEW_TYPE_MAP[rawType];
     if (!mappedType) continue;
-
     const date = parseDate(row['Date'] || row['date'] || '');
     if (!date) continue;
-
     const qty = Math.abs(parseAmount(row['Quantity'] || row['quantity'] || '0'));
     const price = Math.abs(parseAmount(row['Price'] || row['price'] || '0'));
     const costBasis = Math.abs(parseAmount(row['CostBasis'] || row['Cost Basis'] || row['costbasis'] || '0'));
@@ -140,43 +110,25 @@ function parseNewRows(rows: Record<string, string>[], ticker: string, accountId:
 
     if (mappedType === 'dividend_reinvest') {
       const divAmount = costBasis || qty * price;
-      preview.push({
-        date, ticker, type: 'dividend',
-        quantity: 0, price: divAmount, amount: divAmount, fee: 0,
-        notes: 'Dividend Reinvest (배당)', skip: false,
-        duplicate: dupCheck(db, accountId, date, ticker, 'dividend', 0, divAmount),
-        raw_code: rawType,
-      });
-      preview.push({
-        date, ticker, type: 'buy',
-        quantity: qty, price, amount: costBasis, fee,
-        notes: 'Dividend Reinvest (재투자 매수)', skip: false,
-        duplicate: dupCheck(db, accountId, date, ticker, 'buy', qty, price),
-        raw_code: rawType,
-      });
+      preview.push({ date, ticker, type: 'dividend', quantity: 0, price: divAmount, amount: divAmount, fee: 0, notes: 'Dividend Reinvest (배당)', skip: false, duplicate: dupCheckSync(existing, date, ticker, 'dividend', 0, divAmount), raw_code: rawType });
+      preview.push({ date, ticker, type: 'buy', quantity: qty, price, amount: costBasis, fee, notes: 'Dividend Reinvest (재투자 매수)', skip: false, duplicate: dupCheckSync(existing, date, ticker, 'buy', qty, price), raw_code: rawType });
       continue;
     }
-
     if (mappedType === 'skip') continue;
-
     const txType = mappedType as TransactionType;
     const txQty = txType === 'dividend' ? 0 : qty;
     const txPrice = txType === 'dividend' ? (costBasis || qty * price) : price;
     const txFee = txType === 'buy' ? fee : 0;
-
-    preview.push({
-      date, ticker, type: txType,
-      quantity: txQty, price: txPrice, amount: costBasis || qty * price, fee: txFee,
-      notes: rawType, skip: false,
-      duplicate: dupCheck(db, accountId, date, ticker, txType, txQty, txPrice),
-      raw_code: rawType,
-    });
+    preview.push({ date, ticker, type: txType, quantity: txQty, price: txPrice, amount: costBasis || qty * price, fee: txFee, notes: rawType, skip: false, duplicate: dupCheckSync(existing, date, ticker, txType, txQty, txPrice), raw_code: rawType });
   }
   return preview;
 }
 
 export async function POST(req: NextRequest) {
-  if (!await getAuthUser()) return unauthorized();
+  const user = await getAuthUser();
+  if (!user) return unauthorized();
+  const supabase = getAdminClient();
+
   const formData = await req.formData();
   const file = formData.get('file') as File | null;
   const accountId = formData.get('account_id');
@@ -191,33 +143,30 @@ export async function POST(req: NextRequest) {
 
   const headers = Object.keys(rows[0]);
   const format = detectFormat(headers);
-  const db = getDb();
-  const accId = Number(accountId);
+  const accId = String(accountId);
 
-  if (format === 'new' && !tickerInput) {
-    return NextResponse.json({ error: 'ticker_required', format }, { status: 400 });
-  }
+  if (format === 'new' && !tickerInput) return NextResponse.json({ error: 'ticker_required', format }, { status: 400 });
+
+  const { data: existingTxs } = await supabase.from('transactions').select('transaction_date, ticker, type, quantity, price').eq('account_id', accId);
+  const existing = existingTxs || [];
 
   const preview = format === 'webull'
-    ? parseWebullRows(rows, accId, db)
+    ? parseWebullRows(rows, accId, existing)
     : format === 'new'
-      ? parseNewRows(rows, tickerInput, accId, db)
-      : parseRobinhoodRows(rows, accId, db);
+      ? parseNewRows(rows, tickerInput, accId, existing)
+      : parseRobinhoodRows(rows, accId, existing);
 
   const action = formData.get('action');
   if (action === 'import') {
-    const insert = db.prepare(
-      `INSERT INTO transactions (account_id, date, ticker, type, quantity, price, fee, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    );
-    let imported = 0;
-    db.transaction(() => {
-      for (const p of preview) {
-        if (p.skip || p.duplicate) continue;
-        insert.run(accId, p.date, p.ticker, p.type, p.quantity, p.price, p.fee, p.notes);
-        imported++;
-      }
-    })();
-    return NextResponse.json({ imported, total: preview.length });
+    const toInsert = preview.filter(p => !p.skip && !p.duplicate).map(p => ({
+      account_id: accId, transaction_date: p.date, ticker: p.ticker, type: p.type,
+      quantity: p.quantity, price: p.price, fee: p.fee, note: p.notes, user_id: user.id,
+    }));
+    if (toInsert.length) {
+      const { error } = await supabase.from('transactions').insert(toInsert);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ imported: toInsert.length, total: preview.length });
   }
 
   return NextResponse.json({ preview, total: preview.length, format });

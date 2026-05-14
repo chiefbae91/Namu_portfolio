@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import getDb from '@/lib/db';
+import { getAdminClient } from '@/lib/supabase-admin';
 import { getAuthUser, unauthorized } from '@/lib/auth';
 
 type Interval = '1m' | '15m' | '1d' | '1wk';
 type Range = '5d' | '1mo' | '3mo' | '6mo' | '1y';
 
-const RANGE_DAYS: Record<string, number> = {
-  '5d': 5, '1mo': 30, '3mo': 90, '6mo': 180, '1y': 365,
-};
+const RANGE_DAYS: Record<string, number> = { '5d': 5, '1mo': 30, '3mo': 90, '6mo': 180, '1y': 365 };
 
 function coerceInterval(interval: Interval, range: Range): Interval {
   const days = RANGE_DAYS[range] ?? 30;
@@ -27,8 +25,7 @@ export async function GET(req: NextRequest) {
 
   const resolvedInterval = coerceInterval(intervalParam, rangeParam);
   const isIntraday = resolvedInterval === '1m' || resolvedInterval === '15m';
-
-  const db = getDb();
+  const supabase = getAdminClient();
 
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=${resolvedInterval}&range=${rangeParam}`;
@@ -57,32 +54,33 @@ export async function GET(req: NextRequest) {
       })
       .filter(c => c.close !== null && c.open !== null);
 
-    // Transactions for chart overlay and history table
-    const transactions = db.prepare(`
-      SELECT t.id, t.date, t.type, t.subtype, t.quantity, t.price, t.fee, t.ticker,
-             t.notes, a.name as account_name
-      FROM transactions t
-      JOIN accounts a ON t.account_id = a.id
-      WHERE t.ticker = ? AND t.type IN ('buy','sell','dividend')
-      ORDER BY t.date DESC, t.id DESC
-    `).all(ticker);
+    const { data: accountsData } = await supabase.from('accounts').select('id, name, hidden');
+    const accountNameMap: Record<string, string> = Object.fromEntries((accountsData || []).map((a: any) => [a.id, a.name]));
 
-    // For daily charts, Yahoo Finance often omits the current trading day from historical
-    // responses. Synthesize a flat candle at the current price for any transaction date
-    // within the chart range that has no matching candle.
-    // Intraday intervals are excluded: Yahoo Finance includes live intraday candles when
-    // the market is open, and adding a synthetic one pre-market would use the previous
-    // close price, which is misleading.
+    const { data: txData } = await supabase
+      .from('transactions')
+      .select('id, transaction_date, type, quantity, price, fee, ticker, note, account_id')
+      .eq('ticker', ticker)
+      .or('type.ilike.buy,type.ilike.sell,type.ilike.dividend')
+      .order('transaction_date', { ascending: false })
+      .order('id', { ascending: false });
+
+    const transactions = (txData || []).map((t: any) => ({
+      ...t,
+      date: t.transaction_date,
+      notes: t.note,
+      account_name: accountNameMap[t.account_id],
+    }));
+
     if (!isIntraday && price > 0 && candles.length > 0) {
       const rangeStart = candles[0].date;
       const candleDates = new Set(candles.map(c => c.date));
       const missingDates = new Set<string>();
-      for (const tx of transactions as any[]) {
+      for (const tx of transactions) {
         const d = (tx.date as string).slice(0, 10);
         if (d >= rangeStart && !candleDates.has(d)) missingDates.add(d);
       }
       for (const d of missingDates) {
-        // 20:00 UTC ≈ 4pm ET (market close), ensures correct date in both UTC and ET
         const ts = Math.floor(new Date(d + 'T20:00:00Z').getTime() / 1000);
         candles.push({ time: ts, date: d, open: price, high: price, low: price, close: price });
       }
@@ -90,44 +88,31 @@ export async function GET(req: NextRequest) {
     }
 
     // Per-account holdings via FIFO lot calculation
-    const hLotRows = db.prepare(`
-      SELECT t.id, t.account_id, a.name as account_name, t.quantity, t.price, t.fee
-      FROM transactions t JOIN accounts a ON t.account_id = a.id
-      WHERE t.type = 'buy' AND t.ticker = ? AND a.hidden = 0
-      ORDER BY t.date ASC, t.id ASC
-    `).all(ticker) as any[];
+    const [{ data: hLotData }, { data: hSellData }] = await Promise.all([
+      supabase.from('transactions').select('id, account_id, quantity, price, fee')
+        .ilike('type', 'buy').eq('ticker', ticker)
+        .order('transaction_date').order('id'),
+      supabase.from('transactions').select('id, account_id, quantity')
+        .ilike('type', 'sell').eq('ticker', ticker)
+        .order('transaction_date').order('id'),
+    ]);
 
-    const hLots = hLotRows.map(r => ({ ...r, remaining: r.quantity as number }));
+    const hLots = (hLotData || []).map((r: any) => ({ ...r, remaining: r.quantity as number }));
 
-    const hSells = db.prepare(`
-      SELECT t.id, t.account_id, t.quantity
-      FROM transactions t JOIN accounts a ON t.account_id = a.id
-      WHERE t.type = 'sell' AND t.ticker = ? AND a.hidden = 0
-      ORDER BY t.date ASC, t.id ASC
-    `).all(ticker) as any[];
-
-    const hAssigns = db.prepare(`
-      SELECT la.sell_tx_id, la.buy_tx_id, la.quantity
-      FROM lot_assignments la
-      JOIN transactions s ON la.sell_tx_id = s.id
-      WHERE s.ticker = ?
-    `).all(ticker) as any[];
-
-    const hAssignsBySell: Record<number, { buy_tx_id: number; quantity: number }[]> = {};
-    for (const a of hAssigns) (hAssignsBySell[a.sell_tx_id] ??= []).push(a);
-
-    for (const sell of hSells) {
-      const assigns = hAssignsBySell[sell.id];
-      if (assigns?.length) {
-        for (const a of assigns) {
-          const lot = hLots.find(l => l.id === a.buy_tx_id);
-          if (lot) lot.remaining = Math.max(0, lot.remaining - a.quantity);
-        }
-      } else {
-        const accLots = hLots.filter(l => l.account_id === sell.account_id && l.remaining > 0);
-        let need = sell.quantity as number;
-        for (const lot of accLots) {
+    // FIFO — same account first, cross-account fallback for mismatched UUIDs
+    for (const sell of hSellData || []) {
+      let need = sell.quantity as number;
+      for (const lot of hLots) {
+        if (need <= 0) break;
+        if (lot.account_id !== sell.account_id || lot.remaining < 0.00001) continue;
+        const use = Math.min(lot.remaining, need);
+        lot.remaining -= use;
+        need -= use;
+      }
+      if (need > 0.00001) {
+        for (const lot of hLots) {
           if (need <= 0) break;
+          if (lot.remaining < 0.00001) continue;
           const use = Math.min(lot.remaining, need);
           lot.remaining -= use;
           need -= use;
@@ -135,22 +120,20 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const holdingMap: Record<number, { account_name: string; qty: number; cost: number }> = {};
+    // Group by resolved account name; lots with unrecognised UUIDs accumulate under one key
+    const holdingMap: Record<string, { account_id: string; account_name: string; qty: number; cost: number }> = {};
     for (const lot of hLots) {
       if (lot.remaining < 0.00001) continue;
-      if (!holdingMap[lot.account_id]) holdingMap[lot.account_id] = { account_name: lot.account_name, qty: 0, cost: 0 };
+      const resolvedName: string = accountNameMap[lot.account_id] ?? '';
+      const key = resolvedName || '__unknown__';
+      if (!holdingMap[key]) holdingMap[key] = { account_id: resolvedName ? lot.account_id : 'unknown', account_name: resolvedName || 'Portfolio', qty: 0, cost: 0 };
       const feePerShare = lot.quantity > 0 ? lot.fee / lot.quantity : 0;
-      holdingMap[lot.account_id].qty += lot.remaining;
-      holdingMap[lot.account_id].cost += lot.remaining * (lot.price + feePerShare);
+      holdingMap[key].qty += lot.remaining;
+      holdingMap[key].cost += lot.remaining * (lot.price + feePerShare);
     }
 
-    const holdings = Object.entries(holdingMap)
-      .map(([id, h]) => ({
-        account_id: Number(id),
-        account_name: h.account_name,
-        quantity: h.qty,
-        avg_cost: h.qty > 0 ? h.cost / h.qty : 0,
-      }))
+    const holdings = Object.values(holdingMap)
+      .map(h => ({ account_id: h.account_id, account_name: h.account_name, quantity: h.qty, avg_cost: h.qty > 0 ? h.cost / h.qty : 0 }))
       .filter(h => h.quantity > 0.00001);
 
     return NextResponse.json({ price, candles, resolvedInterval, transactions, holdings });

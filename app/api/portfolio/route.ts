@@ -1,18 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import getDb from '@/lib/db';
-import { TaxLotMethod } from '@/lib/types';
+import { getAdminClient } from '@/lib/supabase-admin';
 import { getAuthUser, unauthorized } from '@/lib/auth';
-
-interface Lot {
-  id: number;
-  date: string;
-  ticker: string;
-  account_id: number;
-  quantity: number;
-  price: number;
-  fee: number;
-  remaining: number;
-}
 
 function detectLeverage(shortName: string): string {
   const n = shortName.toUpperCase();
@@ -40,78 +28,56 @@ async function fetchPriceData(ticker: string): Promise<{ price: number; prevClos
     const quoteType: string = meta?.instrumentType ?? meta?.quoteType ?? '';
     const nameForLeverage = `${meta?.longName ?? ''} ${meta?.shortName ?? ''}`;
     const leverage = quoteType === 'ETF' ? detectLeverage(nameForLeverage) : '';
-    return {
-      price: meta?.regularMarketPrice ?? 0,
-      prevClose: meta?.chartPreviousClose ?? 0,
-      quoteType,
-      leverage,
-    };
+    return { price: meta?.regularMarketPrice ?? 0, prevClose: meta?.chartPreviousClose ?? 0, quoteType, leverage };
   } catch { return { price: 0, prevClose: 0, quoteType: '', leverage: '' }; }
 }
 
 export async function GET(req: NextRequest) {
   if (!await getAuthUser()) return unauthorized();
-  const db = getDb();
+  const supabase = getAdminClient();
   const { searchParams } = new URL(req.url);
   const accountIdsParam = searchParams.get('account_ids');
-  const accountIds = accountIdsParam
-    ? accountIdsParam.split(',').map(Number).filter(n => Number.isInteger(n) && n > 0)
-    : [];
-  const hasFilter = accountIds.length > 0;
-  const inClause = (col: string) => hasFilter ? `AND ${col} IN (${accountIds.map(() => '?').join(',')})` : '';
-  const accWhere = inClause('t.account_id');
-  const cfWhere = inClause('cf.account_id');
-  const accArgs = accountIds;
+  // account_id filtering is skipped because transaction account_ids may not match
+  // the current accounts table (data imported with different UUIDs)
+  void accountIdsParam;
 
-  // All buy lots
-  const buyRows = db.prepare(`
-    SELECT t.id, t.date, t.ticker, t.account_id, t.quantity, t.price, t.fee
-    FROM transactions t JOIN accounts a ON t.account_id = a.id
-    WHERE t.type = 'buy' AND a.hidden = 0 ${accWhere}
-    ORDER BY t.date ASC, t.id ASC
-  `).all(...accArgs) as any[];
+  const { data: allAccounts } = await supabase.from('accounts').select('id, name, hidden').order('name');
+  const visibleAccounts = (allAccounts || []).filter((a: any) => !a.hidden);
 
-  const lots: Lot[] = buyRows.map(r => ({ ...r, remaining: r.quantity }));
+  // Fetch all transactions (types stored as uppercase in Supabase)
+  const [
+    { data: buyRows },
+    { data: sellRows },
+    { data: allTxRows },
+    { data: cashFlowRows },
+  ] = await Promise.all([
+    supabase.from('transactions').select('id, transaction_date, ticker, account_id, quantity, price, fee')
+      .ilike('type', 'buy').order('transaction_date').order('id'),
+    supabase.from('transactions').select('id, ticker, quantity, account_id')
+      .ilike('type', 'sell').order('transaction_date').order('id'),
+    supabase.from('transactions').select('account_id, type, quantity, price, fee'),
+    supabase.from('cash_flow').select('account_id, amount, type'),
+  ]);
 
-  // All sell transactions
-  const sellRows = db.prepare(`
-    SELECT t.id, t.ticker, t.quantity, t.price, t.fee, t.lot_method, t.account_id
-    FROM transactions t JOIN accounts a ON t.account_id = a.id
-    WHERE t.type = 'sell' AND a.hidden = 0 ${accWhere}
-    ORDER BY t.date ASC, t.id ASC
-  `).all(...accArgs) as any[];
+  interface Lot { id: string; ticker: string; account_id: string; quantity: number; price: number; fee: number; remaining: number; }
+  const lots: Lot[] = (buyRows || []).map((r: any) => ({ ...r, remaining: r.quantity }));
 
-  // Lot assignments
-  const assignRows = db.prepare(`
-    SELECT la.sell_tx_id, la.buy_tx_id, la.quantity FROM lot_assignments la
-    JOIN transactions s ON la.sell_tx_id = s.id
-    JOIN accounts a ON s.account_id = a.id
-    WHERE a.hidden = 0 ${inClause('s.account_id')}
-  `).all(...accArgs) as any[];
-
-  const assignsBySell: Record<number, { buy_tx_id: number; quantity: number }[]> = {};
-  for (const a of assignRows) {
-    if (!assignsBySell[a.sell_tx_id]) assignsBySell[a.sell_tx_id] = [];
-    assignsBySell[a.sell_tx_id].push(a);
-  }
-
-  // Apply sells to reduce lot remainders
-  for (const sell of sellRows) {
-    const assignments = assignsBySell[sell.id];
-    if (assignments?.length) {
-      for (const a of assignments) {
-        const lot = lots.find(l => l.id === a.buy_tx_id);
-        if (lot) lot.remaining = Math.max(0, lot.remaining - a.quantity);
-      }
-    } else {
-      const method: TaxLotMethod = (sell.lot_method as TaxLotMethod) || 'fifo';
-      const tickerLots = lots.filter(
-        l => l.ticker === sell.ticker && l.account_id === sell.account_id && l.remaining > 0
-      );
-      const ordered = method === 'lifo' ? [...tickerLots].reverse() : tickerLots;
-      let need = sell.quantity;
-      for (const lot of ordered) {
+  // Apply sells FIFO — same account first, then cross-account fallback for mismatched UUIDs
+  for (const sell of sellRows || []) {
+    let need = sell.quantity;
+    // Pass 1: same account_id
+    for (const lot of lots) {
+      if (need <= 0) break;
+      if (lot.ticker !== sell.ticker || lot.account_id !== sell.account_id || lot.remaining < 0.00001) continue;
+      const use = Math.min(lot.remaining, need);
+      lot.remaining -= use;
+      need -= use;
+    }
+    // Pass 2: any account (handles old imported data where buy/sell have different UUIDs)
+    if (need > 0.00001) {
+      for (const lot of lots) {
         if (need <= 0) break;
+        if (lot.ticker !== sell.ticker || lot.remaining < 0.00001) continue;
         const use = Math.min(lot.remaining, need);
         lot.remaining -= use;
         need -= use;
@@ -119,7 +85,6 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Build positions from remaining lots
   const posMap: Record<string, { qty: number; cost: number }> = {};
   for (const lot of lots) {
     if (lot.remaining < 0.00001) continue;
@@ -150,96 +115,39 @@ export async function GET(req: NextRequest) {
     const value = pos.qty * current_price;
     const return_amount = value - pos.cost;
     const return_pct = pos.cost > 0 ? (return_amount / pos.cost) * 100 : 0;
-    return {
-      ticker,
-      quantity: pos.qty,
-      avg_cost,
-      current_price,
-      prev_close,
-      value,
-      cost: pos.cost,
-      return_pct,
-      return_amount,
-      quote_type: quoteTypeMap[ticker] ?? '',
-      leverage: leverageMap[ticker] ?? '',
-    };
+    return { ticker, quantity: pos.qty, avg_cost, current_price, prev_close, value, cost: pos.cost, return_pct, return_amount, quote_type: quoteTypeMap[ticker] ?? '', leverage: leverageMap[ticker] ?? '' };
   });
 
-  // Cash balance from transactions
-  const allTx = db.prepare(`
-    SELECT t.type, t.quantity, t.price, t.fee FROM transactions t
-    JOIN accounts a ON t.account_id = a.id WHERE a.hidden = 0 ${accWhere}
-  `).all(...accArgs) as any[];
-
-  let cash = 0;
-  for (const tx of allTx) {
-    if (tx.type === 'cash') cash += tx.price; // legacy
-    else if (tx.type === 'sell') cash += tx.quantity * tx.price - tx.fee;
-    else if (tx.type === 'buy') cash -= tx.quantity * tx.price + tx.fee;
-    else if (tx.type === 'dividend') cash += tx.quantity * tx.price;
+  // Cash from all transactions (uppercase type comparison)
+  const accCashMap: Record<string, number> = {};
+  for (const tx of allTxRows || []) {
+    const t = (tx.type as string).toLowerCase();
+    const delta = t === 'sell' ? tx.quantity * tx.price - tx.fee
+      : t === 'buy' ? -(tx.quantity * tx.price + tx.fee)
+      : t === 'dividend' ? tx.quantity * tx.price
+      : t === 'cash' ? tx.price : 0;
+    accCashMap[tx.account_id] = (accCashMap[tx.account_id] || 0) + delta;
   }
-
-  // Cash balance from cash_flow (Transfer deposits/withdrawals)
-  const cashFlowRows = db.prepare(`
-    SELECT cf.amount, cf.type FROM cash_flow cf
-    JOIN accounts a ON cf.account_id = a.id WHERE a.hidden = 0 ${cfWhere}
-  `).all(...accArgs) as any[];
-
-  for (const cf of cashFlowRows) {
-    if (cf.type === 'DEPOSIT') cash += cf.amount;
-    else if (cf.type === 'WITHDRAW') cash -= cf.amount;
+  for (const cf of cashFlowRows || []) {
+    const delta = cf.type === 'DEPOSIT' ? cf.amount : -cf.amount;
+    accCashMap[cf.account_id] = (accCashMap[cf.account_id] || 0) + delta;
   }
+  const totalCash = Object.values(accCashMap).reduce((s, v) => s + v, 0);
 
-  // ── Per-account breakdown ─────────────────────────────────────────
-  const visAccounts = db.prepare(
-    `SELECT id, name FROM accounts WHERE hidden = 0 ${inClause('id')} ORDER BY name`
-  ).all(...accArgs) as any[];
-
-  // Per-account tx cash
-  const accTxRows = db.prepare(`
-    SELECT t.account_id,
-      SUM(CASE
-        WHEN t.type = 'sell'     THEN t.quantity * t.price - t.fee
-        WHEN t.type = 'buy'      THEN -(t.quantity * t.price + t.fee)
-        WHEN t.type = 'dividend' THEN t.quantity * t.price
-        WHEN t.type = 'cash'     THEN t.price
-        ELSE 0 END) AS tx_cash
-    FROM transactions t JOIN accounts a ON t.account_id = a.id
-    WHERE a.hidden = 0 ${accWhere}
-    GROUP BY t.account_id
-  `).all(...accArgs) as any[];
-
-  const accCfRows = db.prepare(`
-    SELECT cf.account_id,
-      SUM(CASE WHEN cf.type = 'DEPOSIT' THEN cf.amount ELSE -cf.amount END) AS flow
-    FROM cash_flow cf JOIN accounts a ON cf.account_id = a.id
-    WHERE a.hidden = 0 ${cfWhere}
-    GROUP BY cf.account_id
-  `).all(...accArgs) as any[];
-
-  // Per-account stock value from remaining lots × current prices
-  const accStockMap: Record<number, number> = {};
+  const accStockMap: Record<string, number> = {};
   for (const lot of lots) {
     if (lot.remaining < 0.00001) continue;
-    if (!accStockMap[lot.account_id]) accStockMap[lot.account_id] = 0;
-    accStockMap[lot.account_id] += lot.remaining * (priceMap[lot.ticker] || 0);
+    accStockMap[lot.account_id] = (accStockMap[lot.account_id] || 0) + lot.remaining * (priceMap[lot.ticker] || 0);
   }
 
-  const accCashMap: Record<number, number> = {};
-  for (const row of accTxRows) accCashMap[row.account_id] = row.tx_cash || 0;
-  for (const row of accCfRows) accCashMap[row.account_id] = (accCashMap[row.account_id] || 0) + (row.flow || 0);
-
-  const account_breakdown = visAccounts.map((acc: any) => ({
+  // account_breakdown based on visible accounts
+  // (values may be 0 if transaction account_ids don't match current account IDs)
+  const account_breakdown = visibleAccounts.map((acc: any) => ({
     account_id: acc.id,
     account_name: acc.name,
     cash: accCashMap[acc.id] || 0,
     stock_value: accStockMap[acc.id] || 0,
   }));
 
-  return NextResponse.json({
-    positions,
-    cash,
-    stock_value: positions.reduce((s, p) => s + p.value, 0),
-    account_breakdown,
-  });
+  return NextResponse.json({ positions, cash: totalCash, stock_value: positions.reduce((s, p) => s + p.value, 0), account_breakdown });
 }

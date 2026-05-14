@@ -131,9 +131,9 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, o
       ? <ChevronUp size={11} style={{ marginLeft: 2 }} />
       : <ChevronDown size={11} style={{ marginLeft: 2 }} />;
 
-  const fmtPrice = (p: string | null) => {
-    if (!p) return null;
-    return p.trim().split(/\s+/).map(part => {
+  const fmtPrice = (p: string | number | null) => {
+    if (p == null || p === '') return null;
+    return String(p).trim().split(/\s+/).map(part => {
       const n = parseFloat(part.replace(/,/g, ''));
       return isNaN(n) ? part : `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }).join(' ');

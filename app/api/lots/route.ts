@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import getDb from '@/lib/db';
+import { getAdminClient } from '@/lib/supabase-admin';
 import { LotInfo, LotSelection, TaxLotMethod } from '@/lib/types';
 import { getAuthUser, unauthorized } from '@/lib/auth';
 
 interface RawLot {
-  id: number;
+  id: string;
   date: string;
   ticker: string;
-  account_id: number;
+  account_id: string;
   account_name: string;
   quantity: number;
   price: number;
@@ -15,66 +15,55 @@ interface RawLot {
   remaining: number;
 }
 
-function computeRemainingLots(ticker: string, accountId: number | null): RawLot[] {
-  const db = getDb();
+async function computeRemainingLots(ticker: string, accountId: string | null): Promise<RawLot[]> {
+  const supabase = getAdminClient();
 
-  // All buy lots for this ticker (oldest first)
-  let buySql = `
-    SELECT t.id, t.date, t.ticker, t.account_id, a.name as account_name,
-           t.quantity, t.price, t.fee, t.quantity as remaining
-    FROM transactions t
-    JOIN accounts a ON t.account_id = a.id
-    WHERE t.type = 'buy' AND t.ticker = ? AND a.hidden = 0
-  `;
-  const buyArgs: any[] = [ticker];
-  if (accountId) { buySql += ' AND t.account_id = ?'; buyArgs.push(accountId); }
-  buySql += ' ORDER BY t.date ASC, t.id ASC';
-  const lots: RawLot[] = (db.prepare(buySql).all(...buyArgs) as any[]).map(r => ({ ...r }));
+  const { data: accounts } = await supabase.from('accounts').select('id, name, hidden');
+  const visibleAccounts = (accounts || []).filter((a: any) => !a.hidden);
+  const nameMap: Record<string, string> = Object.fromEntries(visibleAccounts.map((a: any) => [a.id, a.name]));
 
-  // All sell transactions for this ticker (chronological)
-  let sellSql = `
-    SELECT t.id, t.quantity, t.lot_method
-    FROM transactions t
-    JOIN accounts a ON t.account_id = a.id
-    WHERE t.type = 'sell' AND t.ticker = ? AND a.hidden = 0
-  `;
-  const sellArgs: any[] = [ticker];
-  if (accountId) { sellSql += ' AND t.account_id = ?'; sellArgs.push(accountId); }
-  sellSql += ' ORDER BY t.date ASC, t.id ASC';
-  const sells = db.prepare(sellSql).all(...sellArgs) as any[];
+  let buyQuery = supabase
+    .from('transactions')
+    .select('id, transaction_date, ticker, account_id, quantity, price, fee')
+    .ilike('type', 'buy').eq('ticker', ticker)
+    .order('transaction_date').order('id');
+  if (accountId) buyQuery = buyQuery.eq('account_id', accountId);
 
-  // Lot assignments indexed by sell tx id
-  const assignRows = db.prepare(`
-    SELECT la.sell_tx_id, la.buy_tx_id, la.quantity
-    FROM lot_assignments la
-    JOIN transactions sell_tx ON la.sell_tx_id = sell_tx.id
-    WHERE sell_tx.ticker = ?
-    ${accountId ? 'AND sell_tx.account_id = ?' : ''}
-  `).all(ticker, ...(accountId ? [accountId] : [])) as any[];
+  let sellQuery = supabase
+    .from('transactions')
+    .select('id, quantity, account_id')
+    .ilike('type', 'sell').eq('ticker', ticker)
+    .order('transaction_date').order('id');
+  if (accountId) sellQuery = sellQuery.eq('account_id', accountId);
 
-  const assignsByS: Record<number, { buy_tx_id: number; quantity: number }[]> = {};
-  for (const a of assignRows) {
-    if (!assignsByS[a.sell_tx_id]) assignsByS[a.sell_tx_id] = [];
-    assignsByS[a.sell_tx_id].push({ buy_tx_id: a.buy_tx_id, quantity: a.quantity });
-  }
+  const [{ data: buyData }, { data: sellData }] = await Promise.all([buyQuery, sellQuery]);
 
-  // Apply sells to reduce lot remainders
-  for (const sell of sells) {
-    const assignments = assignsByS[sell.id];
-    if (assignments?.length) {
-      // Specific lot assignments
-      for (const a of assignments) {
-        const lot = lots.find(l => l.id === a.buy_tx_id);
-        if (lot) lot.remaining = Math.max(0, lot.remaining - a.quantity);
-      }
-    } else {
-      // FIFO for all unassigned sells (covers average_cost / fifo / lifo historical)
-      const method: TaxLotMethod = (sell.lot_method as TaxLotMethod) || 'fifo';
-      const available = lots.filter(l => l.remaining > 0);
-      const ordered = method === 'lifo' ? [...available].reverse() : available;
-      let need = sell.quantity;
-      for (const lot of ordered) {
+  const lots: RawLot[] = (buyData || []).map((r: any) => ({
+    id: r.id,
+    date: r.transaction_date,
+    ticker: r.ticker,
+    account_id: r.account_id,
+    account_name: nameMap[r.account_id] || '',
+    quantity: r.quantity,
+    price: r.price,
+    fee: r.fee,
+    remaining: r.quantity,
+  }));
+
+  // FIFO — same account first, cross-account fallback for mismatched UUIDs
+  for (const sell of sellData || []) {
+    let need = sell.quantity;
+    for (const lot of lots) {
+      if (need <= 0) break;
+      if (lot.account_id !== sell.account_id || lot.remaining < 0.00001) continue;
+      const use = Math.min(lot.remaining, need);
+      lot.remaining -= use;
+      need -= use;
+    }
+    if (need > 0.00001) {
+      for (const lot of lots) {
         if (need <= 0) break;
+        if (lot.remaining < 0.00001) continue;
         const use = Math.min(lot.remaining, need);
         lot.remaining -= use;
         need -= use;
@@ -88,9 +77,7 @@ function computeRemainingLots(ticker: string, accountId: number | null): RawLot[
 function selectLots(lots: RawLot[], sellQty: number, method: TaxLotMethod): LotSelection[] {
   const selected: LotSelection[] = [];
   let need = sellQty;
-
   const ordered = method === 'lifo' ? [...lots].reverse() : lots;
-
   for (const lot of ordered) {
     if (need <= 0) break;
     const use = Math.min(lot.remaining, need);
@@ -110,9 +97,8 @@ export async function GET(req: NextRequest) {
 
   if (!ticker) return NextResponse.json({ error: 'ticker required' }, { status: 400 });
 
-  const lots = computeRemainingLots(ticker, accountId ? Number(accountId) : null);
+  const lots = await computeRemainingLots(ticker, accountId || null);
 
-  // Overall avg cost for reference
   const totalQty = lots.reduce((s, l) => s + l.remaining, 0);
   const totalCostAll = lots.reduce((s, l) => s + l.remaining * l.price, 0);
   const avg_cost_all = totalQty > 0 ? totalCostAll / totalQty : 0;
@@ -132,11 +118,7 @@ export async function GET(req: NextRequest) {
     total_cost = sellQty * avg_cost_all;
   }
 
-  return NextResponse.json({
-    lots,
-    selected,
-    cost_per_share,
-    total_cost,
-    avg_cost_all,
-  });
+  return NextResponse.json({ lots, selected, cost_per_share, total_cost, avg_cost_all });
 }
+
+void (null as unknown as LotInfo);

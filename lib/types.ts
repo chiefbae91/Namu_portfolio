@@ -3,10 +3,10 @@ export type TransactionType = 'buy' | 'sell' | 'dividend' | 'cash' | 'option' | 
 export type TaxLotMethod = 'average_cost' | 'fifo' | 'lifo' | 'specific';
 
 export interface LotInfo {
-  id: number;
+  id: string | number;
   date: string;
   ticker: string;
-  account_id: number;
+  account_id: string | number;
   account_name: string;
   quantity: number;
   remaining: number;
@@ -15,7 +15,7 @@ export interface LotInfo {
 }
 
 export interface LotSelection {
-  buy_tx_id: number;
+  buy_tx_id: string | number;
   quantity: number;
   price: number;
 }
@@ -29,15 +29,15 @@ export interface LotsResponse {
 }
 
 export interface Account {
-  id: number;
+  id: string | number;
   name: string;
   currency: string;
-  hidden: number;
+  hidden: number | boolean;
 }
 
 export interface Transaction {
-  id: number;
-  account_id: number;
+  id: string | number;
+  account_id: string | number;
   account_name?: string;
   date: string;
   ticker: string;
@@ -70,8 +70,8 @@ export interface PortfolioPosition {
 }
 
 export interface OptionPosition {
-  id: number;
-  account_id: number;
+  id: string | number;
+  account_id: string | number;
   account_name?: string;
   date: string;
   ticker: string;
@@ -105,18 +105,18 @@ export interface SummaryData {
 }
 
 export interface AccountBreakdown {
-  account_id: number;
+  account_id: string | number;
   account_name: string;
   cash: number;
   stock_value: number;
 }
 
 export interface TradingHint {
-  id: number;
+  id: string | number;
   ticker: string;
   hint_date: string;
   type: string;
-  price: string | null;
+  price: string | number | null;
   current_price: number | null;
   note: string | null;
   created_at: string;

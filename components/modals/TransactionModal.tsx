@@ -13,7 +13,7 @@ interface Props {
   onSubmit: (data: any) => Promise<void>;
   onClose: () => void;
   prefillTicker?: string;
-  prefillAccountId?: number;
+  prefillAccountId?: string | number;
   tickerSuggestions?: string[];
 }
 
@@ -54,9 +54,9 @@ function isValidDate(d: string) {
 
 // ─── Tax Lot Panel ────────────────────────────────────────────────
 function TaxLotPanel({ ticker, accountId, sellQty, sellPrice, method, onMethodChange, specificSelections, onSpecificChange, currency }: {
-  ticker: string; accountId: number; sellQty: number; sellPrice: number;
+  ticker: string; accountId: string | number; sellQty: number; sellPrice: number;
   method: TaxLotMethod; onMethodChange: (m: TaxLotMethod) => void;
-  specificSelections: Record<number, string>; onSpecificChange: (id: number, v: string) => void;
+  specificSelections: Record<string | number, string>; onSpecificChange: (id: string | number, v: string) => void;
   currency: Currency;
 }) {
   const [lots, setLots] = useState<LotInfo[]>([]);
@@ -195,7 +195,7 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
   const isEditing = !!editingTx;
 
   const [type, setType] = useState('buy');
-  const [accountId, setAccountId] = useState<number>(visible[0]?.id ?? 0);
+  const [accountId, setAccountId] = useState<string | number>(visible[0]?.id ?? '');
   const [ticker, setTicker] = useState('');
   const [date, setDate] = useState(todayStr());
   const [qty, setQty] = useState('');
@@ -206,7 +206,7 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
   const [reinvestQty, setReinvestQty] = useState('');
   const [reinvestPrice, setReinvestPrice] = useState('');
   const [lotMethod, setLotMethod] = useState<TaxLotMethod>('average_cost');
-  const [specificSelections, setSpecificSelections] = useState<Record<number, string>>({});
+  const [specificSelections, setSpecificSelections] = useState<Record<string | number, string>>({});
   const [transferDir, setTransferDir] = useState<'DEPOSIT' | 'WITHDRAW'>('DEPOSIT');
   const [loading, setLoading] = useState(false);
   const [dateError, setDateError] = useState('');
@@ -369,7 +369,7 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
             <div className="form-row">
               <div className="form-group" style={{ flex:1 }}>
                 <label>Account</label>
-                <select value={accountId} onChange={e => setAccountId(Number(e.target.value))} style={{ width:'100%' }}>
+                <select value={accountId} onChange={e => setAccountId(e.target.value)} style={{ width:'100%' }}>
                   {visible.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                 </select>
               </div>

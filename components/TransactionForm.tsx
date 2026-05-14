@@ -54,13 +54,13 @@ function isValidDate(disp: string): boolean {
 // ─── Tax Lot Panel ────────────────────────────────────────────────
 interface TaxLotPanelProps {
   ticker: string;
-  accountId: number;
+  accountId: string | number;
   sellQty: number;
   sellPrice: number;
   method: TaxLotMethod;
   onMethodChange: (m: TaxLotMethod) => void;
-  specificSelections: Record<number, string>;
-  onSpecificChange: (lotId: number, qty: string) => void;
+  specificSelections: Record<string | number, string>;
+  onSpecificChange: (lotId: string | number, qty: string) => void;
   currency: Currency;
 }
 
@@ -257,7 +257,7 @@ export default function TransactionForm({ accounts, currency, editingTx, onSubmi
   const visibleAccounts = accounts.filter(a => !a.hidden);
 
   const [type, setType] = useState('buy');
-  const [accountId, setAccountId] = useState<number>(visibleAccounts[0]?.id ?? 0);
+  const [accountId, setAccountId] = useState<string | number>(visibleAccounts[0]?.id ?? '');
   const [ticker, setTicker] = useState('');
   const [date, setDate] = useState(todayStr());
   const [qty, setQty] = useState('');
@@ -276,7 +276,7 @@ export default function TransactionForm({ accounts, currency, editingTx, onSubmi
 
   // Tax lot state (sell only)
   const [lotMethod, setLotMethod] = useState<TaxLotMethod>('average_cost');
-  const [specificSelections, setSpecificSelections] = useState<Record<number, string>>({});
+  const [specificSelections, setSpecificSelections] = useState<Record<string | number, string>>({});
 
   useEffect(() => {
     if (editingTx) {
@@ -392,7 +392,7 @@ export default function TransactionForm({ accounts, currency, editingTx, onSubmi
           {/* Account */}
           <div className="form-group">
             <label>계좌</label>
-            <select value={accountId} onChange={e => setAccountId(Number(e.target.value))} style={{ minWidth: 130 }}>
+            <select value={accountId} onChange={e => setAccountId(e.target.value)} style={{ minWidth: 130 }}>
               {visibleAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
           </div>

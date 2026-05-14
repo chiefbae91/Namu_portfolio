@@ -1,95 +1,74 @@
 import { NextRequest, NextResponse } from 'next/server';
-import getDb from '@/lib/db';
+import { getAdminClient } from '@/lib/supabase-admin';
 import { getAuthUser, unauthorized } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   if (!await getAuthUser()) return unauthorized();
-  const db = getDb();
+  const supabase = getAdminClient();
   const { searchParams } = new URL(req.url);
   const ticker = searchParams.get('ticker');
 
-  let sql = `
-    SELECT t.*, a.name as account_name,
-      ri.id as reinvest_id, ri.quantity as reinvest_qty, ri.price as reinvest_price
-    FROM transactions t
-    JOIN accounts a ON t.account_id = a.id
-    LEFT JOIN transactions ri ON ri.dividend_id = t.id AND ri.subtype = 'DIVIDEND_REINVEST'
-    WHERE a.hidden = 0
-  `;
-  const args: any[] = [];
+  const { data: accounts } = await supabase.from('accounts').select('id, name, hidden');
+  const visibleAccounts = (accounts || []).filter((a: any) => !a.hidden);
+  const nameMap: Record<string, string> = Object.fromEntries(visibleAccounts.map((a: any) => [a.id, a.name]));
 
-  const accountIdsParam = searchParams.get('account_ids');
-  const accountIds = accountIdsParam
-    ? accountIdsParam.split(',').map(Number).filter(n => Number.isInteger(n) && n > 0)
-    : [];
-  if (accountIds.length > 0) {
-    sql += ` AND t.account_id IN (${accountIds.map(() => '?').join(',')})`;
-    args.push(...accountIds);
-  }
-  if (ticker) {
-    sql += ' AND t.ticker = ?';
-    args.push(ticker);
-  }
-  sql += ' ORDER BY t.date DESC, t.id DESC';
+  let query = supabase
+    .from('transactions')
+    .select('id, account_id, ticker, type, quantity, price, fee, note, transaction_date, created_at')
+    .order('transaction_date', { ascending: false })
+    .order('id', { ascending: false });
 
-  const rows = db.prepare(sql).all(...args);
-  return NextResponse.json(rows);
+  if (ticker) query = query.eq('ticker', ticker);
+
+  const { data: txData, error } = await query;
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const result = (txData || []).map(tx => ({
+    ...tx,
+    date: tx.transaction_date,
+    notes: tx.note,
+    currency: 'USD',
+    lot_method: null,
+    subtype: null,
+    dividend_id: null,
+    reinvest_id: null,
+    reinvest_qty: null,
+    reinvest_price: null,
+    account_name: nameMap[tx.account_id],
+  }));
+
+  return NextResponse.json(result);
 }
 
 export async function POST(req: NextRequest) {
-  if (!await getAuthUser()) return unauthorized();
-  const db = getDb();
+  const user = await getAuthUser();
+  if (!user) return unauthorized();
+  const supabase = getAdminClient();
   const body = await req.json();
-  const { account_id, date, ticker, type, quantity, price, fee, currency, notes,
-          reinvest, reinvest_qty, reinvest_price,
-          lot_method, lot_assignments } = body;
+  const { account_id, date, ticker, type, quantity, price, fee, notes } = body;
 
   if (!account_id || !date || !type) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
-  const insertTx = db.prepare(`
-    INSERT INTO transactions (account_id, date, ticker, type, quantity, price, fee, currency, notes, lot_method, subtype, dividend_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
+  const { data: newTx, error: txError } = await supabase
+    .from('transactions')
+    .insert({
+      account_id,
+      transaction_date: date,
+      ticker: ticker || '',
+      type,
+      quantity: quantity || 0,
+      price: price || 0,
+      fee: fee || 0,
+      note: notes || '',
+      user_id: user.id,
+    })
+    .select()
+    .single();
 
-  const insertLotAssignment = db.prepare(`
-    INSERT INTO lot_assignments (sell_tx_id, buy_tx_id, quantity) VALUES (?, ?, ?)
-  `);
+  if (txError) return NextResponse.json({ error: txError.message }, { status: 500 });
 
-  const created: any[] = [];
-
-  db.transaction(() => {
-    const result = insertTx.run(
-      account_id, date, ticker || '', type,
-      quantity || 0, price || 0, fee || 0,
-      currency || 'USD', notes || '',
-      type === 'sell' ? (lot_method || 'average_cost') : null,
-      null, null
-    );
-    const newId = result.lastInsertRowid;
-    created.push(db.prepare('SELECT * FROM transactions WHERE id = ?').get(newId));
-
-    // Save specific lot assignments for sell transactions
-    if (type === 'sell' && lot_method === 'specific' && Array.isArray(lot_assignments)) {
-      for (const la of lot_assignments) {
-        if (la.quantity > 0) {
-          insertLotAssignment.run(newId, la.buy_tx_id, la.quantity);
-        }
-      }
-    }
-
-    // Auto-create DIVIDEND_REINVEST buy record
-    if (type === 'dividend' && reinvest && reinvest_qty && reinvest_price) {
-      const r2 = insertTx.run(
-        account_id, date, ticker || '', 'buy',
-        reinvest_qty, reinvest_price, 0, currency || 'USD',
-        'Dividend reinvestment', null,
-        'DIVIDEND_REINVEST', newId
-      );
-      created.push(db.prepare('SELECT * FROM transactions WHERE id = ?').get(r2.lastInsertRowid));
-    }
-  })();
-
-  return NextResponse.json(created, { status: 201 });
+  const tx = { ...newTx, date: newTx.transaction_date, notes: newTx.note, currency: 'USD', lot_method: null, subtype: null, dividend_id: null };
+  return NextResponse.json([tx], { status: 201 });
 }

@@ -142,7 +142,7 @@ export default function Home() {
     }));
 
     const combined = [...txs, ...transfers]
-      .sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+      .sort((a, b) => b.date.localeCompare(a.date) || String(b.id).localeCompare(String(a.id)));
     setTransactions(combined);
   }, [accountFilter]);
 
@@ -298,9 +298,9 @@ export default function Home() {
   };
 
   const visibleAccounts = accounts.filter(a => !a.hidden);
-  const checkedIds: Set<number> = accountFilter === ''
+  const checkedIds: Set<string | number> = accountFilter === ''
     ? new Set(visibleAccounts.map(a => a.id))
-    : new Set(accountFilter.split(',').map(Number));
+    : new Set(accountFilter.split(','));
   const allChecked = visibleAccounts.every(a => checkedIds.has(a.id));
 
   return (
@@ -358,7 +358,7 @@ export default function Home() {
                         return;
                       }
                       const nowAll = visibleAccounts.every(acc => next.has(acc.id));
-                      setAccountFilter(nowAll ? '' : [...next].sort((x, y) => x - y).join(','));
+                      setAccountFilter(nowAll ? '' : [...next].sort().join(','));
                     }}
                   />
                   {a.name}

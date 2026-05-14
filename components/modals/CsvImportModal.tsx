@@ -11,7 +11,7 @@ interface Props {
 
 export default function CsvImportModal({ accounts, onClose, onImported }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [accountId, setAccountId] = useState<number>(accounts[0]?.id ?? 0);
+  const [accountId, setAccountId] = useState<string | number>(accounts[0]?.id ?? '');
   const [ticker, setTicker] = useState('');
   const [needsTicker, setNeedsTicker] = useState(false);
   const [format, setFormat] = useState<string>('');
@@ -96,7 +96,7 @@ export default function CsvImportModal({ accounts, onClose, onImported }: Props)
         <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <div className="form-group">
             <label>Account</label>
-            <select value={accountId} onChange={e => setAccountId(Number(e.target.value))} style={{ minWidth: 160 }}>
+            <select value={accountId} onChange={e => setAccountId(e.target.value)} style={{ minWidth: 160 }}>
               {accounts.filter(a => !a.hidden).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
           </div>
