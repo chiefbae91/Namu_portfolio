@@ -31,7 +31,7 @@ export async function GET() {
   return NextResponse.json({
     USD: 1,
     KRW: krw ?? FALLBACK.KRW,
-    EUR: eurusd != null ? Math.round((1 / eurusd) * 10000) / 10000 : FALLBACK.EUR,
+    EUR: eurusd != null ? 1 / eurusd : FALLBACK.EUR,
     DXY: dxy ?? FALLBACK.DXY,
     WTI: wti ?? FALLBACK.WTI,
     GOLD: gold ?? FALLBACK.GOLD,

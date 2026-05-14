@@ -27,12 +27,68 @@ function parseDate(s: string): string {
   return s;
 }
 
-function detectFormat(headers: string[]): 'robinhood' | 'new' {
+function detectFormat(headers: string[]): 'robinhood' | 'new' | 'webull' {
   const lower = headers.map(h => h.toLowerCase().trim());
+  // Webull: has 'side' + ('filled time' or 'placed time') — very specific to Webull order exports
+  if (lower.some(h => h === 'side') && lower.some(h => h === 'filled time' || h === 'placed time'))
+    return 'webull';
+  // Webull alternate: has 'side' + 'filled qty'
+  if (lower.some(h => h === 'side') && lower.some(h => h.includes('filled qty') || h === 'qty'))
+    return 'webull';
   if (lower.some(h => h === 'costbasis' || h === 'cost basis')) return 'new';
   if (lower.some(h => h === 'trans code' || h === 'trans_code' || h === 'instrument')) return 'robinhood';
   if (lower.includes('type') && !lower.includes('trans code')) return 'new';
   return 'robinhood';
+}
+
+function parseWebullDate(s: string): string {
+  if (!s) return '';
+  // "MM/DD/YYYY HH:MM:SS EDT" → strip timezone, take date part
+  const parts = s.trim().split(' ');
+  const datePart = parts[0];
+  if (datePart.includes('/')) {
+    const [m, d, y] = datePart.split('/');
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  return datePart.slice(0, 10);
+}
+
+function parseWebullRows(rows: Record<string, string>[], accountId: number, db: ReturnType<typeof getDb>): CsvPreviewRow[] {
+  const preview: CsvPreviewRow[] = [];
+  for (const row of rows) {
+    // Only import fully filled orders
+    const status = (row['Status'] || row['status'] || '').trim().toLowerCase();
+    if (status && status !== 'filled') continue;
+
+    const side = (row['Side'] || row['side'] || '').trim().toLowerCase();
+    if (side !== 'buy' && side !== 'sell') continue;
+    const type: TransactionType = side === 'buy' ? 'buy' : 'sell';
+
+    // Prefer Filled Time (actual execution), fall back to Placed Time or Trade Time
+    const rawDate = row['Filled Time'] || row['filled time'] || row['Trade Time'] || row['Order Time'] || row['trade time'] || row['order time'] || '';
+    const date = parseWebullDate(rawDate);
+    if (!date) continue;
+
+    const ticker = (row['Symbol'] || row['symbol'] || row['Instrument'] || '').trim().toUpperCase();
+    if (!ticker) continue;
+
+    // Quantity: Webull uses 'Filled' for actual filled shares
+    const qty = Math.abs(parseAmount(row['Filled'] || row['filled'] || row['Filled Qty'] || row['filled qty'] || row['Qty'] || row['qty'] || '0'));
+    // Price: 'Avg Price' is actual fill price; 'Price' has "@" prefix (limit price)
+    const price = Math.abs(parseAmount(row['Avg Price'] || row['avg price'] || (row['Price'] || '').replace('@', '') || '0'));
+    const amount = qty * price;
+    const fee = Math.abs(parseAmount(row['Commission'] || row['commission'] || row['Fee'] || row['fee'] || '0'));
+
+    const name = (row['Name'] || row['name'] || '').trim();
+    const duplicate = dupCheck(db, accountId, date, ticker, type, qty, price);
+    preview.push({
+      date, ticker, type,
+      quantity: qty, price, amount, fee,
+      notes: name || 'Webull',
+      skip: false, duplicate, raw_code: side,
+    });
+  }
+  return preview;
 }
 
 function dupCheck(db: ReturnType<typeof getDb>, accountId: number, date: string, ticker: string, type: string, qty: number, price: number): boolean {
@@ -140,9 +196,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'ticker_required', format }, { status: 400 });
   }
 
-  const preview = format === 'new'
-    ? parseNewRows(rows, tickerInput, accId, db)
-    : parseRobinhoodRows(rows, accId, db);
+  const preview = format === 'webull'
+    ? parseWebullRows(rows, accId, db)
+    : format === 'new'
+      ? parseNewRows(rows, tickerInput, accId, db)
+      : parseRobinhoodRows(rows, accId, db);
 
   const action = formData.get('action');
   if (action === 'import') {

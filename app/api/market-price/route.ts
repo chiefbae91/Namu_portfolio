@@ -124,8 +124,8 @@ export async function GET(req: NextRequest) {
       .map(([id, h]) => ({
         account_id: Number(id),
         account_name: h.account_name,
-        quantity: Math.round(h.qty * 10000) / 10000,
-        avg_cost: h.qty > 0 ? Math.round((h.cost / h.qty) * 100) / 100 : 0,
+        quantity: h.qty,
+        avg_cost: h.qty > 0 ? h.cost / h.qty : 0,
       }))
       .filter(h => h.quantity > 0.00001);
 

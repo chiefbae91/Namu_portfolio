@@ -146,14 +146,14 @@ export async function GET(req: NextRequest) {
     const return_pct = pos.cost > 0 ? (return_amount / pos.cost) * 100 : 0;
     return {
       ticker,
-      quantity: Math.round(pos.qty * 10000) / 10000,
-      avg_cost: Math.round(avg_cost * 100) / 100,
+      quantity: pos.qty,
+      avg_cost,
       current_price,
       prev_close,
-      value: Math.round(value * 100) / 100,
-      cost: Math.round(pos.cost * 100) / 100,
-      return_pct: Math.round(return_pct * 100) / 100,
-      return_amount: Math.round(return_amount * 100) / 100,
+      value,
+      cost: pos.cost,
+      return_pct,
+      return_amount,
       quote_type: quoteTypeMap[ticker] ?? '',
       leverage: leverageMap[ticker] ?? '',
     };
@@ -227,8 +227,8 @@ export async function GET(req: NextRequest) {
   const account_breakdown = visAccounts.map((acc: any) => ({
     account_id: acc.id,
     account_name: acc.name,
-    cash: Math.round((accCashMap[acc.id] || 0) * 100) / 100,
-    stock_value: Math.round((accStockMap[acc.id] || 0) * 100) / 100,
+    cash: accCashMap[acc.id] || 0,
+    stock_value: accStockMap[acc.id] || 0,
   }));
 
   return NextResponse.json({

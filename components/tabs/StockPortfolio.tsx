@@ -50,6 +50,14 @@ function Badge({ label, color, ml = 5 }: { label: string; color: string; ml?: nu
   );
 }
 
+function MoveBadge({ current, prev }: { current: number; prev: number }) {
+  if (!current || !prev) return null;
+  const pct = (current - prev) / prev * 100;
+  if (pct >= 5) return <span style={{ fontSize: 16 }}>🔥</span>;
+  if (pct <= -5) return <span style={{ fontSize: 16 }}>⚠️</span>;
+  return null;
+}
+
 function QuoteTypeBadge({ quoteType, leverage }: { quoteType?: string; leverage?: string }) {
   if (!quoteType || quoteType === 'EQUITY') return null;
   const badge = QUOTE_TYPE_BADGE[quoteType];
@@ -143,6 +151,7 @@ export default function StockPortfolio({ positions, currency, rates, onTickerCli
       <table>
         <thead>
           <tr>
+            <th style={{ width: 1, whiteSpace: 'nowrap', padding: '0 4px' }}></th>
             <th {...th('ticker', 'left')}>Symbol <SortIndicator active={sortKey === 'ticker'} dir={sortDir} /></th>
             <th {...thStatic()}>Price</th>
             <th {...thStatic()}>Shares</th>
@@ -161,6 +170,9 @@ export default function StockPortfolio({ positions, currency, rates, onTickerCli
             const barPct = maxWeight > 0 ? (weight / maxWeight) * 100 : 0;
             return (
               <tr key={p.ticker}>
+                <td style={{ textAlign: 'center', width: 1, whiteSpace: 'nowrap', padding: '0 4px' }}>
+                  <MoveBadge current={p.current_price} prev={p.prev_close} />
+                </td>
                 <td>
                   <button
                     onClick={() => onTickerClick(p.ticker)}

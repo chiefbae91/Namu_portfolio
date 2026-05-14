@@ -76,7 +76,7 @@ export default function CsvImportModal({ accounts, onClose, onImported }: Props)
   const typeColor = (t: string) => ({ buy: 'var(--green)', sell: 'var(--red)', dividend: '#f59e0b', cash: '#60a5fa', skip: 'var(--muted)' }[t] ?? 'var(--muted)');
 
   const importable = preview?.filter(r => !r.skip && !r.duplicate) ?? [];
-  const formatLabel = format === 'new' ? 'Generic' : format === 'robinhood' ? 'Robinhood' : '';
+  const formatLabel = format === 'new' ? 'Generic' : format === 'robinhood' ? 'Robinhood' : format === 'webull' ? 'Webull' : '';
 
   return (
     <div className="modal-overlay" onClick={onClose}>
