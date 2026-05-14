@@ -4,6 +4,7 @@ import { Pencil, PlusCircle, Trash2, ChevronLeft, ChevronRight } from 'lucide-re
 import { Transaction, Currency, ExchangeRates } from '@/lib/types';
 import { formatCurrency } from '@/lib/format';
 import TickerTypeahead from '@/components/TickerTypeahead';
+import NoteTooltip from '@/components/NoteTooltip';
 
 interface Props {
   transactions: Transaction[];
@@ -262,7 +263,7 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
               <th style={{ textAlign: 'right' }}>Price</th>
               <th style={{ textAlign: 'right' }}>Total</th>
               <th style={{ textAlign: 'right' }}>Fee</th>
-              <th>Note</th>
+              <th style={{ width: '100%' }}>Note</th>
               <th></th>
             </tr>
           </thead>
@@ -304,12 +305,8 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
                   <td style={{ textAlign: 'right' }}>{tx.price > 0 ? fmt(tx.price) : '-'}</td>
                   <td style={{ textAlign: 'right' }}>{fmt(total)}</td>
                   <td style={{ textAlign: 'right' }} className="muted">{tx.fee > 0 ? fmt(tx.fee) : '-'}</td>
-                  <td style={{ maxWidth: 180 }}>
-                    {tx.notes
-                      ? <span title={tx.notes} style={{ color: 'var(--muted)', fontSize: 12, cursor: 'default' }}>
-                          {tx.notes.length > 20 ? tx.notes.slice(0, 20) + '…' : tx.notes}
-                        </span>
-                      : <span className="muted">—</span>}
+                  <td style={{ overflow: 'hidden', maxWidth: 0 }}>
+                    {tx.notes ? <NoteTooltip note={tx.notes} /> : <span className="muted">—</span>}
                   </td>
                   <td style={{ display: 'flex', gap: 6 }}>
                     {tx.type !== 'transfer_deposit' && tx.type !== 'transfer_withdraw'

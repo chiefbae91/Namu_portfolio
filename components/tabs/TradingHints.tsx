@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Pencil, PlusCircle, Trash2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
 import { TradingHint } from '@/lib/types';
 import TickerTypeahead from '@/components/TickerTypeahead';
+import NoteTooltip from '@/components/NoteTooltip';
 
 type DateRangeMode = 'all' | 'last_day' | 'last_week' | 'last_month' | 'custom';
 
@@ -249,7 +250,7 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, o
               <th>Type</th>
               <th style={{ textAlign: 'right' }}>Hint Price</th>
               <th style={{ textAlign: 'right' }}>Stock Price at Creation</th>
-              <th>Note</th>
+              <th style={{ width: '100%' }}>Note</th>
               <th></th>
             </tr>
           </thead>
@@ -285,18 +286,8 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, o
                     ? `$${hint.current_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                     : <span className="muted">—</span>}
                 </td>
-                <td style={{ maxWidth: 220 }}>
-                  {hint.note
-                    ? (
-                      <span
-                        title={hint.note}
-                        style={{ color: 'var(--muted)', fontSize: 12, cursor: 'default' }}
-                      >
-                        {hint.note.length > 20 ? hint.note.slice(0, 20) + '…' : hint.note}
-                      </span>
-                    )
-                    : <span className="muted">—</span>
-                  }
+                <td style={{ overflow: 'hidden', maxWidth: 0 }}>
+                  {hint.note ? <NoteTooltip note={hint.note} /> : <span className="muted">—</span>}
                 </td>
                 <td style={{ display: 'flex', gap: 6, whiteSpace: 'nowrap' }}>
                   <button

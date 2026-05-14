@@ -295,7 +295,7 @@ export default function Home() {
   const checkedIds: Set<number> = accountFilter === ''
     ? new Set(visibleAccounts.map(a => a.id))
     : new Set(accountFilter.split(',').map(Number));
-  const allChecked = visibleAccounts.length > 0 && visibleAccounts.every(a => checkedIds.has(a.id));
+  const allChecked = visibleAccounts.every(a => checkedIds.has(a.id));
 
   return (
     <div style={{ minHeight: '100vh', padding: '0 0 40px' }}>
@@ -338,10 +338,6 @@ export default function Home() {
           </button>
           {accountDropdownOpen && (
             <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, minWidth: 200, boxShadow: '0 4px 16px rgba(0,0,0,0.4)', padding: '4px 0' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', cursor: 'pointer', fontSize: 12, color: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
-                <input type="checkbox" checked={allChecked} onChange={() => setAccountFilter('')} style={{ cursor: 'pointer', accentColor: 'var(--accent)' }} />
-                All Accounts
-              </label>
               {visibleAccounts.map(a => (
                 <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', cursor: 'pointer', fontSize: 13 }}>
                   <input
@@ -351,6 +347,10 @@ export default function Home() {
                     onChange={e => {
                       const next = new Set(checkedIds);
                       if (e.target.checked) next.add(a.id); else next.delete(a.id);
+                      if (next.size === 0) {
+                        alert('At least one account must be selected.');
+                        return;
+                      }
                       const nowAll = visibleAccounts.every(acc => next.has(acc.id));
                       setAccountFilter(nowAll ? '' : [...next].sort((x, y) => x - y).join(','));
                     }}
