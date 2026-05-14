@@ -19,9 +19,30 @@ export interface ChartTx {
   notes?: string | null;
 }
 
+export interface ChartHint {
+  date: string;
+  type: string;
+  price: string | null;
+  note: string | null;
+}
+
+function parsePrices(p: string | null): number[] {
+  if (!p) return [];
+  return p.trim().split(/\s+/).map(s => parseFloat(s.replace(/,/g, ''))).filter(n => !isNaN(n));
+}
+
+function fmtHintPrice(p: string | null): string | null {
+  if (!p) return null;
+  return p.trim().split(/\s+/).map(part => {
+    const n = parseFloat(part.replace(/,/g, ''));
+    return isNaN(n) ? part : `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }).join(' ');
+}
+
 interface Props {
   candles: OHLCPoint[];
   transactions?: ChartTx[];
+  chartHints?: ChartHint[];
   resolvedInterval?: string;
 }
 
@@ -38,11 +59,38 @@ interface MarkerTooltipState {
   tx: ChartTx;
 }
 
+interface HintMarkerTooltipState {
+  svgX: number;
+  svgY: number;
+  hints: ChartHint[];
+}
+
 const PAD = { top: 16, right: 20, bottom: 36, left: 64 };
 const H = 320;
 
 const TX_COLORS: Record<string, string> = { buy: '#00e676', sell: '#ff5252', dividend: '#f59e0b' };
 const TX_LABELS: Record<string, string> = { buy: 'Buy', sell: 'Sell', dividend: 'Dividend' };
+
+const HINT_COLORS: Record<string, string> = {
+  resistance: '#ff5252', support: '#00e676', supply_level: '#f59e0b',
+  short_target: '#60a5fa', long_target: '#818cf8', buy_stop: '#ef4444',
+  trailing_supply: '#fb923c', note_only: '#64748b',
+};
+const HINT_SHORT: Record<string, string> = {
+  resistance: 'Res', support: 'Sup', supply_level: 'SL',
+  short_target: 'ST', long_target: 'LT', buy_stop: 'BS',
+  trailing_supply: 'TS', note_only: 'Note',
+};
+const HINT_LABEL: Record<string, string> = {
+  resistance:      '벽 (Resistance)',
+  support:         '지지 (Support)',
+  supply_level:    '매물대 (Supply Level)',
+  short_target:    '단기 목표주가 (Short Target)',
+  long_target:     '장기 목표주가 (Long Target)',
+  buy_stop:        '매수 중지 (Buy Halt)',
+  trailing_supply: '추격 매물대 (Trailing Supply)',
+  note_only:       '메모 (Note Only)',
+};
 
 function getTxColor(tx: ChartTx): string {
   if (tx.subtype === 'DIVIDEND_REINVEST') return '#f97316';
@@ -59,11 +107,12 @@ function formatXLabel(date: string, interval: string): string {
   return date.slice(5);
 }
 
-export default function CandlestickChart({ candles, transactions = [], resolvedInterval = '1d' }: Props) {
+export default function CandlestickChart({ candles, transactions = [], chartHints, resolvedInterval = '1d' }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(600);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [markerTooltip, setMarkerTooltip] = useState<MarkerTooltipState | null>(null);
+  const [hintMarkerTooltip, setHintMarkerTooltip] = useState<HintMarkerTooltipState | null>(null);
 
   useLayoutEffect(() => {
     if (!containerRef.current) return;
@@ -76,7 +125,10 @@ export default function CandlestickChart({ candles, transactions = [], resolvedI
   const cw = width - PAD.left - PAD.right;
   const ch = H - PAD.top - PAD.bottom;
 
-  const allPrices = candles.flatMap(c => [c.high, c.low]).filter(v => v != null && !isNaN(v));
+  const allPrices = [
+    ...candles.flatMap(c => [c.high, c.low]).filter(v => v != null && !isNaN(v)),
+    ...(chartHints ?? []).flatMap(h => parsePrices(h.price)),
+  ];
   const minP = Math.min(...allPrices);
   const maxP = Math.max(...allPrices);
   const span = maxP - minP || 1;
@@ -109,7 +161,14 @@ export default function CandlestickChart({ candles, transactions = [], resolvedI
     return txByDate[dateKey] ?? [];
   });
 
+  const hintsByDate: Record<string, ChartHint[]> = {};
+  for (const h of chartHints ?? []) {
+    const k = h.date.slice(0, 10);
+    (hintsByDate[k] ??= []).push(h);
+  }
+
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (hintMarkerTooltip) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const mx = e.clientX - rect.left - PAD.left;
     const idx = Math.floor(mx / slot);
@@ -215,42 +274,95 @@ export default function CandlestickChart({ candles, transactions = [], resolvedI
             );
           })}
 
+
+          {/* Hint date dot markers */}
+          {candles.map((c, i) => {
+            const dateKey = c.date.slice(0, 10);
+            if (isIntraday && i > 0 && candles[i - 1].date.slice(0, 10) === dateKey) return null;
+            const dateHints = hintsByDate[dateKey];
+            if (!dateHints?.length) return null;
+            const cx = PAD.left + i * slot + slot / 2;
+            const allHintPrices = dateHints.flatMap(h => parsePrices(h.price));
+            const lowestPrice = allHintPrices.length > 0 ? Math.min(...allHintPrices) : null;
+            const rawDotY = lowestPrice !== null
+              ? PAD.top + toY(lowestPrice)
+              : PAD.top + 8;
+            const dotY = Math.max(PAD.top + 4, Math.min(PAD.top + ch - 4, rawDotY));
+            const isMulti = dateHints.length > 1;
+            const dotColor = isMulti ? 'white' : (HINT_COLORS[dateHints[0].type] ?? '#64748b');
+            return (
+              <circle key={`hd-${i}`}
+                cx={cx} cy={dotY} r={4.5}
+                fill={dotColor}
+                stroke={isMulti ? '#94a3b8' : dotColor}
+                strokeWidth={isMulti ? 1 : 0}
+                opacity={0.9}
+                style={{ cursor: 'pointer' }}
+                onMouseEnter={e => {
+                  e.stopPropagation();
+                  setTooltip(null);
+                  setHintMarkerTooltip({ svgX: cx, svgY: dotY, hints: dateHints });
+                }}
+                onMouseLeave={() => setHintMarkerTooltip(null)}
+              />
+            );
+          })}
+
           {/* Crosshair — hidden while a marker tooltip is active */}
-          {tooltip && !markerTooltip && (
+          {tooltip && !markerTooltip && !hintMarkerTooltip && (
             <line x1={tooltip.x} y1={PAD.top} x2={tooltip.x} y2={PAD.top + ch}
               stroke="rgba(255,255,255,0.2)" strokeWidth={1} strokeDasharray="4,4" />
           )}
         </svg>
 
         {/* Legend */}
-        <div style={{ display: 'flex', gap: 14, padding: '4px 8px 2px', fontSize: 11, color: '#64748b', flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-            <span style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <span style={{ width: 8, height: 5, background: '#00e676', display: 'inline-block', borderRadius: 1 }} />
-              <span style={{ width: 8, height: 5, background: '#ff5252', display: 'inline-block', borderRadius: 1 }} />
+        {chartHints !== undefined ? (
+          <div style={{ display: 'flex', gap: 10, padding: '4px 8px 2px', fontSize: 11, color: '#64748b', flexWrap: 'wrap', alignItems: 'center' }}>
+            {[...new Map(chartHints.map(h => [h.type, h])).values()].map(h => (
+              <span key={h.type} style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                <svg width={10} height={10} style={{ display: 'block' }}>
+                  <circle cx="5" cy="5" r="4" fill={HINT_COLORS[h.type] ?? '#64748b'} opacity={0.9} />
+                </svg>
+                <span style={{ color: HINT_COLORS[h.type] ?? '#64748b' }}>{HINT_LABEL[h.type] ?? h.type}</span>
+              </span>
+            ))}
+            {chartHints.some((h, _, arr) => arr.filter(x => x.date.slice(0, 10) === h.date.slice(0, 10)).length > 1) && (
+              <span style={{ display: 'flex', gap: 5, alignItems: 'center', marginLeft: 4, paddingLeft: 8, borderLeft: '1px solid var(--border)' }}>
+                <svg width={10} height={10} style={{ display: 'block' }}><circle cx="5" cy="5" r="4" fill="white" stroke="#94a3b8" strokeWidth={1} opacity={0.9} /></svg>
+                Multiple
+              </span>
+            )}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 14, padding: '4px 8px 2px', fontSize: 11, color: '#64748b', flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <span style={{ width: 8, height: 5, background: '#00e676', display: 'inline-block', borderRadius: 1 }} />
+                <span style={{ width: 8, height: 5, background: '#ff5252', display: 'inline-block', borderRadius: 1 }} />
+              </span>
+              OHLC
             </span>
-            OHLC
-          </span>
-          <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-            <svg width={10} height={12} style={{ display: 'block' }}><polygon points="5,1 0,11 10,11" fill="#00e676" opacity={0.9} /></svg>
-            Buy
-          </span>
-          <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-            <svg width={10} height={12} style={{ display: 'block' }}><polygon points="0,1 10,1 5,11" fill="#ff5252" opacity={0.9} /></svg>
-            Sell
-          </span>
-          <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-            <svg width={10} height={10} style={{ display: 'block' }}><circle cx="5" cy="5" r="4.5" fill="#f59e0b" opacity={0.9} /></svg>
-            Dividend
-          </span>
-          <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-            <svg width={10} height={10} style={{ display: 'block' }}><circle cx="5" cy="5" r="4.5" fill="#f97316" opacity={0.9} /></svg>
-            Div. Reinvest
-          </span>
-        </div>
+            <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+              <svg width={10} height={12} style={{ display: 'block' }}><polygon points="5,1 0,11 10,11" fill="#00e676" opacity={0.9} /></svg>
+              Buy
+            </span>
+            <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+              <svg width={10} height={12} style={{ display: 'block' }}><polygon points="0,1 10,1 5,11" fill="#ff5252" opacity={0.9} /></svg>
+              Sell
+            </span>
+            <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+              <svg width={10} height={10} style={{ display: 'block' }}><circle cx="5" cy="5" r="4.5" fill="#f59e0b" opacity={0.9} /></svg>
+              Dividend
+            </span>
+            <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+              <svg width={10} height={10} style={{ display: 'block' }}><circle cx="5" cy="5" r="4.5" fill="#f97316" opacity={0.9} /></svg>
+              Div. Reinvest
+            </span>
+          </div>
+        )}
 
         {/* Candle OHLC tooltip */}
-        {tooltip && !markerTooltip && (
+        {tooltip && !markerTooltip && !hintMarkerTooltip && (
           <div style={{
             position: 'absolute',
             left: toRight ? tooltip.x + 14 : undefined,
@@ -321,6 +433,59 @@ export default function CandlestickChart({ candles, transactions = [], resolvedI
                   <span style={{ color: '#64748b' }}>Note</span>
                   <span style={{ color: '#e2e8f0', maxWidth: 160, wordBreak: 'break-word' }}>{tx.notes}</span>
                 </>}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Hint date marker tooltip */}
+        {hintMarkerTooltip && (() => {
+          const { svgX, svgY, hints } = hintMarkerTooltip;
+          const toRight2 = svgX < width * 0.62;
+          return (
+            <div style={{
+              position: 'absolute',
+              left: toRight2 ? svgX + 12 : undefined,
+              right: toRight2 ? undefined : width - svgX + 12,
+              top: Math.max(4, svgY + 10),
+              background: '#1a1d27',
+              border: '1px solid #3a3d4a',
+              borderRadius: 8,
+              padding: '8px 12px',
+              fontSize: 12,
+              pointerEvents: 'none',
+              zIndex: 70,
+              minWidth: 190,
+              maxWidth: 260,
+            }}>
+              <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 8, fontWeight: 600 }}>
+                {hints[0].date.slice(0, 10)}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {hints.map((h, i) => (
+                  <div key={i}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{
+                        width: 8, height: 8, borderRadius: '50%',
+                        background: HINT_COLORS[h.type] ?? '#64748b',
+                        flexShrink: 0, display: 'inline-block',
+                      }} />
+                      <span style={{ color: HINT_COLORS[h.type] ?? '#64748b', fontWeight: 600, fontSize: 11 }}>
+                        {HINT_LABEL[h.type] ?? h.type}
+                      </span>
+                      {h.price != null && (
+                        <span style={{ color: '#e2e8f0', fontVariantNumeric: 'tabular-nums', fontSize: 11, marginLeft: 'auto' }}>
+                          {fmtHintPrice(h.price)}
+                        </span>
+                      )}
+                    </div>
+                    {h.note && (
+                      <div style={{ color: '#64748b', fontSize: 11, marginLeft: 14, marginTop: 2 }}>
+                        {h.note}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           );

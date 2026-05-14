@@ -98,6 +98,33 @@ function initSchema(db: Database.Database) {
     );
   `);
 
+  // Migrate price column from REAL to TEXT for multi-price support
+  try {
+    const cols = db.prepare('PRAGMA table_info(trading_hints)').all() as any[];
+    const priceCol = cols.find((c: any) => c.name === 'price');
+    if (priceCol && priceCol.type.toUpperCase() === 'REAL') {
+      db.exec(`
+        ALTER TABLE trading_hints RENAME TO trading_hints_old;
+        CREATE TABLE trading_hints (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          ticker TEXT NOT NULL,
+          hint_date TEXT NOT NULL,
+          type TEXT NOT NULL,
+          price TEXT,
+          current_price REAL,
+          note TEXT,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+        INSERT INTO trading_hints
+          SELECT id, ticker, hint_date, type,
+            CASE WHEN price IS NULL THEN NULL ELSE CAST(price AS TEXT) END,
+            current_price, note, created_at
+          FROM trading_hints_old;
+        DROP TABLE trading_hints_old;
+      `);
+    }
+  } catch { /* migration failed or already done */ }
+
   // Safe migrations for existing DBs
   const migrations = [
     "ALTER TABLE transactions ADD COLUMN notes TEXT DEFAULT ''",

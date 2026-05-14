@@ -1,7 +1,8 @@
 'use client';
-import { useRef, useState } from 'react';
-import { X, Calendar } from 'lucide-react';
+import { useState } from 'react';
+import { X } from 'lucide-react';
 import { TradingHint } from '@/lib/types';
+import DatePickerInput from '@/components/DatePickerInput';
 
 const HINT_TYPES = [
   { value: 'resistance',      label: '벽 (Resistance)' },
@@ -9,7 +10,7 @@ const HINT_TYPES = [
   { value: 'supply_level',    label: '매물대 (Supply Level)' },
   { value: 'short_target',    label: '단기 목표 주가 (Short-term Target)' },
   { value: 'long_target',     label: '장기 목표 주가 (Long-term Target)' },
-  { value: 'buy_stop',        label: '매수 중지 (Buy Stop)' },
+  { value: 'buy_stop',        label: '매수 중지 (Buy Halt)' },
   { value: 'trailing_supply', label: '추격 매물대 (Trailing Supply)' },
   { value: 'note_only',       label: 'Note Only' },
 ];
@@ -52,26 +53,29 @@ function sanitizeISO(isoDate: string): string {
 }
 
 function fmtPrice(raw: string) {
-  const n = parseFloat(raw.replace(/,/g, ''));
-  if (isNaN(n)) return raw;
-  const [int, dec = ''] = n.toFixed(2).split('.');
-  return int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + dec;
+  return raw.trim().split(/\s+/).map(part => {
+    const n = parseFloat(part.replace(/,/g, ''));
+    if (isNaN(n)) return part;
+    const [int, dec = ''] = n.toFixed(2).split('.');
+    return int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + dec;
+  }).join(' ');
 }
 
 interface Props {
   editingHint?: TradingHint | null;
+  prefillTicker?: string | null;
   onClose: () => void;
   onSaved: () => void;
 }
 
-export default function TradingHintModal({ editingHint, onClose, onSaved }: Props) {
-  const [ticker, setTicker] = useState(() => editingHint?.ticker ?? '');
+export default function TradingHintModal({ editingHint, prefillTicker, onClose, onSaved }: Props) {
+  const [ticker, setTicker] = useState(() => editingHint?.ticker ?? prefillTicker ?? '');
   const [hintDate, setHintDate] = useState(() =>
     editingHint ? isoToMMDDYYYY(editingHint.hint_date) : todayFormatted()
   );
   const [type, setType] = useState(() => editingHint?.type ?? '');
   const [priceStr, setPriceStr] = useState(() =>
-    editingHint?.price != null ? fmtPrice(String(editingHint.price)) : ''
+    editingHint?.price != null ? fmtPrice(editingHint.price) : ''
   );
   const [currentPriceStr, setCurrentPriceStr] = useState(() =>
     editingHint?.current_price != null ? fmtPrice(String(editingHint.current_price)) : ''
@@ -81,7 +85,6 @@ export default function TradingHintModal({ editingHint, onClose, onSaved }: Prop
   const [note, setNote] = useState(() => editingHint?.note ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const isBuyStop = type === 'buy_stop';
   const isNoteOnly = type === 'note_only';
@@ -105,7 +108,7 @@ export default function TradingHintModal({ editingHint, onClose, onSaved }: Prop
     if (!ticker.trim()) { setError('Ticker is required'); return; }
     if (!hintDate.trim()) { setError('Date is required'); return; }
     if (!type) { setError('Type is required'); return; }
-    const price = priceDisabled ? null : (parseFloat(priceStr.replace(/,/g, '')) || null);
+    const price = priceDisabled ? null : (priceStr.trim() || null);
     const current_price = cpDisabled ? null : (parseFloat(currentPriceStr.replace(/,/g, '')) || null);
     setSaving(true);
     setError('');
@@ -164,42 +167,17 @@ export default function TradingHintModal({ editingHint, onClose, onSaved }: Prop
           {/* Hint Date */}
           <div className="form-group">
             <label>Hint Date <span style={{ color: 'var(--red)' }}>*</span></label>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <input
-                type="text"
-                value={hintDate}
-                onChange={e => setHintDate(e.target.value)}
-                onBlur={e => {
-                  const val = e.target.value;
-                  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(val)) return;
-                  const sanitized = sanitizeISO(mmddyyyyToISO(val));
-                  const formatted = isoToMMDDYYYY(sanitized);
-                  if (formatted !== val) setHintDate(formatted);
-                  fetchPrice(ticker, formatted);
-                }}
-                style={{ flex: 1 }}
-              />
-              <button
-                type="button"
-                onClick={() => dateInputRef.current?.showPicker?.()}
-                style={{ background: 'var(--border)', color: 'var(--muted)', padding: '6px 10px', borderRadius: 6, flexShrink: 0 }}
-                title="Pick date"
-              >
-                <Calendar size={15} />
-              </button>
-              <input
-                ref={dateInputRef}
-                type="date"
-                max={todayISO()}
-                style={{ display: 'none' }}
-                onChange={e => {
-                  if (!e.target.value) return;
-                  const formatted = isoToMMDDYYYY(sanitizeISO(e.target.value));
-                  setHintDate(formatted);
-                  fetchPrice(ticker, formatted);
-                }}
-              />
-            </div>
+            <DatePickerInput
+              value={hintDate}
+              onChange={val => {
+                setHintDate(val);
+                if (/^\d{2}\/\d{2}\/\d{4}$/.test(val)) {
+                  const sanitized = isoToMMDDYYYY(sanitizeISO(mmddyyyyToISO(val)));
+                  if (sanitized !== val) setHintDate(sanitized);
+                  fetchPrice(ticker, sanitized);
+                }
+              }}
+            />
           </div>
 
           {/* Type */}

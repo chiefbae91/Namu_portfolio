@@ -3,15 +3,31 @@ import { useState } from 'react';
 import { Pencil, Trash2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
 import { TradingHint } from '@/lib/types';
 
+type DateRangeMode = 'all' | 'last_day' | 'last_week' | 'last_month' | 'custom';
+
+function toISODate(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
+
+function getPresetRange(mode: DateRangeMode): { from: string; to: string } | null {
+  if (mode === 'all' || mode === 'custom') return null;
+  const to = new Date();
+  const from = new Date();
+  if (mode === 'last_day') from.setDate(from.getDate() - 1);
+  else if (mode === 'last_week') from.setDate(from.getDate() - 7);
+  else if (mode === 'last_month') from.setMonth(from.getMonth() - 1);
+  return { from: toISODate(from), to: toISODate(to) };
+}
+
 const TYPE_LABELS: Record<string, string> = {
   resistance:      '벽 (Resistance)',
   support:         '지지 (Support)',
   supply_level:    '매물대 (Supply Level)',
-  short_target:    '단기 목표 주가',
-  long_target:     '장기 목표 주가',
-  buy_stop:        '매수 중지 (Buy Stop)',
-  trailing_supply: '추격 매물대',
-  note_only:       'Note Only',
+  short_target:    '단기 목표주가 (Short Target)',
+  long_target:     '장기 목표주가 (Long Target)',
+  buy_stop:        '매수 중지 (Buy Halt)',
+  trailing_supply: '추격 매물대 (Trailing Supply)',
+  note_only:       '메모 (Note Only)',
 };
 
 const TYPE_COLORS: Record<string, string> = {
@@ -45,21 +61,41 @@ interface Props {
   hints: TradingHint[];
   onEdit: (hint: TradingHint) => void;
   onDelete: (id: number) => void;
+  onSymbolClick?: (ticker: string) => void;
 }
 
-export default function TradingHints({ hints, onEdit, onDelete }: Props) {
+export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick }: Props) {
   const [tickerFilter, setTickerFilter] = useState('');
+  const [dateMode, setDateMode] = useState<DateRangeMode>('last_month');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
   const [sortCol, setSortCol] = useState<SortCol>('hint_date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
 
+  const today = toISODate(new Date());
+
   const tickers = [...new Set(hints.map(h => h.ticker))].sort();
 
-  const filtered = hints.filter(h => !tickerFilter || h.ticker === tickerFilter);
+  const activeRange = dateMode === 'custom'
+    ? (customFrom || customTo ? { from: customFrom || '0000-01-01', to: customTo || today } : null)
+    : getPresetRange(dateMode);
+
+  const filtered = hints.filter(h => {
+    if (tickerFilter && h.ticker !== tickerFilter) return false;
+    if (activeRange) {
+      if (activeRange.from && h.hint_date < activeRange.from) return false;
+      if (activeRange.to && h.hint_date > activeRange.to) return false;
+    }
+    return true;
+  });
+  const firstPrice = (p: string | null) =>
+    p ? parseFloat(p.trim().split(/\s+/)[0].replace(/,/g, '')) : -Infinity;
+
   const sorted = [...filtered].sort((a, b) => {
     let cmp = 0;
     if (sortCol === 'hint_date') cmp = a.hint_date.localeCompare(b.hint_date);
-    else if (sortCol === 'price') cmp = (a.price ?? -Infinity) - (b.price ?? -Infinity);
+    else if (sortCol === 'price') cmp = firstPrice(a.price) - firstPrice(b.price);
     else if (sortCol === 'type') cmp = a.type.localeCompare(b.type);
     return sortDir === 'asc' ? cmp : -cmp;
   });
@@ -80,8 +116,13 @@ export default function TradingHints({ hints, onEdit, onDelete }: Props) {
     return sortDir === 'asc' ? <ChevronUp size={11} style={{ marginLeft: 2 }} /> : <ChevronDown size={11} style={{ marginLeft: 2 }} />;
   };
 
-  const fmtPrice = (p: number) =>
-    `$${p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const fmtPrice = (p: string | null) => {
+    if (!p) return null;
+    return p.trim().split(/\s+/).map(part => {
+      const n = parseFloat(part.replace(/,/g, ''));
+      return isNaN(n) ? part : `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }).join(' ');
+  };
 
   return (
     <div>
@@ -95,8 +136,63 @@ export default function TradingHints({ hints, onEdit, onDelete }: Props) {
           <option value="">All Symbols</option>
           {tickers.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
-        {tickerFilter && (
-          <button className="btn-secondary btn-sm" onClick={() => { setTickerFilter(''); setPage(1); }}>Reset</button>
+
+        <select
+          value={dateMode}
+          onChange={e => { setDateMode(e.target.value as DateRangeMode); setPage(1); }}
+          style={{ minWidth: 130 }}
+        >
+          <option value="last_day">Last Day</option>
+          <option value="last_week">Last Week</option>
+          <option value="last_month">Last Month</option>
+          <option value="custom">Custom</option>
+        </select>
+
+        {dateMode === 'custom' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="date"
+              value={customFrom}
+              max={customTo || today}
+              onChange={e => {
+                const val = e.target.value;
+                // enforce max 1 year range from the chosen start
+                if (customTo) {
+                  const maxTo = new Date(val);
+                  maxTo.setFullYear(maxTo.getFullYear() + 1);
+                  if (customTo > toISODate(maxTo)) setCustomTo(toISODate(maxTo));
+                }
+                setCustomFrom(val);
+                setPage(1);
+              }}
+              style={{ fontSize: 12 }}
+            />
+            <span style={{ color: 'var(--muted)', fontSize: 12 }}>–</span>
+            <input
+              type="date"
+              value={customTo}
+              min={customFrom || undefined}
+              max={(() => {
+                if (!customFrom) return today;
+                const maxDate = new Date(customFrom);
+                maxDate.setFullYear(maxDate.getFullYear() + 1);
+                const maxStr = toISODate(maxDate);
+                return maxStr > today ? today : maxStr;
+              })()}
+              onChange={e => { setCustomTo(e.target.value); setPage(1); }}
+              style={{ fontSize: 12 }}
+            />
+          </div>
+        )}
+
+        {(tickerFilter || dateMode !== 'all') && (
+          <button className="btn-secondary btn-sm" onClick={() => {
+            setTickerFilter('');
+            setDateMode('all');
+            setCustomFrom('');
+            setCustomTo('');
+            setPage(1);
+          }}>Reset</button>
         )}
         <span className="muted" style={{ fontSize: 12 }}>{sorted.length} hints</span>
         {sorted.length > 0 && (
@@ -111,15 +207,15 @@ export default function TradingHints({ hints, onEdit, onDelete }: Props) {
         <table>
           <thead>
             <tr>
-              <th>Symbol</th>
               <th
                 style={{ cursor: 'pointer', userSelect: 'none' }}
-                onClick={() => handleSort('price')}
+                onClick={() => handleSort('hint_date')}
               >
                 <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                  Price <SortIcon col="price" />
+                  Hint Date <SortIcon col="hint_date" />
                 </span>
               </th>
+              <th>Ticker</th>
               <th
                 style={{ cursor: 'pointer', userSelect: 'none' }}
                 onClick={() => handleSort('type')}
@@ -128,12 +224,13 @@ export default function TradingHints({ hints, onEdit, onDelete }: Props) {
                   Type <SortIcon col="type" />
                 </span>
               </th>
+              <th style={{ textAlign: 'right' }}>Current Price</th>
               <th
-                style={{ cursor: 'pointer', userSelect: 'none' }}
-                onClick={() => handleSort('hint_date')}
+                style={{ cursor: 'pointer', userSelect: 'none', textAlign: 'right' }}
+                onClick={() => handleSort('price')}
               >
                 <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                  Hint Date <SortIcon col="hint_date" />
+                  Hint Price <SortIcon col="price" />
                 </span>
               </th>
               <th>Note</th>
@@ -143,9 +240,17 @@ export default function TradingHints({ hints, onEdit, onDelete }: Props) {
           <tbody>
             {paginated.map(hint => (
               <tr key={hint.id}>
-                <td style={{ fontWeight: 600 }}>{hint.ticker}</td>
-                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                  {hint.price != null ? fmtPrice(hint.price) : <span className="muted">—</span>}
+                <td className="muted">{hint.hint_date}</td>
+                <td>
+                  <button
+                    onClick={() => onSymbolClick?.(hint.ticker)}
+                    style={{
+                      background: 'none', color: 'var(--accent)', fontWeight: 600,
+                      padding: 0, textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit',
+                    }}
+                  >
+                    {hint.ticker}
+                  </button>
                 </td>
                 <td>
                   <span style={{
@@ -156,7 +261,14 @@ export default function TradingHints({ hints, onEdit, onDelete }: Props) {
                     {TYPE_LABELS[hint.type] ?? hint.type}
                   </span>
                 </td>
-                <td className="muted">{hint.hint_date}</td>
+                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                  {hint.current_price != null
+                    ? `$${hint.current_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : <span className="muted">—</span>}
+                </td>
+                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                  {fmtPrice(hint.price) ?? <span className="muted">—</span>}
+                </td>
                 <td style={{ maxWidth: 220 }}>
                   {hint.note
                     ? (

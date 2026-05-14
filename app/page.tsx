@@ -10,6 +10,7 @@ import AccountSettingsModal from '@/components/modals/AccountSettingsModal';
 import TradeAnalysisModal from '@/components/modals/TradeAnalysisModal';
 import CsvImportModal from '@/components/modals/CsvImportModal';
 import TradingHintModal from '@/components/modals/TradingHintModal';
+import HintAnalysisModal from '@/components/modals/HintAnalysisModal';
 import SummaryCards from '@/components/SummaryCards';
 
 const TRANSFER_OFFSET = 1_000_000;
@@ -34,7 +35,9 @@ export default function Home() {
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [tradingHintOpen, setTradingHintOpen] = useState(false);
   const [editingHint, setEditingHint] = useState<TradingHint | null>(null);
+  const [hintPrefillTicker, setHintPrefillTicker] = useState<string | null>(null);
   const [tradingHints, setTradingHints] = useState<TradingHint[]>([]);
+  const [hintAnalysisTicker, setHintAnalysisTicker] = useState<string | null>(null);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
   const [ratesUpdatedAt, setRatesUpdatedAt] = useState<Date | null>(null);
   const [ratesRefreshing, setRatesRefreshing] = useState(false);
@@ -176,6 +179,13 @@ export default function Home() {
   const closeTradingHintModal = () => {
     setTradingHintOpen(false);
     setEditingHint(null);
+    setHintPrefillTicker(null);
+  };
+
+  const handleAddHintFromAnalysis = (ticker: string) => {
+    setEditingHint(null);
+    setHintPrefillTicker(ticker);
+    setTradingHintOpen(true);
   };
 
   const handleShowHistoryForTicker = (ticker: string) => {
@@ -345,6 +355,7 @@ export default function Home() {
               hints={tradingHints}
               onEdit={handleEditHint}
               onDelete={handleDeleteHint}
+              onSymbolClick={setHintAnalysisTicker}
             />
           )}
         </div>
@@ -389,8 +400,19 @@ export default function Home() {
       {tradingHintOpen && (
         <TradingHintModal
           editingHint={editingHint}
+          prefillTicker={hintPrefillTicker}
           onClose={closeTradingHintModal}
           onSaved={() => { fetchTradingHints(); closeTradingHintModal(); }}
+        />
+      )}
+      {hintAnalysisTicker && (
+        <HintAnalysisModal
+          ticker={hintAnalysisTicker}
+          hints={tradingHints.filter(h => h.ticker === hintAnalysisTicker)}
+          onClose={() => setHintAnalysisTicker(null)}
+          onAddHint={handleAddHintFromAnalysis}
+          onEditHint={handleEditHint}
+          onDeleteHint={handleDeleteHint}
         />
       )}
     </div>

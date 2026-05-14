@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { X, PlusCircle } from 'lucide-react';
 import { Currency, ExchangeRates } from '@/lib/types';
 import { formatCurrency } from '@/lib/format';
-import StockChart, { StockChartData, TxRow, Holding } from '@/components/StockChart';
+import StockChart, { StockChartData, TxRow, Holding, ChartHint } from '@/components/StockChart';
 
 type Period = '5d' | '1mo' | '3mo' | '6mo' | '1y';
 type Interval = '1m' | '15m' | '1d' | '1wk';
@@ -50,6 +50,10 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
   const [transactions, setTransactions] = useState<TxRow[]>([]);
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [resolvedInterval, setResolvedInterval] = useState('1d');
+  const [showHints, setShowHints] = useState(false);
+  const [chartHints, setChartHints] = useState<ChartHint[]>([]);
+  const [hintsFetched, setHintsFetched] = useState(false);
+  const [hintsLoading, setHintsLoading] = useState(false);
   const fmt = (v: number) => formatCurrency(v, currency, rates);
 
   const handleChartLoaded = useCallback((data: StockChartData) => {
@@ -67,6 +71,24 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
   const handleInterval = (iv: Interval) => {
     localStorage.setItem('chart_interval', iv);
     setIntervalState(iv);
+  };
+
+  const handleToggleHints = async (checked: boolean) => {
+    setShowHints(checked);
+    if (checked && !hintsFetched) {
+      setHintsLoading(true);
+      try {
+        const res = await fetch('/api/trading-hints');
+        const data: any[] = await res.json();
+        setChartHints(
+          data
+            .filter(h => h.ticker === ticker)
+            .map(h => ({ date: h.hint_date, type: h.type, price: h.price, note: h.note }))
+        );
+        setHintsFetched(true);
+      } catch { /* ignore */ }
+      finally { setHintsLoading(false); }
+    }
   };
 
   const preview = transactions.slice(0, PAGE_SIZE);
@@ -159,10 +181,26 @@ export default function TradeAnalysisModal({ ticker, currency, rates, onClose, o
           {intervalCorrected && (
             <span style={{ fontSize: 11, color: 'var(--muted)' }}>→ {resolvedInterval} (auto)</span>
           )}
+          <div style={{ width: 1, height: 18, background: 'var(--border)' }} />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12, color: showHints ? 'var(--text)' : 'var(--muted)', userSelect: 'none' }}>
+            <input
+              type="checkbox"
+              checked={showHints}
+              onChange={e => handleToggleHints(e.target.checked)}
+              style={{ cursor: 'pointer', accentColor: 'var(--accent)' }}
+            />
+            Hints{hintsLoading ? ' …' : ''}
+          </label>
         </div>
 
         {/* Chart — owns its own loading state, no modal flicker */}
-        <StockChart ticker={ticker} period={period} interval={interval} onLoaded={handleChartLoaded} />
+        <StockChart
+          ticker={ticker}
+          period={period}
+          interval={interval}
+          onLoaded={handleChartLoaded}
+          chartHints={showHints ? chartHints : undefined}
+        />
 
         {/* Transaction History */}
         {transactions.length > 0 && (

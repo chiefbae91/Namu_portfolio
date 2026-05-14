@@ -109,7 +109,7 @@ export interface TradingHint {
   ticker: string;
   hint_date: string;
   type: string;
-  price: number | null;
+  price: string | null;
   current_price: number | null;
   note: string | null;
   created_at: string;
