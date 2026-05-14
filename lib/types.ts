@@ -65,6 +65,8 @@ export interface PortfolioPosition {
   cost: number;
   return_pct: number;
   return_amount: number;
+  quote_type?: string;
+  leverage?: string;
 }
 
 export interface OptionPosition {

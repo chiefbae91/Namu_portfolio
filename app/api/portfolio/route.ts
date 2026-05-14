@@ -13,18 +13,39 @@ interface Lot {
   remaining: number;
 }
 
-async function fetchPriceData(ticker: string): Promise<{ price: number; prevClose: number }> {
+function detectLeverage(shortName: string): string {
+  const n = shortName.toUpperCase();
+  const isInverse = n.includes('ULTRASHORT') || n.includes('BEAR') || n.includes('INVERSE') ||
+    n.includes('-1X') || n.includes('-2X') || n.includes('-3X') ||
+    (n.includes('SHORT') && !n.includes('ULTRAPRO SHORT') && n.includes('ULTRA'));
+  const is3x = n.includes('3X') || n.includes('TRIPLE') || (n.includes('ULTRAPRO') && !isInverse);
+  const is2x = n.includes('2X') || n.includes('DOUBLE') ||
+    (n.includes('ULTRA') && !n.includes('ULTRASHORT') && !n.includes('ULTRAPRO'));
+  if (is3x && isInverse) return '-3x';
+  if (is2x && isInverse) return '-2x';
+  if (isInverse) return 'inv';
+  if (is3x) return '3x';
+  if (is2x) return '2x';
+  return '';
+}
+
+async function fetchPriceData(ticker: string): Promise<{ price: number; prevClose: number; quoteType: string; leverage: string }> {
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`;
     const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, next: { revalidate: 60 } });
-    if (!res.ok) return { price: 0, prevClose: 0 };
+    if (!res.ok) return { price: 0, prevClose: 0, quoteType: '', leverage: '' };
     const data = await res.json();
     const meta = data?.chart?.result?.[0]?.meta;
+    const quoteType: string = meta?.instrumentType ?? meta?.quoteType ?? '';
+    const nameForLeverage = `${meta?.longName ?? ''} ${meta?.shortName ?? ''}`;
+    const leverage = quoteType === 'ETF' ? detectLeverage(nameForLeverage) : '';
     return {
       price: meta?.regularMarketPrice ?? 0,
       prevClose: meta?.chartPreviousClose ?? 0,
+      quoteType,
+      leverage,
     };
-  } catch { return { price: 0, prevClose: 0 }; }
+  } catch { return { price: 0, prevClose: 0, quoteType: '', leverage: '' }; }
 }
 
 export async function GET(req: NextRequest) {
@@ -106,9 +127,13 @@ export async function GET(req: NextRequest) {
   const priceDataArr = await Promise.all(activeTickers.map(fetchPriceData));
   const priceMap: Record<string, number> = {};
   const prevCloseMap: Record<string, number> = {};
+  const quoteTypeMap: Record<string, string> = {};
+  const leverageMap: Record<string, string> = {};
   activeTickers.forEach((t, i) => {
     priceMap[t] = priceDataArr[i].price;
     prevCloseMap[t] = priceDataArr[i].prevClose;
+    quoteTypeMap[t] = priceDataArr[i].quoteType;
+    leverageMap[t] = priceDataArr[i].leverage;
   });
 
   const positions = activeTickers.map(ticker => {
@@ -129,6 +154,8 @@ export async function GET(req: NextRequest) {
       cost: Math.round(pos.cost * 100) / 100,
       return_pct: Math.round(return_pct * 100) / 100,
       return_amount: Math.round(return_amount * 100) / 100,
+      quote_type: quoteTypeMap[ticker] ?? '',
+      leverage: leverageMap[ticker] ?? '',
     };
   });
 

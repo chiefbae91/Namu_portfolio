@@ -21,6 +21,48 @@ function SortIndicator({ active, dir }: { active: boolean; dir: SortDir }) {
   );
 }
 
+const QUOTE_TYPE_BADGE: Record<string, { label: string; color: string }> = {
+  ETF:            { label: 'ETF',    color: '#6366f1' },
+  MUTUALFUND:     { label: 'MF',     color: '#8b5cf6' },
+  CRYPTOCURRENCY: { label: 'CRYPTO', color: '#f97316' },
+  INDEX:          { label: 'INDEX',  color: '#64748b' },
+  FUTURE:         { label: 'FUT',    color: '#06b6d4' },
+  OPTION:         { label: 'OPT',    color: '#ef4444' },
+};
+
+const LEVERAGE_BADGE: Record<string, { label: string; color: string }> = {
+  '3x':  { label: '3X',   color: '#ef4444' },
+  '2x':  { label: '2X',   color: '#f97316' },
+  '-2x': { label: '-2X',  color: '#a855f7' },
+  '-3x': { label: '-3X',  color: '#ec4899' },
+  'inv': { label: 'INV',  color: '#8b5cf6' },
+};
+
+function Badge({ label, color, ml = 5 }: { label: string; color: string; ml?: number }) {
+  return (
+    <span style={{
+      fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
+      background: color, color: 'white', letterSpacing: '0.04em',
+      marginLeft: ml, verticalAlign: 'middle',
+    }}>
+      {label}
+    </span>
+  );
+}
+
+function QuoteTypeBadge({ quoteType, leverage }: { quoteType?: string; leverage?: string }) {
+  if (!quoteType || quoteType === 'EQUITY') return null;
+  const badge = QUOTE_TYPE_BADGE[quoteType];
+  if (!badge) return null;
+  const lvBadge = leverage ? LEVERAGE_BADGE[leverage] : null;
+  return (
+    <>
+      <Badge label={badge.label} color={badge.color} ml={5} />
+      {lvBadge && <Badge label={lvBadge.label} color={lvBadge.color} ml={3} />}
+    </>
+  );
+}
+
 function PriceChange({ current, prev }: { current: number; prev: number }) {
   if (!current || !prev) return null;
   const diff = current - prev;
@@ -126,6 +168,7 @@ export default function StockPortfolio({ positions, currency, rates, onTickerCli
                   >
                     {p.ticker}
                   </button>
+                  <QuoteTypeBadge quoteType={p.quote_type} leverage={p.leverage} />
                 </td>
                 <td style={{ textAlign: 'right' }}>
                   {hasPrice ? (
