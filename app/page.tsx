@@ -15,6 +15,7 @@ import CsvImportModal from '@/components/modals/CsvImportModal';
 import TradingHintModal from '@/components/modals/TradingHintModal';
 import SummaryCards from '@/components/SummaryCards';
 import AccountBanner from '@/components/AccountBanner';
+import ThemeToggle from '@/components/ThemeToggle';
 import PriceAlertToasts, { PriceAlert } from '@/components/PriceAlertToasts';
 
 const TRANSFER_OFFSET = 1_000_000;
@@ -416,10 +417,12 @@ export default function Home() {
           </span>
         )}
 
+        <ThemeToggle />
+
         <Link
           href="/guide"
           title="User Guide"
-          target='_blank'
+          target="_blank"
           style={{ background: 'none', color: 'var(--muted)', padding: '6px 8px', display: 'flex', alignItems: 'center' }}
         >
           <HelpCircle size={15} />

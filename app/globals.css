@@ -13,6 +13,17 @@
   --red: #ef4444;
 }
 
+html.light {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --muted: #64748b;
+  --accent: #4f46e5;
+  --green: #059669;
+  --red: #dc2626;
+}
+
 * { box-sizing: border-box; }
 
 body {
@@ -27,7 +38,7 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
 input, select, textarea {
-  background: #12151f;
+  background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: 6px;
@@ -80,7 +91,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 table { width: 100%; border-collapse: collapse; }
 th { text-align: left; padding: 8px 12px; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); white-space: nowrap; }
-td { padding: 8px 12px; border-bottom: 1px solid rgba(42,45,58,0.5); white-space: nowrap; }
+td { padding: 8px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
 tr:last-child td { border-bottom: none; }
 tr:hover td { background: rgba(99,102,241,0.04); }
 
