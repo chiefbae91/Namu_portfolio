@@ -5,14 +5,15 @@ import { Transaction, Currency, ExchangeRates } from '@/lib/types';
 import { formatCurrency } from '@/lib/format';
 import TickerTypeahead from '@/components/TickerTypeahead';
 import NoteTooltip from '@/components/NoteTooltip';
+import { getLabelMap, resolveAccountName } from '@/lib/accountLabelMap';
 
 interface Props {
   transactions: Transaction[];
   currency: Currency;
   rates: ExchangeRates;
   onEdit: (tx: Transaction) => void;
-  onDelete: (id: number) => Promise<void>;
-  onDeleteMany: (ids: number[]) => Promise<void>;
+  onDelete: (id: string | number) => Promise<void>;
+  onDeleteMany: (ids: (string | number)[]) => Promise<void>;
   deepLink?: { ticker: string; id: number } | null;
   onAddTradingHistory?: () => void;
   onTickerClick?: (ticker: string) => void;
@@ -120,10 +121,17 @@ const TYPE_FILTER_OPTIONS = [
 export default function TransactionHistory({ transactions, currency, rates, onEdit, onDelete, onDeleteMany, deepLink, onAddTradingHistory, onTickerClick }: Props) {
   const [tickerFilter, setTickerFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
-  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [selected, setSelected] = useState<Set<string | number>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [drConfirmId, setDrConfirmId] = useState<number | null>(null);
+  const [drConfirmId, setDrConfirmId] = useState<string | number | null>(null);
   const [page, setPage] = useState(1);
+  const [labelMap, setLabelMap] = useState<Record<string, string>>(getLabelMap);
+
+  useEffect(() => {
+    const handler = () => setLabelMap(getLabelMap());
+    window.addEventListener('account_label_map_changed', handler);
+    return () => window.removeEventListener('account_label_map_changed', handler);
+  }, []);
 
   useEffect(() => { setPage(1); }, [tickerFilter, typeFilter]);
 
@@ -174,7 +182,7 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
     }
   };
 
-  const toggleOne = (id: number) => {
+  const toggleOne = (id: string | number) => {
     setSelected(prev => {
       const s = new Set(prev);
       s.has(id) ? s.delete(id) : s.add(id);
@@ -189,8 +197,8 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
     setConfirmOpen(false);
   };
 
-  const handleDeleteOne = async (id: number) => {
-    await onDelete(id);
+  const handleDeleteOne = async (id: string | number) => {
+    await onDelete(id as number);
     setSelected(prev => { const s = new Set(prev); s.delete(id); return s; });
   };
 
@@ -290,16 +298,19 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
                   <td className="muted">{tx.date}</td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {tx.account_name && (
-                        <span style={{
-                          fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 3,
-                          background: getAccountBadgeColor(tx.account_name),
-                          color: 'white',
-                          letterSpacing: '0.04em', flexShrink: 0,
-                        }}>
-                          {getAccountInitials(tx.account_name)}
-                        </span>
-                      )}
+                      {tx.account_name && (() => {
+                        const displayName = resolveAccountName(tx.account_name, labelMap);
+                        return (
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 3,
+                            background: getAccountBadgeColor(displayName),
+                            color: 'white',
+                            letterSpacing: '0.04em', flexShrink: 0,
+                          }}>
+                            {getAccountInitials(displayName)}
+                          </span>
+                        );
+                      })()}
                       {tx.ticker && onTickerClick
                         ? <button style={{ background: 'none', color: 'var(--accent)', fontWeight: 500, padding: 0, cursor: 'pointer' }} onClick={() => onTickerClick(tx.ticker!)}>{tx.ticker}</button>
                         : <span style={{ fontWeight: 500 }}>{tx.ticker || '-'}</span>

@@ -46,7 +46,7 @@ function xTicks(data: DataPoint[]): string[] {
 }
 
 interface Props {
-  accountId: number;
+  accountId: string | number;
   accountName: string;
   onClose: () => void;
 }

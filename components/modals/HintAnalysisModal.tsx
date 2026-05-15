@@ -46,9 +46,9 @@ function fmtNum(p: number | null): string {
   return `$${p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function fmtPrice(p: string | null): string {
-  if (!p) return '—';
-  return p.trim().split(/\s+/).map(part => {
+function fmtPrice(p: string | number | null): string {
+  if (p == null || p === '') return '—';
+  return String(p).trim().split(/\s+/).map(part => {
     const n = parseFloat(part.replace(/,/g, ''));
     return isNaN(n) ? part : `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }).join(' ');
@@ -60,7 +60,7 @@ interface Props {
   onClose: () => void;
   onAddHint: (ticker: string) => void;
   onEditHint: (hint: TradingHint) => void;
-  onDeleteHint: (id: number) => void;
+  onDeleteHint: (id: string | number) => void;
 }
 
 const btnStyle = (active: boolean) => ({
@@ -96,7 +96,7 @@ export default function HintAnalysisModal({ ticker, hints, onClose, onAddHint, o
   const chartHints: ChartHint[] = hints.map(h => ({
     date: h.hint_date,
     type: h.type,
-    price: h.price,
+    price: h.price != null ? String(h.price) : null,
     note: h.note,
   }));
 

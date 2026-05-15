@@ -4,6 +4,7 @@ import { X, PlusCircle, Pencil, Trash2 } from 'lucide-react';
 import { Currency, ExchangeRates, TradingHint } from '@/lib/types';
 import { formatCurrency } from '@/lib/format';
 import StockChart, { StockChartData, TxRow, Holding, ChartHint } from '@/components/StockChart';
+import { getLabelMap, resolveAccountName } from '@/lib/accountLabelMap';
 
 type Period = '5d' | '1mo' | '3mo' | '6mo' | '1y';
 type Interval = '1m' | '15m' | '1d' | '1wk';
@@ -112,7 +113,7 @@ interface Props {
   hintRefreshTrigger?: number;
   onAddHint?: (ticker: string) => void;
   onEditHint?: (hint: TradingHint) => void;
-  onDeleteHint?: (id: number) => void;
+  onDeleteHint?: (id: string | number) => void;
 }
 
 export default function TradeAnalysisModal({
@@ -137,6 +138,13 @@ export default function TradeAnalysisModal({
   const [hintsData, setHintsData] = useState<TradingHint[]>([]);
   const [hintsLoaded, setHintsLoaded] = useState(false);
   const [hintsLoading, setHintsLoading] = useState(false);
+  const [labelMap, setLabelMap] = useState<Record<string, string>>(getLabelMap);
+
+  useEffect(() => {
+    const handler = () => setLabelMap(getLabelMap());
+    window.addEventListener('account_label_map_changed', handler);
+    return () => window.removeEventListener('account_label_map_changed', handler);
+  }, []);
 
   const fmt = (v: number) => formatCurrency(v, currency, rates);
 
@@ -177,7 +185,7 @@ export default function TradeAnalysisModal({
   const switchToHistory = () => setActiveTab('history');
 
   const chartHints: ChartHint[] | undefined = activeTab === 'hints'
-    ? hintsData.map(h => ({ date: h.hint_date, type: h.type, price: h.price, note: h.note }))
+    ? hintsData.map(h => ({ date: h.hint_date, type: h.type, price: h.price != null ? String(h.price) : null, note: h.note }))
     : undefined;
 
   const preview = transactions.slice(0, PAGE_SIZE);
@@ -225,7 +233,7 @@ export default function TradeAnalysisModal({
                 {holdings.map(h => (
                   <div key={h.account_id} style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
                     <span style={{ minWidth: 90, fontWeight: 500, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 130 }}>
-                      {h.account_name}
+                      {resolveAccountName(h.account_name, labelMap)}
                     </span>
                     <span style={{ color: 'var(--muted)' }}>{h.quantity.toLocaleString('en-US')} sh</span>
                     <span style={{ color: '#64748b' }}>@ {fmt(h.avg_cost)}</span>
@@ -341,7 +349,7 @@ export default function TradeAnalysisModal({
                           return (
                             <tr key={tx.id ?? i}>
                               <td className="muted">{tx.date}</td>
-                              <td><AccountBadge name={tx.account_name} /></td>
+                              <td><AccountBadge name={resolveAccountName(tx.account_name, labelMap)} /></td>
                               <td style={{ fontWeight: 500 }}>{tx.ticker}</td>
                               <td>
                                 <span style={{ color: TX_TYPE_COLORS[tx.type?.toLowerCase()] || 'var(--muted)', fontWeight: 500 }}>

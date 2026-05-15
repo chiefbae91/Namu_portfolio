@@ -11,7 +11,7 @@ interface Props {
   showKrw: boolean;
   showEur: boolean;
   loading?: boolean;
-  onAccountClick?: (id: number, name: string) => void;
+  onAccountClick?: (id: string | number, name: string) => void;
 }
 
 function fmtUSD(v: number, signed = false) {
@@ -29,14 +29,14 @@ function fmtEUR(usd: number, rate: number) {
 interface CardProps {
   label: string;
   total: number;
-  accounts: { id?: number; name: string; value: number }[];
+  accounts: { id?: string | number; name: string; value: number }[];
   krwRate: number;
   eurRate: number;
   showKrw: boolean;
   showEur: boolean;
   color: string;
   loading?: boolean;
-  onAccountClick?: (id: number, name: string) => void;
+  onAccountClick?: (id: string | number, name: string) => void;
 }
 
 function SummaryCard({ label, total, accounts, krwRate, eurRate, showKrw, showEur, color, loading, onAccountClick }: CardProps) {

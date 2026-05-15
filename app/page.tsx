@@ -33,8 +33,8 @@ export default function Home() {
   const [txModalOpen, setTxModalOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [analysisTicker, setAnalysisTicker] = useState<string | null>(null);
-  const [historyAccount, setHistoryAccount] = useState<{ id: number; name: string } | null>(null);
-  const [txPrefill, setTxPrefill] = useState<{ ticker: string; accountId: number } | null>(null);
+  const [historyAccount, setHistoryAccount] = useState<{ id: string | number; name: string } | null>(null);
+  const [txPrefill, setTxPrefill] = useState<{ ticker: string; accountId: string | number } | null>(null);
   const [historyDeepLink, setHistoryDeepLink] = useState<{ ticker: string; id: number } | null>(null);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [csvImportOpen, setCsvImportOpen] = useState(false);

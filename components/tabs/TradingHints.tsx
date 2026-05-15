@@ -79,7 +79,7 @@ function getPageNums(current: number, total: number): (number | null)[] {
 interface Props {
   hints: TradingHint[];
   onEdit: (hint: TradingHint) => void;
-  onDelete: (id: number) => void;
+  onDelete: (id: string | number) => void;
   onSymbolClick?: (ticker: string) => void;
   onAddHint?: () => void;
 }
