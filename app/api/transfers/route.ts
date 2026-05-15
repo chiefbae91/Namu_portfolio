@@ -3,14 +3,16 @@ import { getAdminClient } from '@/lib/supabase-admin';
 import { getAuthUser, unauthorized } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
-  if (!await getAuthUser()) return unauthorized();
+  const user = await getAuthUser();
+  if (!user) return unauthorized();
   const supabase = getAdminClient();
-  const { data: accounts } = await supabase.from('accounts').select('id, name, hidden');
+  const { data: accounts } = await supabase.from('accounts').select('id, name, hidden').eq('user_id', user.id);
   const nameMap: Record<string, string> = Object.fromEntries((accounts || []).map((a: any) => [a.id, a.name]));
 
   const { data, error } = await supabase
     .from('cash_flow')
     .select('id, account_id, type, amount, flow_date')
+    .eq('user_id', user.id)
     .order('flow_date', { ascending: false })
     .order('id', { ascending: false });
 

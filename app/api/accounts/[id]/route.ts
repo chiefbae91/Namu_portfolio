@@ -3,7 +3,8 @@ import { getAdminClient } from '@/lib/supabase-admin';
 import { getAuthUser, unauthorized } from '@/lib/auth';
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  if (!await getAuthUser()) return unauthorized();
+  const user = await getAuthUser();
+  if (!user) return unauthorized();
   const supabase = getAdminClient();
   const { name, hidden } = await req.json();
   const id = params.id;
@@ -21,6 +22,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     .from('accounts')
     .update(updates)
     .eq('id', id)
+    .eq('user_id', user.id)
     .select()
     .single();
 
@@ -28,13 +30,18 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (error.code === '23505') return NextResponse.json({ error: 'Name already exists' }, { status: 409 });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   return NextResponse.json(data);
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  if (!await getAuthUser()) return unauthorized();
+  const user = await getAuthUser();
+  if (!user) return unauthorized();
   const supabase = getAdminClient();
   const id = params.id;
+
+  const { data: account } = await supabase.from('accounts').select('id').eq('id', id).eq('user_id', user.id).single();
+  if (!account) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { count } = await supabase
     .from('transactions')
@@ -43,6 +50,6 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
   if (count && count > 0) return NextResponse.json({ error: 'Account has transactions' }, { status: 409 });
 
-  await supabase.from('accounts').delete().eq('id', id);
+  await supabase.from('accounts').delete().eq('id', id).eq('user_id', user.id);
   return NextResponse.json({ ok: true });
 }

@@ -3,9 +3,10 @@ import { getAdminClient } from '@/lib/supabase-admin';
 import { getAuthUser, unauthorized } from '@/lib/auth';
 
 export async function GET() {
-  if (!await getAuthUser()) return unauthorized();
+  const user = await getAuthUser();
+  if (!user) return unauthorized();
   const supabase = getAdminClient();
-  const { data, error } = await supabase.from('accounts').select('*').order('id');
+  const { data, error } = await supabase.from('accounts').select('*').eq('user_id', user.id).order('id');
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);
 }

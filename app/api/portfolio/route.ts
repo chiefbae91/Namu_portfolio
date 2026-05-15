@@ -33,13 +33,14 @@ async function fetchPriceData(ticker: string): Promise<{ price: number; prevClos
 }
 
 export async function GET(req: NextRequest) {
-  if (!await getAuthUser()) return unauthorized();
+  const user = await getAuthUser();
+  if (!user) return unauthorized();
   const supabase = getAdminClient();
   const { searchParams } = new URL(req.url);
   const accountIdsParam = searchParams.get('account_ids');
   const filterIds = accountIdsParam ? accountIdsParam.split(',').filter(Boolean) : null;
 
-  const { data: allAccounts } = await supabase.from('accounts').select('id, name, hidden').order('name');
+  const { data: allAccounts } = await supabase.from('accounts').select('id, name, hidden').eq('user_id', user.id).order('name');
   const visibleAccounts = (allAccounts || []).filter((a: any) => !a.hidden);
 
   // Fetch all transactions (types stored as uppercase in Supabase)
@@ -50,11 +51,11 @@ export async function GET(req: NextRequest) {
     { data: cashFlowRows },
   ] = await Promise.all([
     supabase.from('transactions').select('id, transaction_date, ticker, account_id, quantity, price, fee')
-      .ilike('type', 'buy').order('transaction_date').order('id'),
+      .eq('user_id', user.id).ilike('type', 'buy').order('transaction_date').order('id'),
     supabase.from('transactions').select('id, ticker, quantity, account_id')
-      .ilike('type', 'sell').order('transaction_date').order('id'),
-    supabase.from('transactions').select('account_id, type, quantity, price, fee'),
-    supabase.from('cash_flow').select('account_id, amount, type'),
+      .eq('user_id', user.id).ilike('type', 'sell').order('transaction_date').order('id'),
+    supabase.from('transactions').select('account_id, type, quantity, price, fee').eq('user_id', user.id),
+    supabase.from('cash_flow').select('account_id, amount, type').eq('user_id', user.id),
   ]);
 
   interface Lot { id: string; ticker: string; account_id: string; quantity: number; price: number; fee: number; remaining: number; }

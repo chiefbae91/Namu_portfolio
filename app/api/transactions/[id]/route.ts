@@ -3,7 +3,8 @@ import { getAdminClient } from '@/lib/supabase-admin';
 import { getAuthUser, unauthorized } from '@/lib/auth';
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  if (!await getAuthUser()) return unauthorized();
+  const user = await getAuthUser();
+  if (!user) return unauthorized();
   const supabase = getAdminClient();
   const id = params.id;
   const { account_id, date, ticker, type, quantity, price, fee, notes } = await req.json();
@@ -20,11 +21,13 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       fee: fee || 0,
       note: notes || '',
     })
-    .eq('id', id);
+    .eq('id', id)
+    .eq('user_id', user.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const { data: updated } = await supabase.from('transactions').select().eq('id', id).single();
+  const { data: updated } = await supabase.from('transactions').select().eq('id', id).eq('user_id', user.id).single();
+  if (!updated) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   return NextResponse.json({
     ...updated,
     date: updated?.transaction_date,
@@ -37,8 +40,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  if (!await getAuthUser()) return unauthorized();
+  const user = await getAuthUser();
+  if (!user) return unauthorized();
   const supabase = getAdminClient();
-  await supabase.from('transactions').delete().eq('id', params.id);
+  await supabase.from('transactions').delete().eq('id', params.id).eq('user_id', user.id);
   return NextResponse.json({ ok: true });
 }

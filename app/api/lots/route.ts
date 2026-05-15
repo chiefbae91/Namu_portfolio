@@ -15,16 +15,17 @@ interface RawLot {
   remaining: number;
 }
 
-async function computeRemainingLots(ticker: string, accountId: string | null): Promise<RawLot[]> {
+async function computeRemainingLots(ticker: string, accountId: string | null, userId: string): Promise<RawLot[]> {
   const supabase = getAdminClient();
 
-  const { data: accounts } = await supabase.from('accounts').select('id, name, hidden');
+  const { data: accounts } = await supabase.from('accounts').select('id, name, hidden').eq('user_id', userId);
   const visibleAccounts = (accounts || []).filter((a: any) => !a.hidden);
   const nameMap: Record<string, string> = Object.fromEntries(visibleAccounts.map((a: any) => [a.id, a.name]));
 
   let buyQuery = supabase
     .from('transactions')
     .select('id, transaction_date, ticker, account_id, quantity, price, fee')
+    .eq('user_id', userId)
     .ilike('type', 'buy').eq('ticker', ticker)
     .order('transaction_date').order('id');
   if (accountId) buyQuery = buyQuery.eq('account_id', accountId);
@@ -32,6 +33,7 @@ async function computeRemainingLots(ticker: string, accountId: string | null): P
   let sellQuery = supabase
     .from('transactions')
     .select('id, quantity, account_id')
+    .eq('user_id', userId)
     .ilike('type', 'sell').eq('ticker', ticker)
     .order('transaction_date').order('id');
   if (accountId) sellQuery = sellQuery.eq('account_id', accountId);
@@ -88,7 +90,8 @@ function selectLots(lots: RawLot[], sellQty: number, method: TaxLotMethod): LotS
 }
 
 export async function GET(req: NextRequest) {
-  if (!await getAuthUser()) return unauthorized();
+  const user = await getAuthUser();
+  if (!user) return unauthorized();
   const { searchParams } = new URL(req.url);
   const ticker = searchParams.get('ticker');
   const accountId = searchParams.get('account_id');
@@ -97,7 +100,7 @@ export async function GET(req: NextRequest) {
 
   if (!ticker) return NextResponse.json({ error: 'ticker required' }, { status: 400 });
 
-  const lots = await computeRemainingLots(ticker, accountId || null);
+  const lots = await computeRemainingLots(ticker, accountId || null, user.id);
 
   const totalQty = lots.reduce((s, l) => s + l.remaining, 0);
   const totalCostAll = lots.reduce((s, l) => s + l.remaining * l.price, 0);

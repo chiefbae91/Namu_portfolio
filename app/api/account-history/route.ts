@@ -13,7 +13,8 @@ const RANGE_CONFIG: Record<string, { yfRange: string; interval: string }> = {
 };
 
 export async function GET(req: NextRequest) {
-  if (!await getAuthUser()) return unauthorized();
+  const user = await getAuthUser();
+  if (!user) return unauthorized();
   const { searchParams } = new URL(req.url);
   const accountIdStr = searchParams.get('account_id');
   const range = searchParams.get('range') ?? '1M';
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
   const supabase = getAdminClient();
   const { yfRange, interval } = RANGE_CONFIG[range] ?? RANGE_CONFIG['1M'];
 
-  const { data: account } = await supabase.from('accounts').select('id, name').eq('id', accountId).single();
+  const { data: account } = await supabase.from('accounts').select('id, name').eq('id', accountId).eq('user_id', user.id).single();
   if (!account) return NextResponse.json({ error: 'Account not found' }, { status: 404 });
 
   const [{ data: txData }, { data: flowData }] = await Promise.all([

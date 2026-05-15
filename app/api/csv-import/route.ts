@@ -136,6 +136,10 @@ export async function POST(req: NextRequest) {
 
   if (!file || !accountId) return NextResponse.json({ error: 'file and account_id required' }, { status: 400 });
 
+  const accId = String(accountId);
+  const { data: ownedAccount } = await supabase.from('accounts').select('id').eq('id', accId).eq('user_id', user.id).single();
+  if (!ownedAccount) return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+
   const text = await file.text();
   const parsed = Papa.parse(text, { header: true, skipEmptyLines: true, quoteChar: '"' });
   const rows = parsed.data as Record<string, string>[];
@@ -143,7 +147,6 @@ export async function POST(req: NextRequest) {
 
   const headers = Object.keys(rows[0]);
   const format = detectFormat(headers);
-  const accId = String(accountId);
 
   if (format === 'new' && !tickerInput) return NextResponse.json({ error: 'ticker_required', format }, { status: 400 });
 

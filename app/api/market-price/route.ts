@@ -15,7 +15,8 @@ function coerceInterval(interval: Interval, range: Range): Interval {
 }
 
 export async function GET(req: NextRequest) {
-  if (!await getAuthUser()) return unauthorized();
+  const user = await getAuthUser();
+  if (!user) return unauthorized();
   const { searchParams } = new URL(req.url);
   const ticker = searchParams.get('ticker');
   const rangeParam = (searchParams.get('range') ?? '1mo') as Range;
@@ -54,13 +55,14 @@ export async function GET(req: NextRequest) {
       })
       .filter(c => c.close !== null && c.open !== null);
 
-    const { data: accountsData } = await supabase.from('accounts').select('id, name, hidden');
+    const { data: accountsData } = await supabase.from('accounts').select('id, name, hidden').eq('user_id', user.id);
     const accountNameMap: Record<string, string> = Object.fromEntries((accountsData || []).map((a: any) => [a.id, a.name]));
 
     const { data: txData } = await supabase
       .from('transactions')
       .select('id, transaction_date, type, quantity, price, fee, ticker, note, account_id')
       .eq('ticker', ticker)
+      .eq('user_id', user.id)
       .or('type.ilike.buy,type.ilike.sell,type.ilike.dividend')
       .order('transaction_date', { ascending: false })
       .order('id', { ascending: false });
@@ -93,10 +95,10 @@ export async function GET(req: NextRequest) {
     // Per-account holdings via FIFO lot calculation
     const [{ data: hLotData }, { data: hSellData }] = await Promise.all([
       supabase.from('transactions').select('id, account_id, quantity, price, fee')
-        .ilike('type', 'buy').eq('ticker', ticker)
+        .eq('user_id', user.id).ilike('type', 'buy').eq('ticker', ticker)
         .order('transaction_date').order('id'),
       supabase.from('transactions').select('id, account_id, quantity')
-        .ilike('type', 'sell').eq('ticker', ticker)
+        .eq('user_id', user.id).ilike('type', 'sell').eq('ticker', ticker)
         .order('transaction_date').order('id'),
     ]);
 
