@@ -29,6 +29,7 @@ const TYPE_LABELS: Record<string, string> = {
   long_target:     '장기 목표주가 (Long Target)',
   buy_stop:        '매수 중지 (Buy Halt)',
   trailing_supply: '추격 매물대 (Trailing Supply)',
+  accumulation:    '매집 자리 (Accumulation)',
   note_only:       '메모 (Note Only)',
   faded_supply:    '흐린 매물대 (Faded Supply Zone)',
   last_buy_zone:   '마지막 매물대 (Last Buy Zone)',
@@ -42,6 +43,7 @@ const TYPE_COLORS: Record<string, string> = {
   long_target:     '#818cf8',
   buy_stop:        '#ef4444',
   trailing_supply: '#fb923c',
+  accumulation:    '#22d3ee',
   note_only:       '#64748b',
   faded_supply:    '#a78bfa',
   last_buy_zone:   '#f43f5e',
@@ -60,6 +62,7 @@ const TYPE_FILTER_OPTIONS = [
   { value: 'long_target',     label: '장기 목표주가 (Long Target)' },
   { value: 'buy_stop',        label: '매수 중지 (Buy Halt)' },
   { value: 'trailing_supply', label: '추격 매물대 (Trailing Supply)' },
+  { value: 'accumulation',    label: '매집 자리 (Accumulation)' },
   { value: 'note_only',       label: '메모 (Note Only)' },
 ];
 

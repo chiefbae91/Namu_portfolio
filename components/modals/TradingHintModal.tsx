@@ -15,6 +15,7 @@ const HINT_TYPES = [
   { value: 'long_target',     label: '장기 목표 주가 (Long-term Target)' },
   { value: 'buy_stop',        label: '매수 중지 (Buy Halt)' },
   { value: 'trailing_supply', label: '추격 매물대 (Trailing Supply)' },
+  { value: 'accumulation',    label: '매집 자리 (Accumulation)' },
   { value: 'note_only',       label: 'Note Only' },
 ];
 
