@@ -127,7 +127,7 @@ export default function SummaryCards({
   return (
     <div style={{ marginBottom: 20 }}>
       {/* Top row: 4 cards + toggle button */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr) auto', gap: 12, alignItems: 'stretch' }}>
+      <div className="summary-top-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr) auto', gap: 12, alignItems: 'stretch' }}>
         <CompactCard
           label="Total Assets" value={totalNow} color="#e2e8f0"
           krwRate={krwRate} eurRate={eurRate} showKrw={showKrw} showEur={showEur} loading={loading}
@@ -147,6 +147,7 @@ export default function SummaryCards({
 
         {/* Toggle button */}
         <button
+          className="summary-toggle-btn"
           onClick={() => setExpanded(e => !e)}
           style={{
             background: 'var(--surface)',

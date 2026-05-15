@@ -262,8 +262,8 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
         )}
       </div>
 
-      {/* Table */}
-      <div style={{ overflowX: 'auto' }}>
+      {/* Table (desktop) */}
+      <div className="mobile-hide" style={{ overflowX: 'auto' }}>
         <table>
           <thead>
             <tr>
@@ -349,6 +349,65 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
         {filtered.length === 0 && (
           <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)' }}>No transactions</div>
         )}
+      </div>
+
+      {/* Card list (mobile) */}
+      <div className="mobile-only">
+        {filtered.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)' }}>No transactions</div>
+        )}
+        {paginated.map(tx => {
+          const isTransfer = tx.type === 'transfer_deposit' || tx.type === 'transfer_withdraw';
+          const total = (tx.type === 'cash' || isTransfer) ? tx.price : tx.quantity * tx.price;
+          const isSelected = selected.has(tx.id);
+          const canEditTx = tx.type !== 'transfer_deposit' && tx.type !== 'transfer_withdraw'
+            && tx.type !== 'dividend' && tx.subtype !== 'DIVIDEND_REINVEST';
+          return (
+            <div key={tx.id} className="mobile-card" style={{ background: isSelected ? 'rgba(99,102,241,0.08)' : 'var(--surface)' }}>
+              {/* Row 1: checkbox, badge, ticker, date */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input type="checkbox" checked={isSelected} onChange={() => toggleOne(tx.id)} style={{ cursor: 'pointer', flexShrink: 0 }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+                  {tx.account_name && (() => {
+                    const displayName = resolveAccountName(tx.account_name, labelMap);
+                    return (
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 3, background: getAccountBadgeColor(displayName), color: 'white', letterSpacing: '0.04em', flexShrink: 0 }}>
+                        {getAccountInitials(displayName)}
+                      </span>
+                    );
+                  })()}
+                  {tx.ticker && onTickerClick
+                    ? <button style={{ background: 'none', color: 'var(--accent)', fontWeight: 600, padding: 0, cursor: 'pointer', fontSize: 14 }} onClick={() => onTickerClick(tx.ticker!)}>{tx.ticker}</button>
+                    : <span style={{ fontWeight: 600, fontSize: 14 }}>{tx.ticker || '-'}</span>
+                  }
+                </div>
+                <span style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>{tx.date}</span>
+              </div>
+              {/* Row 2: type, qty@price, total */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                <span style={{ color: txColor(tx), fontWeight: 500, fontSize: 12 }}>{txLabel(tx)}</span>
+                <span style={{ flex: 1 }} />
+                {tx.quantity > 0 && tx.price > 0 && (
+                  <span style={{ fontSize: 12, color: 'var(--muted)' }}>{tx.quantity} @ {fmt(tx.price)}</span>
+                )}
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{fmt(total)}</span>
+              </div>
+              {/* Row 3: actions */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4, marginTop: 6 }}>
+                {canEditTx && (
+                  <button style={{ background: 'none', color: 'var(--accent)', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, minHeight: 36 }}
+                    onClick={() => onEdit(tx)}>
+                    <Pencil size={13} /> Edit
+                  </button>
+                )}
+                <button style={{ background: 'none', color: 'var(--red)', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, minHeight: 36 }}
+                  onClick={() => tx.subtype === 'DIVIDEND_REINVEST' ? setDrConfirmId(tx.id) : handleDeleteOne(tx.id)}>
+                  <Trash2 size={13} /> Delete
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Pagination */}

@@ -151,16 +151,16 @@ export default function StockPortfolio({ positions, currency, rates, onTickerCli
       <table>
         <thead>
           <tr>
-            <th style={{ width: 1, whiteSpace: 'nowrap', padding: '0 4px' }}></th>
+            <th className="col-hide-mobile" style={{ width: 1, whiteSpace: 'nowrap', padding: '0 4px' }}></th>
             <th {...th('ticker', 'left')}>Symbol <SortIndicator active={sortKey === 'ticker'} dir={sortDir} /></th>
             <th {...thStatic()}>Price</th>
             <th {...thStatic()}>Shares</th>
-            <th {...thStatic()}>Avg Cost</th>
+            <th className="col-hide-mobile" {...thStatic()}>Avg Cost</th>
             <th {...th('value')}>Mkt Value <SortIndicator active={sortKey === 'value'} dir={sortDir} /></th>
-            <th {...th('cost')}>Cost Basis <SortIndicator active={sortKey === 'cost'} dir={sortDir} /></th>
-            <th {...th('weight')}>Weight <SortIndicator active={sortKey === 'weight'} dir={sortDir} /></th>
-            <th {...th('return_amount')}>P&amp;L <SortIndicator active={sortKey === 'return_amount'} dir={sortDir} /></th>
-            <th {...th('return_pct')}>Return% <SortIndicator active={sortKey === 'return_pct'} dir={sortDir} /></th>
+            <th className="col-hide-mobile" {...th('cost')}>Cost Basis <SortIndicator active={sortKey === 'cost'} dir={sortDir} /></th>
+            <th className="col-hide-mobile" {...th('weight')}>Weight <SortIndicator active={sortKey === 'weight'} dir={sortDir} /></th>
+            <th className="col-hide-mobile" {...th('return_amount')}>P&amp;L <SortIndicator active={sortKey === 'return_amount'} dir={sortDir} /></th>
+            <th className="col-hide-mobile" {...th('return_pct')}>Return% <SortIndicator active={sortKey === 'return_pct'} dir={sortDir} /></th>
           </tr>
         </thead>
         <tbody>
@@ -170,7 +170,7 @@ export default function StockPortfolio({ positions, currency, rates, onTickerCli
             const barPct = maxWeight > 0 ? (weight / maxWeight) * 100 : 0;
             return (
               <tr key={p.ticker}>
-                <td style={{ textAlign: 'center', width: 1, whiteSpace: 'nowrap', padding: '0 4px' }}>
+                <td className="col-hide-mobile" style={{ textAlign: 'center', width: 1, whiteSpace: 'nowrap', padding: '0 4px' }}>
                   <MoveBadge current={p.current_price} prev={p.prev_close} />
                 </td>
                 <td>
@@ -180,27 +180,31 @@ export default function StockPortfolio({ positions, currency, rates, onTickerCli
                   >
                     {p.ticker}
                   </button>
-                  <QuoteTypeBadge quoteType={p.quote_type} leverage={p.leverage} />
+                  <span className="col-hide-mobile">
+                    <QuoteTypeBadge quoteType={p.quote_type} leverage={p.leverage} />
+                  </span>
                 </td>
                 <td style={{ textAlign: 'right' }}>
                   {hasPrice ? (
                     <>
                       <div>{fmt(p.current_price)}</div>
-                      <PriceChange current={p.current_price} prev={p.prev_close} />
+                      <div className="col-hide-mobile">
+                        <PriceChange current={p.current_price} prev={p.prev_close} />
+                      </div>
                     </>
                   ) : <span className="muted">-</span>}
                 </td>
                 <td style={{ textAlign: 'right' }}>{p.quantity.toLocaleString()}</td>
-                <td style={{ textAlign: 'right' }}>{fmt(p.avg_cost)}</td>
+                <td className="col-hide-mobile" style={{ textAlign: 'right' }}>{fmt(p.avg_cost)}</td>
                 <td style={{ textAlign: 'right' }}>{hasPrice ? fmt(p.value) : <span className="muted">-</span>}</td>
-                <td style={{ textAlign: 'right' }}>{fmt(p.cost)}</td>
-                <td style={{ textAlign: 'right' }}>
+                <td className="col-hide-mobile" style={{ textAlign: 'right' }}>{fmt(p.cost)}</td>
+                <td className="col-hide-mobile" style={{ textAlign: 'right' }}>
                   {hasPrice && totalValue > 0 ? `${weight.toFixed(1)}%` : <span className="muted">-</span>}
                 </td>
-                <td style={{ textAlign: 'right' }} className={hasPrice ? (p.return_amount >= 0 ? 'positive' : 'negative') : ''}>
+                <td className={`col-hide-mobile${hasPrice ? (p.return_amount >= 0 ? ' positive' : ' negative') : ''}`} style={{ textAlign: 'right' }}>
                   {hasPrice ? `${p.return_amount >= 0 ? '+' : ''}${fmt(p.return_amount)}` : <span className="muted">-</span>}
                 </td>
-                <td style={{ textAlign: 'right' }} className={hasPrice ? (p.return_pct >= 0 ? 'positive' : 'negative') : ''}>
+                <td className={`col-hide-mobile${hasPrice ? (p.return_pct >= 0 ? ' positive' : ' negative') : ''}`} style={{ textAlign: 'right' }}>
                   {hasPrice ? `${p.return_pct >= 0 ? '+' : ''}${p.return_pct.toFixed(2)}%` : <span className="muted">-</span>}
                 </td>
               </tr>

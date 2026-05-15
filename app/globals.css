@@ -126,3 +126,46 @@ tr:hover td { background: rgba(99,102,241,0.04); }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes slideInRight { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+
+/* ===== Mobile Responsive (≤450px) ===== */
+.mobile-only { display: none; }
+
+@media (max-width: 450px) {
+  .mobile-hide { display: none !important; }
+  .mobile-only { display: block !important; }
+  .mobile-only-flex { display: flex !important; }
+
+  /* Header: stretch app name to fill and center it */
+  .mobile-app-name {
+    flex: 1 !important;
+    text-align: center !important;
+    margin: 0 !important;
+  }
+
+  /* Market data bar row 1: 2-column grid */
+  .market-row-1 {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px 16px !important;
+    align-items: start !important;
+  }
+  .market-sep { display: none !important; }
+  .market-treasury-label { display: none !important; }
+  .market-row-2 { gap: 12px !important; padding: 6px 12px !important; }
+
+  /* Summary cards: vertical stack */
+  .summary-top-grid { grid-template-columns: 1fr !important; }
+  .summary-toggle-btn { min-height: 44px; justify-content: center !important; }
+
+  /* Table columns to hide on mobile */
+  .col-hide-mobile { display: none !important; }
+
+  /* Mobile card list for transaction/hint rows */
+  .mobile-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    background: var(--surface);
+  }
+}

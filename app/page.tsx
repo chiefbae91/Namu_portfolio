@@ -320,17 +320,19 @@ export default function Home() {
               await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'app_name', value: name }) });
             }}
             onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') { setAppNameEditing(false); } }}
+            className="mobile-app-name"
             style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)', background: 'transparent', border: 'none', borderBottom: '2px solid var(--accent)', outline: 'none', marginRight: 8, width: Math.max(120, appNameInput.length * 11) }}
           />
         ) : (
           <h1
             title="Click to rename"
             onClick={() => { setAppNameInput(appName); setAppNameEditing(true); }}
+            className="mobile-app-name"
             style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--accent)', marginRight: 8, cursor: 'pointer' }}
           >{appName}</h1>
         )}
 
-        <div ref={accountDropdownRef} style={{ position: 'relative' }}>
+        <div ref={accountDropdownRef} className="mobile-hide" style={{ position: 'relative' }}>
           <button
             onClick={() => setAccountDropdownOpen(o => !o)}
             style={{ minWidth: 160, padding: '6px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 13 }}
@@ -367,13 +369,13 @@ export default function Home() {
             </div>
           )}
         </div>
-        <button onClick={() => setAccountSettingsOpen(true)}
+        <button className="mobile-hide" onClick={() => setAccountSettingsOpen(true)}
           style={{ background: 'var(--border)', color: 'var(--muted)', padding: '6px 10px' }}
           title="Manage Accounts"><Settings size={15} /></button>
 
-        <div style={{ flex: 1 }} />
+        <div className="mobile-hide" style={{ flex: 1 }} />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div className="mobile-hide" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>USD</span>
           <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', userSelect: 'none' }}>
             <input type="checkbox" checked={showKrw} onChange={e => setShowKrw(e.target.checked)}
@@ -399,14 +401,13 @@ export default function Home() {
           <RefreshCw size={13} style={{ animation: ratesRefreshing ? 'spin 0.6s linear infinite' : 'none' }} />
         </button>
 
-
-        <button onClick={() => setCsvImportOpen(true)}
+        <button className="mobile-hide" onClick={() => setCsvImportOpen(true)}
           style={{ background: 'var(--border)', color: 'var(--muted)', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
           <FileUp size={14} /> CSV Import
         </button>
 
         {userEmail && (
-          <span style={{ fontSize: 11, color: 'var(--muted)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span className="mobile-hide" style={{ fontSize: 11, color: 'var(--muted)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {userEmail}
           </span>
         )}
@@ -423,17 +424,58 @@ export default function Home() {
         </button>
       </div>
 
+      {/* Mobile-only: account dropdown + settings below header */}
+      <div className="mobile-only-flex" style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '8px 14px', gap: 8, alignItems: 'center' }}>
+        <div style={{ position: 'relative', flex: 1 }}>
+          <button
+            onClick={() => setAccountDropdownOpen(o => !o)}
+            style={{ width: '100%', padding: '8px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 13 }}
+          >
+            <span>
+              {allChecked ? 'All Accounts' : checkedIds.size === 1
+                ? visibleAccounts.find(a => checkedIds.has(a.id))?.name ?? '1 Account'
+                : `${checkedIds.size} Accounts`}
+            </span>
+            <ChevronDown size={13} style={{ flexShrink: 0, transform: accountDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+          </button>
+          {accountDropdownOpen && (
+            <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, minWidth: 200, width: '100%', boxShadow: '0 4px 16px rgba(0,0,0,0.4)', padding: '4px 0' }}>
+              {visibleAccounts.map(a => (
+                <label key={`mob-${a.id}`} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', cursor: 'pointer', fontSize: 13 }}>
+                  <input
+                    type="checkbox"
+                    checked={checkedIds.has(a.id)}
+                    style={{ cursor: 'pointer', accentColor: 'var(--accent)' }}
+                    onChange={e => {
+                      const next = new Set(checkedIds);
+                      if (e.target.checked) next.add(a.id); else next.delete(a.id);
+                      if (next.size === 0) { alert('At least one account must be selected.'); return; }
+                      const nowAll = visibleAccounts.every(acc => next.has(acc.id));
+                      setAccountFilter(nowAll ? '' : [...next].sort().join(','));
+                    }}
+                  />
+                  {a.name}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+        <button onClick={() => setAccountSettingsOpen(true)}
+          style={{ background: 'var(--border)', color: 'var(--muted)', padding: '8px 10px', minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6 }}
+          title="Manage Accounts"><Settings size={15} /></button>
+      </div>
+
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: '20px 20px 0' }}>
         {/* Market Data Bar */}
         <div style={{ marginBottom: 16, background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
           {/* Row 1: Futures / Commodities / FX */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '8px 16px', borderBottom: '1px solid var(--border)' }}>
+          <div className="market-row-1" style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '8px 16px', borderBottom: '1px solid var(--border)' }}>
             {(() => {
               const esChange = rates.ES - rates.ES_PREV;
               const esChangePct = rates.ES_PREV !== 0 ? (esChange / rates.ES_PREV) * 100 : 0;
               const esColor = esChange >= 0 ? 'var(--green)' : 'var(--red)';
               return (
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>ES</span>
                   <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
                     {rates.ES.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -444,28 +486,28 @@ export default function Home() {
                 </div>
               );
             })()}
-            <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
+            <div className="market-sep" style={{ width: 1, height: 20, background: 'var(--border)' }} />
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
               <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>WTI</span>
               <span style={{ fontSize: 16, fontWeight: 700, color: '#fb923c', fontVariantNumeric: 'tabular-nums' }}>
                 ${rates.WTI.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
-            <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
+            <div className="market-sep" style={{ width: 1, height: 20, background: 'var(--border)' }} />
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
               <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>GOLD</span>
               <span style={{ fontSize: 16, fontWeight: 700, color: '#f59e0b', fontVariantNumeric: 'tabular-nums' }}>
                 ${rates.GOLD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
-            <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
+            <div className="market-sep" style={{ width: 1, height: 20, background: 'var(--border)' }} />
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
               <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>DXY</span>
               <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
                 {rates.DXY.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
-            {showKrw && <div style={{ width: 1, height: 20, background: 'var(--border)' }} />}
+            {showKrw && <div className="market-sep" style={{ width: 1, height: 20, background: 'var(--border)' }} />}
             {showKrw && (
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
                 <span style={{ fontSize: 16, fontWeight: 700, color: '#fbbf24', fontVariantNumeric: 'tabular-nums' }}>
@@ -474,7 +516,7 @@ export default function Home() {
                 <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}>/USD</span>
               </div>
             )}
-            {showEur && <div style={{ width: 1, height: 20, background: 'var(--border)' }} />}
+            {showEur && <div className="market-sep" style={{ width: 1, height: 20, background: 'var(--border)' }} />}
             {showEur && (
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
                 <span style={{ fontSize: 16, fontWeight: 700, color: '#34d399', fontVariantNumeric: 'tabular-nums' }}>
@@ -484,23 +526,23 @@ export default function Home() {
               </div>
             )}
             {ratesUpdatedAt && (
-              <span style={{ fontSize: 10, color: 'var(--muted)', opacity: 0.6, marginLeft: 'auto' }}>
+              <span className="mobile-hide" style={{ fontSize: 10, color: 'var(--muted)', opacity: 0.6, marginLeft: 'auto' }}>
                 {ratesUpdatedAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'America/New_York', timeZoneName: 'short' })}
               </span>
             )}
           </div>
 
           {/* Row 2: US Treasury Yields */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '6px 16px' }}>
-            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>US TREASURY</span>
-            <div style={{ width: 1, height: 16, background: 'var(--border)' }} />
+          <div className="market-row-2" style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '6px 16px' }}>
+            <span className="market-treasury-label" style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>US TREASURY</span>
+            <div className="market-sep" style={{ width: 1, height: 16, background: 'var(--border)' }} />
             {([
               { label: '5Y', value: rates.T5Y },
               { label: '10Y', value: rates.T10Y },
               { label: '30Y', value: rates.T30Y },
             ] as const).map(({ label, value }, i) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                {i > 0 && <div style={{ width: 1, height: 16, background: 'var(--border)', marginRight: 16 }} />}
+                {i > 0 && <div className="market-sep" style={{ width: 1, height: 16, background: 'var(--border)', marginRight: 16 }} />}
                 <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)' }}>{label}</span>
                 <span style={{ fontSize: 14, fontWeight: 700, color: '#a78bfa', fontVariantNumeric: 'tabular-nums' }}>
                   {value.toFixed(2)}%

@@ -92,6 +92,15 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, o
   const [customTo, setCustomTo] = useState('');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
+  const [expandedNotes, setExpandedNotes] = useState<Set<string | number>>(new Set());
+
+  const toggleNote = (id: string | number) => {
+    setExpandedNotes(prev => {
+      const s = new Set(prev);
+      s.has(id) ? s.delete(id) : s.add(id);
+      return s;
+    });
+  };
 
   const today = toISODate(new Date());
 
@@ -238,8 +247,8 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, o
         )}
       </div>
 
-      {/* Table */}
-      <div style={{ overflowX: 'auto' }}>
+      {/* Table (desktop) */}
+      <div className="mobile-hide" style={{ overflowX: 'auto' }}>
         <table>
           <thead>
             <tr>
@@ -314,6 +323,69 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, o
         {sorted.length === 0 && (
           <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)' }}>No trading hints</div>
         )}
+      </div>
+
+      {/* Card list (mobile) */}
+      <div className="mobile-only">
+        {sorted.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)' }}>No trading hints</div>
+        )}
+        {paginated.map(hint => (
+          <div key={hint.id} className="mobile-card">
+            {/* Row 1: date, ticker, type, note icon */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>{hint.hint_date}</span>
+              <button
+                onClick={() => onSymbolClick?.(hint.ticker)}
+                style={{ background: 'none', color: 'var(--accent)', fontWeight: 700, padding: 0, textDecoration: 'underline', cursor: 'pointer', fontSize: 14 }}
+              >
+                {hint.ticker}
+              </button>
+              <span style={{ color: TYPE_COLORS[hint.type] ?? 'var(--muted)', fontSize: 11, fontWeight: 500 }}>
+                {TYPE_LABELS[hint.type] ?? hint.type}
+              </span>
+              {hint.note && (
+                <button
+                  onClick={() => toggleNote(hint.id)}
+                  style={{ background: 'none', color: expandedNotes.has(hint.id) ? 'var(--accent)' : 'var(--muted)', padding: '2px 4px', fontSize: 14, minHeight: 28 }}
+                  title="Show note"
+                >
+                  📝
+                </button>
+              )}
+            </div>
+            {/* Note expansion */}
+            {hint.note && expandedNotes.has(hint.id) && (
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6, padding: '6px 8px', background: 'rgba(255,255,255,0.04)', borderRadius: 4, whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                {hint.note}
+              </div>
+            )}
+            {/* Row 2: prices */}
+            <div style={{ display: 'flex', gap: 16, marginTop: 6, fontSize: 12 }}>
+              <span>Hint: <strong>{fmtPrice(hint.price) ?? <span className="muted">—</span>}</strong></span>
+              <span style={{ color: 'var(--muted)' }}>
+                Stock: {hint.current_price != null
+                  ? `$${hint.current_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  : '—'}
+              </span>
+            </div>
+            {/* Row 3: actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4, marginTop: 8 }}>
+              <button
+                style={{ background: 'none', color: 'var(--accent)', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, minHeight: 36 }}
+                onClick={() => onEdit(hint)}
+              >
+                <Pencil size={13} /> Edit
+              </button>
+              <button
+                style={{ background: 'none', color: 'var(--red)', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, minHeight: 36 }}
+                onClick={() => onDelete(hint.id)}
+              >
+                <Trash2 size={13} /> Delete
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Pagination */}
