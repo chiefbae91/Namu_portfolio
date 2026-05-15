@@ -219,9 +219,15 @@ export default function SummaryCards({
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       {loading ? '—' : fmtUSD(acc.stock_value)}
+                      {showKrw && !loading && (
+                        <div style={{ fontSize: 11, color: '#fbbf24' }}>{fmtKRW(acc.stock_value, krwRate)}</div>
+                      )}
                     </div>
                     <div style={{ textAlign: 'right', color: '#60a5fa' }}>
                       {loading ? '—' : fmtUSD(acc.cash)}
+                      {showKrw && !loading && (
+                        <div style={{ fontSize: 11, color: '#fbbf24' }}>{fmtKRW(acc.cash, krwRate)}</div>
+                      )}
                     </div>
                   </div>
                 );
@@ -234,9 +240,24 @@ export default function SummaryCards({
                 fontWeight: 700, color: 'var(--text)',
               }}>
                 <span style={{ color: 'var(--muted)', fontSize: 11 }}>Total</span>
-                <span style={{ textAlign: 'right' }}>{loading ? '—' : fmtUSD(totalNow)}</span>
-                <span style={{ textAlign: 'right' }}>{loading ? '—' : fmtUSD(stockValue)}</span>
-                <span style={{ textAlign: 'right', color: '#60a5fa' }}>{loading ? '—' : fmtUSD(cash)}</span>
+                <div style={{ textAlign: 'right' }}>
+                  {loading ? '—' : fmtUSD(totalNow)}
+                  {showKrw && !loading && (
+                    <div style={{ fontSize: 11, color: '#fbbf24', fontWeight: 600 }}>{fmtKRW(totalNow, krwRate)}</div>
+                  )}
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  {loading ? '—' : fmtUSD(stockValue)}
+                  {showKrw && !loading && (
+                    <div style={{ fontSize: 11, color: '#fbbf24', fontWeight: 600 }}>{fmtKRW(stockValue, krwRate)}</div>
+                  )}
+                </div>
+                <div style={{ textAlign: 'right', color: '#60a5fa' }}>
+                  {loading ? '—' : fmtUSD(cash)}
+                  {showKrw && !loading && (
+                    <div style={{ fontSize: 11, color: '#fbbf24', fontWeight: 600 }}>{fmtKRW(cash, krwRate)}</div>
+                  )}
+                </div>
               </div>
             </div>
           )}
