@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, Settings, FileUp, RefreshCw, LogOut } from 'lucide-react';
+import { ChevronDown, Settings, FileUp, RefreshCw, LogOut, HelpCircle } from 'lucide-react';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
 import { Account, AccountBreakdown, ExchangeRates, PortfolioPosition, SummaryData, Transaction, TradingHint } from '@/lib/types';
 import StockPortfolio from '@/components/tabs/StockPortfolio';
@@ -414,6 +415,14 @@ export default function Home() {
             {userEmail}
           </span>
         )}
+
+        <Link
+          href="/guide"
+          title="User Guide"
+          style={{ background: 'none', color: 'var(--muted)', padding: '6px 8px', display: 'flex', alignItems: 'center' }}
+        >
+          <HelpCircle size={15} />
+        </Link>
 
         <button
           onClick={async () => {
