@@ -312,6 +312,7 @@ export default function Home() {
     <div style={{ minHeight: '100vh', padding: '0 0 40px' }}>
       {/* Header */}
       <div style={{ background: 'var(--header-bg)', borderBottom: '1px solid var(--border)', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <img src="/logo.svg" alt="Namu Portfolio logo" style={{ width: 36, height: 36, flexShrink: 0 }} />
         {appNameEditing ? (
           <input
             autoFocus
