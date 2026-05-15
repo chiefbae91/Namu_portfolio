@@ -419,6 +419,7 @@ export default function Home() {
         <Link
           href="/guide"
           title="User Guide"
+          target='_blank'
           style={{ background: 'none', color: 'var(--muted)', padding: '6px 8px', display: 'flex', alignItems: 'center' }}
         >
           <HelpCircle size={15} />
