@@ -129,6 +129,7 @@ tr:hover td { background: rgba(99,102,241,0.04); }
 
 /* ===== Mobile Responsive (≤450px) ===== */
 .mobile-only { display: none; }
+.mobile-only-flex { display: none; }
 
 @media (max-width: 450px) {
   .mobile-hide { display: none !important; }
