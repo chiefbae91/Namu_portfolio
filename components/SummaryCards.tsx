@@ -1,4 +1,6 @@
 'use client';
+import { useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { AccountBreakdown } from '@/lib/types';
 
 interface Props {
@@ -11,6 +13,7 @@ interface Props {
   showKrw: boolean;
   showEur: boolean;
   loading?: boolean;
+  accountFilter?: string;
   onAccountClick?: (id: string | number, name: string) => void;
 }
 
@@ -19,83 +22,43 @@ function fmtUSD(v: number, signed = false) {
   if (!signed) return abs;
   return v >= 0 ? `+${abs}` : `-${abs}`;
 }
-function fmtKRW(usd: number, rate: number) {
-  return `₩${Math.round(usd * rate).toLocaleString('en-US')}`;
+function fmtKRW(usd: number, rate: number, signed = false) {
+  const abs = `₩${Math.round(Math.abs(usd) * rate).toLocaleString('en-US')}`;
+  if (!signed) return abs;
+  return usd >= 0 ? `+${abs}` : `-${abs}`;
 }
-function fmtEUR(usd: number, rate: number) {
-  return `€${(usd * rate).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function fmtEUR(usd: number, rate: number, signed = false) {
+  const abs = `€${Math.abs(usd * rate).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (!signed) return abs;
+  return usd >= 0 ? `+${abs}` : `-${abs}`;
 }
 
-interface CardProps {
+interface CompactCardProps {
   label: string;
-  total: number;
-  accounts: { id?: string | number; name: string; value: number }[];
+  value: number;
+  color: string;
   krwRate: number;
   eurRate: number;
   showKrw: boolean;
   showEur: boolean;
-  color: string;
   loading?: boolean;
-  onAccountClick?: (id: string | number, name: string) => void;
 }
 
-function SummaryCard({ label, total, accounts, krwRate, eurRate, showKrw, showEur, color, loading, onAccountClick }: CardProps) {
-  const hasExtra = showKrw || showEur;
-
+function CompactCard({ label, value, color, krwRate, eurRate, showKrw, showEur, loading }: CompactCardProps) {
   return (
     <div className="card" style={{ minWidth: 0 }}>
       <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6, fontWeight: 500 }}>{label}</div>
-
-      <div style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1.2, marginBottom: hasExtra ? 3 : 12 }}>
-        {loading ? <span style={{ fontSize: 14, color: 'var(--muted)' }}>Loading...</span> : fmtUSD(total)}
+      <div style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1.2 }}>
+        {loading ? <span style={{ fontSize: 14, color: 'var(--muted)' }}>Loading...</span> : fmtUSD(value)}
       </div>
-
       {showKrw && !loading && (
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#fbbf24', marginBottom: 2 }}>
-          {fmtKRW(total, krwRate)}
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#fbbf24', marginTop: 3 }}>
+          {fmtKRW(value, krwRate)}
         </div>
       )}
       {showEur && !loading && (
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#34d399', marginBottom: 2 }}>
-          {fmtEUR(total, eurRate)}
-        </div>
-      )}
-
-      <div style={{ marginBottom: hasExtra ? 8 : 0 }} />
-
-      {accounts.length > 0 && (
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {accounts.map(acc => (
-            <div key={acc.name}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
-                {onAccountClick && acc.id != null ? (
-                  <button
-                    onClick={() => onAccountClick(acc.id!, acc.name)}
-                    style={{ background: 'none', color: 'var(--accent)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '50%', padding: 0, textAlign: 'left', cursor: 'pointer', fontSize: 12 }}
-                  >
-                    {acc.name}
-                  </button>
-                ) : (
-                  <span style={{ color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '50%' }}>
-                    {acc.name}
-                  </span>
-                )}
-                <span style={{ fontWeight: 500, flexShrink: 0 }}>
-                  {loading ? '—' : fmtUSD(acc.value)}
-                </span>
-              </div>
-              {showKrw && !loading && (
-                <div style={{ textAlign: 'right', fontSize: 11, color: '#fbbf24', marginTop: 1 }}>
-                  {fmtKRW(acc.value, krwRate)}
-                </div>
-              )}
-              {showEur && !loading && (
-                <div style={{ textAlign: 'right', fontSize: 11, color: '#34d399', marginTop: 1 }}>
-                  {fmtEUR(acc.value, eurRate)}
-                </div>
-              )}
-            </div>
-          ))}
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#34d399', marginTop: 3 }}>
+          {fmtEUR(value, eurRate)}
         </div>
       )}
     </div>
@@ -110,121 +73,175 @@ interface DailyCardProps {
   showKrw: boolean;
   showEur: boolean;
   loading?: boolean;
-  accountBreakdown: AccountBreakdown[];
-  prevCloseStockValue: number;
 }
 
-function DailyPnLCard({ change, prevClose, krwRate, eurRate, showKrw, showEur, loading, accountBreakdown, prevCloseStockValue }: DailyCardProps) {
+function CompactDailyCard({ change, prevClose, krwRate, eurRate, showKrw, showEur, loading }: DailyCardProps) {
   const hasData = !loading && prevClose > 0;
   const isUp = change >= 0;
-  const color = isUp ? 'var(--green)' : 'var(--red)';
+  const color = hasData ? (isUp ? 'var(--green)' : 'var(--red)') : 'var(--muted)';
   const pct = prevClose > 0 ? (change / prevClose) * 100 : 0;
-  const hasExtra = showKrw || showEur;
 
   return (
     <div className="card" style={{ minWidth: 0 }}>
       <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6, fontWeight: 500 }}>Daily P&L</div>
-
-      {/* Main value */}
-      <div style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1.2, marginBottom: 3 }}>
+      <div style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1.2 }}>
         {loading
           ? <span style={{ fontSize: 14, color: 'var(--muted)' }}>Loading...</span>
-          : !hasData ? <span style={{ fontSize: 14, color: 'var(--muted)' }}>—</span>
-          : fmtUSD(change, true)}
+          : !hasData
+          ? <span style={{ fontSize: 14, color: 'var(--muted)' }}>—</span>
+          : <>{fmtUSD(change, true)} <span style={{ fontSize: 14, fontWeight: 600 }}>({isUp ? '+' : ''}{pct.toFixed(2)}%)</span></>
+        }
       </div>
-
-      {/* Percentage */}
-      {hasData && (
-        <div style={{ fontSize: 13, fontWeight: 600, color, marginBottom: hasExtra ? 3 : 12 }}>
-          {isUp ? '+' : ''}{pct.toFixed(2)}%
-        </div>
-      )}
-
-      {/* KRW */}
       {showKrw && hasData && (
-        <div style={{ fontSize: 13, fontWeight: 600, color: isUp ? '#fbbf24' : 'var(--red)', marginBottom: 2 }}>
-          {change >= 0 ? '+' : '-'}{fmtKRW(Math.abs(change), krwRate)}
+        <div style={{ fontSize: 13, fontWeight: 600, color: isUp ? '#fbbf24' : 'var(--red)', marginTop: 3 }}>
+          {fmtKRW(change, krwRate, true)}
         </div>
       )}
-      {/* EUR */}
       {showEur && hasData && (
-        <div style={{ fontSize: 13, fontWeight: 600, color: isUp ? '#34d399' : 'var(--red)', marginBottom: 2 }}>
-          {change >= 0 ? '+' : '-'}{fmtEUR(Math.abs(change), eurRate)}
-        </div>
-      )}
-
-      <div style={{ marginBottom: hasExtra ? 8 : 0 }} />
-
-      {/* Per-account breakdown (proportional) */}
-      {hasData && accountBreakdown.length > 0 && prevCloseStockValue > 0 && (
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {accountBreakdown.map(acc => {
-            const ratio = prevCloseStockValue > 0 ? (acc.stock_value / (acc.stock_value + (prevCloseStockValue - acc.stock_value > 0 ? 0 : 0))) : 0;
-            const acctPrevClose = prevCloseStockValue > 0
-              ? (acc.stock_value / accountBreakdown.reduce((s, a) => s + a.stock_value, 0)) * prevCloseStockValue
-              : 0;
-            const acctChange = acc.stock_value - acctPrevClose;
-            const acctColor = acctChange >= 0 ? 'var(--green)' : 'var(--red)';
-            return (
-              <div key={acc.account_name}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
-                  <span style={{ color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '50%' }}>
-                    {acc.account_name}
-                  </span>
-                  <span style={{ fontWeight: 600, color: acctColor, flexShrink: 0 }}>
-                    {fmtUSD(acctChange, true)}
-                  </span>
-                </div>
-              </div>
-            );
-            void ratio;
-          })}
+        <div style={{ fontSize: 13, fontWeight: 600, color: isUp ? '#34d399' : 'var(--red)', marginTop: 3 }}>
+          {fmtEUR(change, eurRate, true)}
         </div>
       )}
     </div>
   );
 }
 
-export default function SummaryCards({ cash, stockValue, prevCloseStockValue, accountBreakdown, krwRate, eurRate, showKrw, showEur, loading, onAccountClick }: Props) {
+export default function SummaryCards({
+  cash, stockValue, prevCloseStockValue, accountBreakdown,
+  krwRate, eurRate, showKrw, showEur, loading,
+  accountFilter, onAccountClick,
+}: Props) {
+  const [expanded, setExpanded] = useState(false);
+
   const totalNow = cash + stockValue;
   const totalPrevClose = cash + prevCloseStockValue;
   const dailyChange = totalNow - totalPrevClose;
 
+  const selectedIds: Set<string> = accountFilter
+    ? new Set(accountFilter.split(',').map(s => s.trim()))
+    : new Set();
+  const visibleBreakdown = accountFilter
+    ? accountBreakdown.filter(a => selectedIds.has(String(a.account_id)))
+    : accountBreakdown;
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
-      <SummaryCard
-        label="Cash"
-        total={cash}
-        accounts={accountBreakdown.map(a => ({ name: a.account_name, value: a.cash }))}
-        color="#60a5fa"
-        krwRate={krwRate} eurRate={eurRate} showKrw={showKrw} showEur={showEur} loading={loading}
-      />
-      <SummaryCard
-        label="Market Value"
-        total={stockValue}
-        accounts={accountBreakdown.map(a => ({ name: a.account_name, value: a.stock_value }))}
-        color="#6366f1"
-        krwRate={krwRate} eurRate={eurRate} showKrw={showKrw} showEur={showEur} loading={loading}
-      />
-      <SummaryCard
-        label="Total Assets"
-        total={totalNow}
-        accounts={accountBreakdown.map(a => ({ id: a.account_id, name: a.account_name, value: a.cash + a.stock_value }))}
-        color="#e2e8f0"
-        krwRate={krwRate} eurRate={eurRate} showKrw={showKrw} showEur={showEur} loading={loading}
-        onAccountClick={onAccountClick}
-      />
-      <DailyPnLCard
-        change={dailyChange}
-        prevClose={totalPrevClose}
-        krwRate={krwRate}
-        eurRate={eurRate}
-        showKrw={showKrw}
-        showEur={showEur}
-        loading={loading}
-        accountBreakdown={accountBreakdown}
-        prevCloseStockValue={prevCloseStockValue}
-      />
+    <div style={{ marginBottom: 20 }}>
+      {/* Top row: 4 cards + toggle button */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr) auto', gap: 12, alignItems: 'stretch' }}>
+        <CompactCard
+          label="Total Assets" value={totalNow} color="#e2e8f0"
+          krwRate={krwRate} eurRate={eurRate} showKrw={showKrw} showEur={showEur} loading={loading}
+        />
+        <CompactDailyCard
+          change={dailyChange} prevClose={totalPrevClose}
+          krwRate={krwRate} eurRate={eurRate} showKrw={showKrw} showEur={showEur} loading={loading}
+        />
+        <CompactCard
+          label="Market Value" value={stockValue} color="#6366f1"
+          krwRate={krwRate} eurRate={eurRate} showKrw={showKrw} showEur={showEur} loading={loading}
+        />
+        <CompactCard
+          label="Cash" value={cash} color="#60a5fa"
+          krwRate={krwRate} eurRate={eurRate} showKrw={showKrw} showEur={showEur} loading={loading}
+        />
+
+        {/* Toggle button */}
+        <button
+          onClick={() => setExpanded(e => !e)}
+          style={{
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 8,
+            color: 'var(--muted)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '0 10px',
+            minWidth: 36,
+          }}
+          title={expanded ? 'Hide account breakdown' : 'Show account breakdown'}
+        >
+          {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </button>
+      </div>
+
+      {/* Expanded account breakdown */}
+      {expanded && (
+        <div className="card" style={{ marginTop: 8, padding: '10px 14px' }}>
+          {visibleBreakdown.length === 0 ? (
+            <div style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center', padding: '8px 0' }}>
+              No accounts selected
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {/* Header */}
+              <div style={{
+                display: 'grid', gridTemplateColumns: '1fr repeat(3, 120px)',
+                fontSize: 11, color: 'var(--muted)', fontWeight: 600,
+                paddingBottom: 6, borderBottom: '1px solid var(--border)', marginBottom: 4,
+              }}>
+                <span>Account</span>
+                <span style={{ textAlign: 'right' }}>Total Assets</span>
+                <span style={{ textAlign: 'right' }}>Market Value</span>
+                <span style={{ textAlign: 'right' }}>Cash</span>
+              </div>
+
+              {visibleBreakdown.map(acc => {
+                const total = acc.cash + acc.stock_value;
+                return (
+                  <div key={acc.account_id} style={{
+                    display: 'grid', gridTemplateColumns: '1fr repeat(3, 120px)',
+                    fontSize: 13, padding: '5px 0',
+                    borderBottom: '1px solid var(--border)',
+                  }}>
+                    <div>
+                      {onAccountClick ? (
+                        <button
+                          onClick={() => onAccountClick(acc.account_id, acc.account_name)}
+                          style={{
+                            background: 'none', color: 'var(--accent)', padding: 0,
+                            cursor: 'pointer', fontSize: 13, fontWeight: 500,
+                            textDecoration: 'underline',
+                          }}
+                        >
+                          {acc.account_name}
+                        </button>
+                      ) : (
+                        <span style={{ color: 'var(--text)', fontWeight: 500 }}>{acc.account_name}</span>
+                      )}
+                    </div>
+                    <div style={{ textAlign: 'right', fontWeight: 600 }}>
+                      {loading ? '—' : fmtUSD(total)}
+                      {showKrw && !loading && (
+                        <div style={{ fontSize: 11, color: '#fbbf24' }}>{fmtKRW(total, krwRate)}</div>
+                      )}
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      {loading ? '—' : fmtUSD(acc.stock_value)}
+                    </div>
+                    <div style={{ textAlign: 'right', color: '#60a5fa' }}>
+                      {loading ? '—' : fmtUSD(acc.cash)}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Totals row */}
+              <div style={{
+                display: 'grid', gridTemplateColumns: '1fr repeat(3, 120px)',
+                fontSize: 13, padding: '6px 0 2px',
+                fontWeight: 700, color: 'var(--text)',
+              }}>
+                <span style={{ color: 'var(--muted)', fontSize: 11 }}>Total</span>
+                <span style={{ textAlign: 'right' }}>{loading ? '—' : fmtUSD(totalNow)}</span>
+                <span style={{ textAlign: 'right' }}>{loading ? '—' : fmtUSD(stockValue)}</span>
+                <span style={{ textAlign: 'right', color: '#60a5fa' }}>{loading ? '—' : fmtUSD(cash)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

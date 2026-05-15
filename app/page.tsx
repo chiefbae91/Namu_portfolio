@@ -500,6 +500,7 @@ export default function Home() {
           showKrw={showKrw}
           showEur={showEur}
           loading={portfolioLoading}
+          accountFilter={accountFilter}
           onAccountClick={(id, name) => setHistoryAccount({ id, name })}
         />
 
