@@ -17,10 +17,10 @@ export default function AccountBanner({ onOpenAccounts }: Props) {
     }}>
       <div>
         <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'white', lineHeight: 1.4 }}>
-          당신의 모든 계좌를 여기서 중앙 관리 하세요
+          Centralize your portfolio management
         </p>
         <p style={{ margin: '4px 0 0', fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
-          투자 포트폴리오, 거래 내역, 매매 힌트를 한 곳에서 관리하세요.
+          Track your portfolio, trading history, and hints — all in one place.
         </p>
       </div>
       <button
@@ -37,7 +37,7 @@ export default function AccountBanner({ onOpenAccounts }: Props) {
           boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
         }}
       >
-        계좌 관리 시작 →
+        Get Started →
       </button>
     </div>
   );
