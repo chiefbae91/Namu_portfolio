@@ -53,6 +53,7 @@ export default function Home() {
   const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([]);
   const alertStateRef = useRef<Record<string, 'up' | 'down' | null>>({});
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [accountsLoaded, setAccountsLoaded] = useState(false);
 
   const fetchTradingHints = useCallback(async () => {
     const res = await fetch('/api/trading-hints');
@@ -63,6 +64,7 @@ export default function Home() {
   const fetchAccounts = useCallback(async () => {
     const res = await fetch('/api/accounts');
     setAccounts(await res.json());
+    setAccountsLoaded(true);
   }, []);
 
   const fetchRates = useCallback(async () => {
@@ -552,58 +554,97 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <SummaryCards
-          cash={summary.cash}
-          stockValue={summary.stock}
-          prevCloseStockValue={positions.reduce((sum, p) => sum + p.prev_close * p.quantity, 0)}
-          accountBreakdown={accountBreakdown}
-          krwRate={rates.KRW}
-          eurRate={rates.EUR}
-          showKrw={showKrw}
-          showEur={showEur}
-          loading={portfolioLoading}
-          accountFilter={accountFilter}
-          onAccountClick={(id, name) => setHistoryAccount({ id, name })}
-        />
+        {/* Summary Cards — hidden when no accounts */}
+        {accountsLoaded && accounts.length > 0 && (
+          <SummaryCards
+            cash={summary.cash}
+            stockValue={summary.stock}
+            prevCloseStockValue={positions.reduce((sum, p) => sum + p.prev_close * p.quantity, 0)}
+            accountBreakdown={accountBreakdown}
+            krwRate={rates.KRW}
+            eurRate={rates.EUR}
+            showKrw={showKrw}
+            showEur={showEur}
+            loading={portfolioLoading}
+            accountFilter={accountFilter}
+            onAccountClick={(id, name) => setHistoryAccount({ id, name })}
+          />
+        )}
 
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-          {([['portfolio', 'Portfolio'], ['history', 'Trading History'], ['hints', 'Trading Hint']] as const).map(([tab, label]) => (
-            <button key={tab} className={`tab ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
-              {label}
-            </button>
-          ))}
-        </div>
+        {accountsLoaded && accounts.length === 0 ? (
+          <>
+            {/* No accounts: prompt to create one */}
+            <div className="card" style={{ textAlign: 'center', padding: '60px 20px', marginBottom: 20 }}>
+              <div style={{ fontSize: 48, marginBottom: 16 }}>🏦</div>
+              <h2 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
+                첫 계좌를 생성해주세요
+              </h2>
+              <p style={{ color: 'var(--muted)', fontSize: 14, margin: '0 0 24px' }}>
+                계좌를 추가하면 포트폴리오와 거래내역을 관리할 수 있습니다.
+              </p>
+              <button
+                onClick={() => setAccountSettingsOpen(true)}
+                style={{ background: 'var(--accent)', color: 'white', padding: '10px 24px', fontWeight: 600, fontSize: 14 }}
+              >
+                + 계좌 관리
+              </button>
+            </div>
 
-        {/* Tab Content */}
-        <div className="card" style={{ marginBottom: 20, overflowX: 'auto' }}>
-          {activeTab === 'portfolio' && (
-            <StockPortfolio positions={positions} currency="USD" rates={rates} onTickerClick={ticker => { setAnalysisInitialTab('history'); setAnalysisTicker(ticker); }} />
-          )}
-          {activeTab === 'history' && (
-            <TransactionHistory
-              transactions={transactions}
-              currency="USD"
-              rates={rates}
-              onEdit={openEditModal}
-              onDelete={handleDeleteTx}
-              onDeleteMany={handleDeleteMany}
-              deepLink={historyDeepLink}
-              onAddTradingHistory={() => { setEditingTx(null); setTxModalOpen(true); }}
-              onTickerClick={ticker => { setAnalysisInitialTab('history'); setAnalysisTicker(ticker); }}
-            />
-          )}
-          {activeTab === 'hints' && (
-            <TradingHints
-              hints={tradingHints}
-              onEdit={handleEditHint}
-              onDelete={handleDeleteHint}
-              onSymbolClick={ticker => { setAnalysisInitialTab('hints'); setAnalysisTicker(ticker); }}
-              onAddHint={() => { setEditingHint(null); setTradingHintOpen(true); }}
-            />
-          )}
-        </div>
+            {/* Only show Trading Hints tab */}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+              <button className="tab active">Trading Hint</button>
+            </div>
+            <div className="card" style={{ marginBottom: 20, overflowX: 'auto' }}>
+              <TradingHints
+                hints={tradingHints}
+                onEdit={handleEditHint}
+                onDelete={handleDeleteHint}
+                onSymbolClick={ticker => { setAnalysisInitialTab('hints'); setAnalysisTicker(ticker); }}
+                onAddHint={() => { setEditingHint(null); setTradingHintOpen(true); }}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Tabs */}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+              {([['portfolio', 'Portfolio'], ['history', 'Trading History'], ['hints', 'Trading Hint']] as const).map(([tab, label]) => (
+                <button key={tab} className={`tab ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Tab Content */}
+            <div className="card" style={{ marginBottom: 20, overflowX: 'auto' }}>
+              {activeTab === 'portfolio' && (
+                <StockPortfolio positions={positions} currency="USD" rates={rates} onTickerClick={ticker => { setAnalysisInitialTab('history'); setAnalysisTicker(ticker); }} />
+              )}
+              {activeTab === 'history' && (
+                <TransactionHistory
+                  transactions={transactions}
+                  currency="USD"
+                  rates={rates}
+                  onEdit={openEditModal}
+                  onDelete={handleDeleteTx}
+                  onDeleteMany={handleDeleteMany}
+                  deepLink={historyDeepLink}
+                  onAddTradingHistory={() => { setEditingTx(null); setTxModalOpen(true); }}
+                  onTickerClick={ticker => { setAnalysisInitialTab('history'); setAnalysisTicker(ticker); }}
+                />
+              )}
+              {activeTab === 'hints' && (
+                <TradingHints
+                  hints={tradingHints}
+                  onEdit={handleEditHint}
+                  onDelete={handleDeleteHint}
+                  onSymbolClick={ticker => { setAnalysisInitialTab('hints'); setAnalysisTicker(ticker); }}
+                  onAddHint={() => { setEditingHint(null); setTradingHintOpen(true); }}
+                />
+              )}
+            </div>
+          </>
+        )}
 
       </div>
 
