@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAuthUser, unauthorized } from '@/lib/auth';
 
-const FALLBACK: Record<string, number> = { USD: 1, KRW: 1380, EUR: 0.92, DXY: 104, WTI: 78, GOLD: 2300, ES: 5800, ES_PREV: 5800 };
+const FALLBACK: Record<string, number> = { USD: 1, KRW: 1380, EUR: 0.92, DXY: 104, WTI: 78, GOLD: 2300, ES: 5800, ES_PREV: 5800, T5Y: 4.25, T10Y: 4.50, T30Y: 4.75 };
 
 async function yahooRate(symbol: string): Promise<number | null> {
   try {
@@ -42,13 +42,16 @@ export async function GET() {
   if (!await getAuthUser()) return unauthorized();
   // USDKRW=X → 1 USD = X KRW (direct)
   // EURUSD=X → 1 EUR = X USD → invert to get USD→EUR rate
-  const [krw, eurusd, dxy, wti, gold, es] = await Promise.all([
+  const [krw, eurusd, dxy, wti, gold, es, t5y, t10y, t30y] = await Promise.all([
     yahooRate('USDKRW=X'),
     yahooRate('EURUSD=X'),
     yahooRate('DX-Y.NYB'),
     yahooRate('CL=F'),
     yahooRate('GC=F'),
     yahooQuote('ES=F'),
+    yahooRate('^FVX'),
+    yahooRate('^TNX'),
+    yahooRate('^TYX'),
   ]);
 
   return NextResponse.json({
@@ -60,5 +63,8 @@ export async function GET() {
     GOLD: gold ?? FALLBACK.GOLD,
     ES: es?.price ?? FALLBACK.ES,
     ES_PREV: es?.prevClose ?? FALLBACK.ES_PREV,
+    T5Y: t5y ?? FALLBACK.T5Y,
+    T10Y: t10y ?? FALLBACK.T10Y,
+    T30Y: t30y ?? FALLBACK.T30Y,
   });
 }

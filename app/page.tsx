@@ -22,7 +22,7 @@ export default function Home() {
   const [accountFilter, setAccountFilter] = useState<string>(''); // '' = all, '1,2,3' = subset
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
   const accountDropdownRef = useRef<HTMLDivElement>(null);
-  const [rates, setRates] = useState<ExchangeRates>({ USD: 1, KRW: 1380, EUR: 0.92, DXY: 104, WTI: 78, GOLD: 2300, ES: 5800, ES_PREV: 5800 });
+  const [rates, setRates] = useState<ExchangeRates>({ USD: 1, KRW: 1380, EUR: 0.92, DXY: 104, WTI: 78, GOLD: 2300, ES: 5800, ES_PREV: 5800, T5Y: 4.25, T10Y: 4.50, T30Y: 4.75 });
   const [showKrw, setShowKrw] = useState(true);
   const [showEur, setShowEur] = useState(false);
   const [activeTab, setActiveTab] = useState<'portfolio' | 'history' | 'hints'>('portfolio');
@@ -424,69 +424,90 @@ export default function Home() {
       </div>
 
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: '20px 20px 0' }}>
-        {/* FX Rate Bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 24, marginBottom: 16, padding: '10px 16px', background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)' }}>
-          {/* E-mini S&P 500 Futures */}
-          {(() => {
-            const esChange = rates.ES - rates.ES_PREV;
-            const esChangePct = rates.ES_PREV !== 0 ? (esChange / rates.ES_PREV) * 100 : 0;
-            const esColor = esChange >= 0 ? 'var(--green)' : 'var(--red)';
-            return (
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>ES</span>
-                <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
-                  {rates.ES.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        {/* Market Data Bar */}
+        <div style={{ marginBottom: 16, background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
+          {/* Row 1: Futures / Commodities / FX */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '8px 16px', borderBottom: '1px solid var(--border)' }}>
+            {(() => {
+              const esChange = rates.ES - rates.ES_PREV;
+              const esChangePct = rates.ES_PREV !== 0 ? (esChange / rates.ES_PREV) * 100 : 0;
+              const esColor = esChange >= 0 ? 'var(--green)' : 'var(--red)';
+              return (
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>ES</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
+                    {rates.ES.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: esColor, fontVariantNumeric: 'tabular-nums' }}>
+                    {esChange >= 0 ? '+' : ''}{esChange.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({esChange >= 0 ? '+' : ''}{esChangePct.toFixed(2)}%)
+                  </span>
+                </div>
+              );
+            })()}
+            <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+              <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>WTI</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: '#fb923c', fontVariantNumeric: 'tabular-nums' }}>
+                ${rates.WTI.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+              <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>GOLD</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: '#f59e0b', fontVariantNumeric: 'tabular-nums' }}>
+                ${rates.GOLD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+              <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>DXY</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
+                {rates.DXY.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+            {showKrw && <div style={{ width: 1, height: 20, background: 'var(--border)' }} />}
+            {showKrw && (
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                <span style={{ fontSize: 16, fontWeight: 700, color: '#fbbf24', fontVariantNumeric: 'tabular-nums' }}>
+                  ₩{Math.round(rates.KRW).toLocaleString('en-US')}
                 </span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: esColor, fontVariantNumeric: 'tabular-nums' }}>
-                  {esChange >= 0 ? '+' : ''}{esChange.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({esChange >= 0 ? '+' : ''}{esChangePct.toFixed(2)}%)
+                <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}>/USD</span>
+              </div>
+            )}
+            {showEur && <div style={{ width: 1, height: 20, background: 'var(--border)' }} />}
+            {showEur && (
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                <span style={{ fontSize: 16, fontWeight: 700, color: '#34d399', fontVariantNumeric: 'tabular-nums' }}>
+                  €{rates.EUR.toFixed(4)}
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}>/USD</span>
+              </div>
+            )}
+            {ratesUpdatedAt && (
+              <span style={{ fontSize: 10, color: 'var(--muted)', opacity: 0.6, marginLeft: 'auto' }}>
+                {ratesUpdatedAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'America/New_York', timeZoneName: 'short' })}
+              </span>
+            )}
+          </div>
+
+          {/* Row 2: US Treasury Yields */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '6px 16px' }}>
+            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>US TREASURY</span>
+            <div style={{ width: 1, height: 16, background: 'var(--border)' }} />
+            {([
+              { label: '5Y', value: rates.T5Y },
+              { label: '10Y', value: rates.T10Y },
+              { label: '30Y', value: rates.T30Y },
+            ] as const).map(({ label, value }, i) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                {i > 0 && <div style={{ width: 1, height: 16, background: 'var(--border)', marginRight: 16 }} />}
+                <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)' }}>{label}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#a78bfa', fontVariantNumeric: 'tabular-nums' }}>
+                  {value.toFixed(2)}%
                 </span>
               </div>
-            );
-          })()}
-          <div style={{ width: 1, height: 28, background: 'var(--border)' }} />
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>WTI</span>
-            <span style={{ fontSize: 22, fontWeight: 700, color: '#fb923c', fontVariantNumeric: 'tabular-nums' }}>
-              ${rates.WTI.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
+            ))}
           </div>
-          <div style={{ width: 1, height: 28, background: 'var(--border)' }} />
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>GOLD</span>
-            <span style={{ fontSize: 22, fontWeight: 700, color: '#f59e0b', fontVariantNumeric: 'tabular-nums' }}>
-              ${rates.GOLD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-          </div>
-          <div style={{ width: 1, height: 28, background: 'var(--border)' }} />
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>DXY</span>
-            <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
-              {rates.DXY.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-          </div>
-          {showKrw && <div style={{ width: 1, height: 28, background: 'var(--border)' }} />}
-          {showKrw && (
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <span style={{ fontSize: 22, fontWeight: 700, color: '#fbbf24', fontVariantNumeric: 'tabular-nums' }}>
-                ₩{Math.round(rates.KRW).toLocaleString('en-US')}
-              </span>
-              <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 500 }}>/USD</span>
-            </div>
-          )}
-          {showEur && <div style={{ width: 1, height: 28, background: 'var(--border)' }} />}
-          {showEur && (
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <span style={{ fontSize: 22, fontWeight: 700, color: '#34d399', fontVariantNumeric: 'tabular-nums' }}>
-                €{rates.EUR.toFixed(4)}
-              </span>
-              <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 500 }}>/USD</span>
-            </div>
-          )}
-          {ratesUpdatedAt && (
-            <span style={{ fontSize: 11, color: 'var(--muted)', opacity: 0.6, marginLeft: 'auto' }}>
-              {ratesUpdatedAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'America/New_York', timeZoneName: 'short' })}
-            </span>
-          )}
         </div>
 
         {/* Summary Cards */}

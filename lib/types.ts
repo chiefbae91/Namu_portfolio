@@ -95,6 +95,9 @@ export interface ExchangeRates {
   GOLD: number;
   ES: number;
   ES_PREV: number;
+  T5Y: number;
+  T10Y: number;
+  T30Y: number;
 }
 
 export interface SummaryData {
