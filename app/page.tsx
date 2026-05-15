@@ -13,6 +13,7 @@ import TradeAnalysisModal from '@/components/modals/TradeAnalysisModal';
 import CsvImportModal from '@/components/modals/CsvImportModal';
 import TradingHintModal from '@/components/modals/TradingHintModal';
 import SummaryCards from '@/components/SummaryCards';
+import AccountBanner from '@/components/AccountBanner';
 import PriceAlertToasts, { PriceAlert } from '@/components/PriceAlertToasts';
 
 const TRANSFER_OFFSET = 1_000_000;
@@ -466,6 +467,11 @@ export default function Home() {
           style={{ background: 'var(--border)', color: 'var(--muted)', padding: '8px 10px', minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6 }}
           title="Manage Accounts"><Settings size={15} /></button>
       </div>
+
+      {/* Onboarding banner — only when no accounts */}
+      {accountsLoaded && accounts.length === 0 && (
+        <AccountBanner onOpenAccounts={() => setAccountSettingsOpen(true)} />
+      )}
 
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: '20px 20px 0' }}>
         {/* Market Data Bar */}
