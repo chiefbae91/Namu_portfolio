@@ -37,9 +37,7 @@ export async function GET(req: NextRequest) {
   const supabase = getAdminClient();
   const { searchParams } = new URL(req.url);
   const accountIdsParam = searchParams.get('account_ids');
-  // account_id filtering is skipped because transaction account_ids may not match
-  // the current accounts table (data imported with different UUIDs)
-  void accountIdsParam;
+  const filterIds = accountIdsParam ? accountIdsParam.split(',').filter(Boolean) : null;
 
   const { data: allAccounts } = await supabase.from('accounts').select('id, name, hidden').order('name');
   const visibleAccounts = (allAccounts || []).filter((a: any) => !a.hidden);
@@ -107,17 +105,6 @@ export async function GET(req: NextRequest) {
     leverageMap[t] = priceDataArr[i].leverage;
   });
 
-  const positions = activeTickers.map(ticker => {
-    const pos = posMap[ticker];
-    const avg_cost = pos.qty > 0 ? pos.cost / pos.qty : 0;
-    const current_price = priceMap[ticker] || 0;
-    const prev_close = prevCloseMap[ticker] || 0;
-    const value = pos.qty * current_price;
-    const return_amount = value - pos.cost;
-    const return_pct = pos.cost > 0 ? (return_amount / pos.cost) * 100 : 0;
-    return { ticker, quantity: pos.qty, avg_cost, current_price, prev_close, value, cost: pos.cost, return_pct, return_amount, quote_type: quoteTypeMap[ticker] ?? '', leverage: leverageMap[ticker] ?? '' };
-  });
-
   // Cash from all transactions (uppercase type comparison)
   const accCashMap: Record<string, number> = {};
   for (const tx of allTxRows || []) {
@@ -132,7 +119,6 @@ export async function GET(req: NextRequest) {
     const delta = cf.type === 'DEPOSIT' ? cf.amount : -cf.amount;
     accCashMap[cf.account_id] = (accCashMap[cf.account_id] || 0) + delta;
   }
-  const totalCash = Object.values(accCashMap).reduce((s, v) => s + v, 0);
 
   const accStockMap: Record<string, number> = {};
   for (const lot of lots) {
@@ -140,8 +126,6 @@ export async function GET(req: NextRequest) {
     accStockMap[lot.account_id] = (accStockMap[lot.account_id] || 0) + lot.remaining * (priceMap[lot.ticker] || 0);
   }
 
-  // account_breakdown based on visible accounts
-  // (values may be 0 if transaction account_ids don't match current account IDs)
   const account_breakdown = visibleAccounts.map((acc: any) => ({
     account_id: acc.id,
     account_name: acc.name,
@@ -149,5 +133,38 @@ export async function GET(req: NextRequest) {
     stock_value: accStockMap[acc.id] || 0,
   }));
 
-  return NextResponse.json({ positions, cash: totalCash, stock_value: positions.reduce((s, p) => s + p.value, 0), account_breakdown });
+  // Apply account filter to totals and positions
+  const activeIds: Set<string> = filterIds
+    ? new Set(filterIds)
+    : new Set(visibleAccounts.map((a: any) => a.id));
+
+  const totalCash = [...activeIds].reduce((s, id) => s + (accCashMap[id] || 0), 0);
+
+  // Filtered positions: only lots belonging to active accounts
+  const filtPosMap: Record<string, { qty: number; cost: number }> = {};
+  for (const lot of lots) {
+    if (lot.remaining < 0.00001 || !activeIds.has(lot.account_id)) continue;
+    if (!filtPosMap[lot.ticker]) filtPosMap[lot.ticker] = { qty: 0, cost: 0 };
+    const feePerShare = lot.quantity > 0 ? lot.fee / lot.quantity : 0;
+    filtPosMap[lot.ticker].qty += lot.remaining;
+    filtPosMap[lot.ticker].cost += lot.remaining * (lot.price + feePerShare);
+  }
+
+  const filteredPositions = Object.keys(filtPosMap).map(ticker => {
+    const pos = filtPosMap[ticker];
+    const avg_cost = pos.qty > 0 ? pos.cost / pos.qty : 0;
+    const current_price = priceMap[ticker] || 0;
+    const prev_close = prevCloseMap[ticker] || 0;
+    const value = pos.qty * current_price;
+    const return_amount = value - pos.cost;
+    const return_pct = pos.cost > 0 ? (return_amount / pos.cost) * 100 : 0;
+    return { ticker, quantity: pos.qty, avg_cost, current_price, prev_close, value, cost: pos.cost, return_pct, return_amount, quote_type: quoteTypeMap[ticker] ?? '', leverage: leverageMap[ticker] ?? '' };
+  });
+
+  return NextResponse.json({
+    positions: filteredPositions,
+    cash: totalCash,
+    stock_value: filteredPositions.reduce((s, p) => s + p.value, 0),
+    account_breakdown,
+  });
 }
