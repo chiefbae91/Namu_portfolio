@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabase-admin';
 import { getAuthUser, unauthorized } from '@/lib/auth';
 
+function parseHintPrice(raw: unknown): number[] | null {
+  if (raw == null || raw === '') return null;
+  const nums = String(raw).trim().split(/[\s,]+/)
+    .map(s => parseFloat(s.replace(/,/g, '')))
+    .filter(n => !isNaN(n) && n > 0);
+  return nums.length > 0 ? nums : null;
+}
+
 export async function GET() {
   const supabase = getAdminClient();
   const { data, error } = await supabase
@@ -22,11 +30,12 @@ export async function POST(req: NextRequest) {
   if (!ticker || !hint_date || !type) {
     return NextResponse.json({ error: 'ticker, hint_date, type required' }, { status: 400 });
   }
+  const parsedPrice = parseHintPrice(price);
   const { data, error } = await supabase
     .from('trading_hints')
     .insert({
       ticker, hint_date, type,
-      price: price ?? null,
+      price: parsedPrice,
       current_price: current_price ?? null,
       note: note ?? null,
       created_by: user.id,

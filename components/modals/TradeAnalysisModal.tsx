@@ -89,12 +89,14 @@ const HINT_TYPE_COLORS: Record<string, string> = {
 
 const PAGE_SIZE = 10;
 
-function fmtHintPrice(p: string | number | null): string {
+function fmtHintPrice(p: string | number | number[] | null): string {
   if (p == null || p === '') return '—';
-  return String(p).trim().split(/\s+/).map(part => {
+  const str = Array.isArray(p) ? p.join(' ') : String(p);
+  const parts = str.trim().split(/[\s,]+/).map(part => {
     const n = parseFloat(part.replace(/,/g, ''));
-    return isNaN(n) ? part : `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  }).join(' ');
+    return isNaN(n) ? null : `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }).filter(Boolean);
+  return parts.length > 0 ? parts.join(' ') : '—';
 }
 
 function fmtNum(p: number | null): string {
@@ -185,7 +187,7 @@ export default function TradeAnalysisModal({
   const switchToHistory = () => setActiveTab('history');
 
   const chartHints: ChartHint[] | undefined = activeTab === 'hints'
-    ? hintsData.map(h => ({ date: h.hint_date, type: h.type, price: h.price != null ? String(h.price) : null, note: h.note }))
+    ? hintsData.map(h => ({ date: h.hint_date, type: h.type, price: h.price ?? null, note: h.note }))
     : undefined;
 
   const preview = transactions.slice(0, PAGE_SIZE);

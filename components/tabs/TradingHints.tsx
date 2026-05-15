@@ -131,12 +131,14 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, o
       ? <ChevronUp size={11} style={{ marginLeft: 2 }} />
       : <ChevronDown size={11} style={{ marginLeft: 2 }} />;
 
-  const fmtPrice = (p: string | number | null) => {
+  const fmtPrice = (p: string | number | number[] | null) => {
     if (p == null || p === '') return null;
-    return String(p).trim().split(/\s+/).map(part => {
+    const str = Array.isArray(p) ? p.join(' ') : String(p);
+    const parts = str.trim().split(/[\s,]+/).map(part => {
       const n = parseFloat(part.replace(/,/g, ''));
-      return isNaN(n) ? part : `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    }).join(' ');
+      return isNaN(n) ? null : `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }).filter(Boolean);
+    return parts.length > 0 ? parts.join(' ') : null;
   };
 
   return (

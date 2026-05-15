@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabase-admin';
 import { getAuthUser, unauthorized } from '@/lib/auth';
 
+function parseHintPrice(raw: unknown): number[] | null {
+  if (raw == null || raw === '') return null;
+  const nums = String(raw).trim().split(/[\s,]+/)
+    .map(s => parseFloat(s.replace(/,/g, '')))
+    .filter(n => !isNaN(n) && n > 0);
+  return nums.length > 0 ? nums : null;
+}
+
 async function canEdit(supabase: ReturnType<typeof import('@/lib/supabase-admin').getAdminClient>, id: string, userId: string): Promise<boolean> {
   const { data } = await supabase
     .from('trading_hints')
@@ -18,9 +26,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const supabase = getAdminClient();
   if (!await canEdit(supabase, params.id, user.id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   const { ticker, hint_date, type, price, current_price, note } = await req.json();
+  const parsedPrice = parseHintPrice(price);
   const { error } = await supabase
     .from('trading_hints')
-    .update({ ticker, hint_date, type, price: price ?? null, current_price: current_price ?? null, note: note ?? null })
+    .update({ ticker, hint_date, type, price: parsedPrice, current_price: current_price ?? null, note: note ?? null })
     .eq('id', params.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

@@ -55,9 +55,10 @@ function sanitizeISO(isoDate: string): string {
   return toWeekday(isoDate > today ? today : isoDate);
 }
 
-function fmtPrice(raw: string | number | null) {
+function fmtPrice(raw: string | number | number[] | null) {
   if (raw == null || raw === '') return '';
-  return String(raw).trim().split(/\s+/).map(part => {
+  const str = Array.isArray(raw) ? raw.join(' ') : String(raw);
+  return str.trim().split(/[\s,]+/).map(part => {
     const n = parseFloat(part.replace(/,/g, ''));
     if (isNaN(n)) return part;
     const [int, dec = ''] = n.toFixed(2).split('.');

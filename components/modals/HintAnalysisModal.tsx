@@ -46,12 +46,14 @@ function fmtNum(p: number | null): string {
   return `$${p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function fmtPrice(p: string | number | null): string {
+function fmtPrice(p: string | number | number[] | null): string {
   if (p == null || p === '') return '—';
-  return String(p).trim().split(/\s+/).map(part => {
+  const str = Array.isArray(p) ? p.join(' ') : String(p);
+  const parts = str.trim().split(/[\s,]+/).map(part => {
     const n = parseFloat(part.replace(/,/g, ''));
-    return isNaN(n) ? part : `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  }).join(' ');
+    return isNaN(n) ? null : `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }).filter(Boolean);
+  return parts.length > 0 ? parts.join(' ') : '—';
 }
 
 interface Props {
@@ -96,7 +98,7 @@ export default function HintAnalysisModal({ ticker, hints, onClose, onAddHint, o
   const chartHints: ChartHint[] = hints.map(h => ({
     date: h.hint_date,
     type: h.type,
-    price: h.price != null ? String(h.price) : null,
+    price: h.price ?? null,
     note: h.note,
   }));
 

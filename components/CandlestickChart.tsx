@@ -22,21 +22,24 @@ export interface ChartTx {
 export interface ChartHint {
   date: string;
   type: string;
-  price: string | null;
+  price: string | number | number[] | null;
   note: string | null;
 }
 
-function parsePrices(p: string | number | null): number[] {
+function parsePrices(p: string | number | number[] | null): number[] {
   if (p == null || p === '') return [];
-  return String(p).trim().split(/\s+/).map(s => parseFloat(s.replace(/,/g, ''))).filter(n => !isNaN(n));
+  if (Array.isArray(p)) return p.filter(n => !isNaN(n) && n > 0);
+  return String(p).trim().split(/[\s,]+/).map(s => parseFloat(s.replace(/,/g, ''))).filter(n => !isNaN(n) && n > 0);
 }
 
-function fmtHintPrice(p: string | number | null): string | null {
+function fmtHintPrice(p: string | number | number[] | null): string | null {
   if (p == null || p === '') return null;
-  return String(p).trim().split(/\s+/).map(part => {
+  const str = Array.isArray(p) ? p.join(' ') : String(p);
+  const parts = str.trim().split(/[\s,]+/).map(part => {
     const n = parseFloat(part.replace(/,/g, ''));
-    return isNaN(n) ? part : `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  }).join(' ');
+    return isNaN(n) ? null : `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }).filter(Boolean);
+  return parts.length > 0 ? parts.join(' ') : null;
 }
 
 interface Props {
