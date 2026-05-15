@@ -385,15 +385,15 @@ export default function Home() {
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>USD</span>
           <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', userSelect: 'none' }}>
             <input type="checkbox" checked={showKrw} onChange={e => setShowKrw(e.target.checked)}
-              style={{ cursor: 'pointer', accentColor: '#fbbf24' }} />
-            <span style={{ fontSize: 12, color: showKrw ? '#fbbf24' : 'var(--muted)', fontWeight: showKrw ? 600 : 400 }}>
+              style={{ cursor: 'pointer', accentColor: 'var(--color-krw)' }} />
+            <span style={{ fontSize: 12, color: showKrw ? 'var(--color-krw)' : 'var(--muted)', fontWeight: showKrw ? 600 : 400 }}>
               KRW
             </span>
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', userSelect: 'none' }}>
             <input type="checkbox" checked={showEur} onChange={e => setShowEur(e.target.checked)}
-              style={{ cursor: 'pointer', accentColor: '#34d399' }} />
-            <span style={{ fontSize: 12, color: showEur ? '#34d399' : 'var(--muted)', fontWeight: showEur ? 600 : 400 }}>
+              style={{ cursor: 'pointer', accentColor: 'var(--color-eur)' }} />
+            <span style={{ fontSize: 12, color: showEur ? 'var(--color-eur)' : 'var(--muted)', fontWeight: showEur ? 600 : 400 }}>
               EUR
             </span>
           </label>
@@ -511,14 +511,14 @@ export default function Home() {
             <div className="market-sep" style={{ width: 1, height: 20, background: 'var(--border)' }} />
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
               <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>WTI</span>
-              <span style={{ fontSize: 16, fontWeight: 700, color: '#fb923c', fontVariantNumeric: 'tabular-nums' }}>
+              <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-oil)', fontVariantNumeric: 'tabular-nums' }}>
                 ${rates.WTI.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="market-sep" style={{ width: 1, height: 20, background: 'var(--border)' }} />
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
               <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>GOLD</span>
-              <span style={{ fontSize: 16, fontWeight: 700, color: '#f59e0b', fontVariantNumeric: 'tabular-nums' }}>
+              <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-gold-commodity)', fontVariantNumeric: 'tabular-nums' }}>
                 ${rates.GOLD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
@@ -532,7 +532,7 @@ export default function Home() {
             {showKrw && <div className="market-sep" style={{ width: 1, height: 20, background: 'var(--border)' }} />}
             {showKrw && (
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                <span style={{ fontSize: 16, fontWeight: 700, color: '#fbbf24', fontVariantNumeric: 'tabular-nums' }}>
+                <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-krw)', fontVariantNumeric: 'tabular-nums' }}>
                   ₩{Math.round(rates.KRW).toLocaleString('en-US')}
                 </span>
                 <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}>/USD</span>
@@ -541,7 +541,7 @@ export default function Home() {
             {showEur && <div className="market-sep" style={{ width: 1, height: 20, background: 'var(--border)' }} />}
             {showEur && (
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                <span style={{ fontSize: 16, fontWeight: 700, color: '#34d399', fontVariantNumeric: 'tabular-nums' }}>
+                <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-eur)', fontVariantNumeric: 'tabular-nums' }}>
                   €{rates.EUR.toFixed(4)}
                 </span>
                 <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}>/USD</span>
@@ -566,7 +566,7 @@ export default function Home() {
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 {i > 0 && <div className="market-sep" style={{ width: 1, height: 16, background: 'var(--border)', marginRight: 16 }} />}
                 <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)' }}>{label}</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: '#a78bfa', fontVariantNumeric: 'tabular-nums' }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-bond)', fontVariantNumeric: 'tabular-nums' }}>
                   {value.toFixed(2)}%
                 </span>
               </div>

@@ -73,7 +73,7 @@ export default function CsvImportModal({ accounts, onClose, onImported }: Props)
   };
 
   const typeLabel = (t: string) => ({ buy: 'Buy', sell: 'Sell', dividend: 'Dividend', cash: 'Cash', skip: 'Skip' }[t] ?? t);
-  const typeColor = (t: string) => ({ buy: 'var(--green)', sell: 'var(--red)', dividend: '#f59e0b', cash: '#60a5fa', skip: 'var(--muted)' }[t] ?? 'var(--muted)');
+  const typeColor = (t: string) => ({ buy: 'var(--green)', sell: 'var(--red)', dividend: 'var(--color-dividend)', cash: 'var(--color-cash)', skip: 'var(--muted)' }[t] ?? 'var(--muted)');
 
   const importable = preview?.filter(r => !r.skip && !r.duplicate) ?? [];
   const formatLabel = format === 'new' ? 'Generic' : format === 'robinhood' ? 'Robinhood' : format === 'webull' ? 'Webull' : '';
@@ -137,7 +137,7 @@ export default function CsvImportModal({ accounts, onClose, onImported }: Props)
         </div>
 
         {needsTicker && !ticker && (
-          <div style={{ color: '#f59e0b', marginBottom: 12, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ color: 'var(--color-gold-commodity)', marginBottom: 12, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
             <AlertCircle size={14} /> This format has no symbol info. Enter a symbol and click Preview.
           </div>
         )}
@@ -181,7 +181,7 @@ export default function CsvImportModal({ accounts, onClose, onImported }: Props)
                       <td style={{ textAlign: 'right' }}>{r.fee > 0 ? `$${r.fee.toFixed(2)}` : '-'}</td>
                       <td style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--muted)', fontSize: 12 }}>{r.notes}</td>
                       <td>
-                        {r.duplicate && <span style={{ fontSize: 11, color: '#f59e0b' }}>Duplicate</span>}
+                        {r.duplicate && <span style={{ fontSize: 11, color: 'var(--color-gold-commodity)' }}>Duplicate</span>}
                         {r.skip && <span style={{ fontSize: 11, color: 'var(--muted)' }}>Skipped</span>}
                         {!r.duplicate && !r.skip && <span style={{ fontSize: 11, color: 'var(--green)' }}>✓</span>}
                       </td>

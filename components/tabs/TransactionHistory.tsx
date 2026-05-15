@@ -56,8 +56,8 @@ const TYPE_LABELS: Record<string, string> = {
   transfer_deposit: 'Transfer - Deposit', transfer_withdraw: 'Transfer - Withdraw',
 };
 const TYPE_COLORS: Record<string, string> = {
-  buy: 'var(--green)', sell: 'var(--red)', dividend: '#f59e0b', cash: '#60a5fa',
-  transfer_deposit: '#34d399', transfer_withdraw: '#f87171',
+  buy: 'var(--green)', sell: 'var(--red)', dividend: 'var(--color-dividend)', cash: 'var(--color-cash)',
+  transfer_deposit: 'var(--color-transfer-in)', transfer_withdraw: 'var(--color-transfer-out)',
 };
 
 function txLabel(tx: { type: string; subtype?: string | null }): string {
@@ -65,7 +65,7 @@ function txLabel(tx: { type: string; subtype?: string | null }): string {
   return TYPE_LABELS[tx.type.toLowerCase()] || tx.type;
 }
 function txColor(tx: { type: string; subtype?: string | null }): string {
-  if (tx.subtype === 'DIVIDEND_REINVEST') return '#34d399';
+  if (tx.subtype === 'DIVIDEND_REINVEST') return 'var(--color-transfer-in)';
   return TYPE_COLORS[tx.type.toLowerCase()] || 'var(--muted)';
 }
 

@@ -25,7 +25,7 @@ const INTERVALS: { value: Interval; label: string }[] = [
 ];
 
 const TX_TYPE_LABELS: Record<string, string> = { buy: 'Buy', sell: 'Sell', dividend: 'Dividend' };
-const TX_TYPE_COLORS: Record<string, string> = { buy: '#00e676', sell: '#ff5252', dividend: '#f59e0b' };
+const TX_TYPE_COLORS: Record<string, string> = { buy: 'var(--color-price-up)', sell: 'var(--color-price-down)', dividend: 'var(--color-dividend)' };
 
 const BADGE_COLORS: [string, string][] = [
   ['robinhood', '#00c853'], ['chase', '#1e88e5'], ['fidelity', '#f59e0b'],
@@ -75,16 +75,17 @@ const HINT_TYPE_LABELS: Record<string, string> = {
 };
 
 const HINT_TYPE_COLORS: Record<string, string> = {
-  resistance:      '#ff5252',
-  support:         '#00e676',
-  supply_level:    '#f59e0b',
-  faded_supply:    '#a78bfa',
-  last_buy_zone:   '#f43f5e',
-  short_target:    '#60a5fa',
-  long_target:     '#818cf8',
-  buy_stop:        '#ef4444',
-  trailing_supply: '#fb923c',
-  note_only:       '#64748b',
+  resistance:      'var(--hint-resistance)',
+  support:         'var(--hint-support)',
+  supply_level:    'var(--hint-supply-level)',
+  faded_supply:    'var(--hint-faded-supply)',
+  last_buy_zone:   'var(--hint-last-buy-zone)',
+  short_target:    'var(--hint-short-target)',
+  long_target:     'var(--hint-long-target)',
+  buy_stop:        'var(--hint-buy-stop)',
+  trailing_supply: 'var(--hint-trailing-supply)',
+  note_only:       'var(--hint-note-only)',
+  accumulation:    'var(--hint-accumulation)',
 };
 
 const PAGE_SIZE = 10;
@@ -205,8 +206,8 @@ export default function TradeAnalysisModal({
 
   const ivBtnStyle = (active: boolean): React.CSSProperties => ({
     padding: '4px 10px', fontSize: 12, borderRadius: 4,
-    background: active ? '#334155' : 'var(--border)',
-    color: active ? '#e2e8f0' : 'var(--muted)',
+    background: active ? 'var(--border)' : 'transparent',
+    color: active ? 'var(--text)' : 'var(--muted)',
     fontWeight: active ? 600 : 400,
     border: active ? '1px solid #475569' : '1px solid transparent',
   });

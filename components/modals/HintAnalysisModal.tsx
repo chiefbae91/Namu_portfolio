@@ -17,10 +17,17 @@ const TYPE_LABELS: Record<string, string> = {
   note_only:       '메모 (Note Only)',
 };
 const TYPE_COLORS: Record<string, string> = {
-  resistance: '#ff5252', support: '#00e676', supply_level: '#f59e0b',
-  faded_supply: '#a78bfa', last_buy_zone: '#f43f5e',
-  short_target: '#60a5fa', long_target: '#818cf8', buy_stop: '#ef4444',
-  trailing_supply: '#fb923c', note_only: '#64748b',
+  resistance:      'var(--hint-resistance)',
+  support:         'var(--hint-support)',
+  supply_level:    'var(--hint-supply-level)',
+  faded_supply:    'var(--hint-faded-supply)',
+  last_buy_zone:   'var(--hint-last-buy-zone)',
+  short_target:    'var(--hint-short-target)',
+  long_target:     'var(--hint-long-target)',
+  buy_stop:        'var(--hint-buy-stop)',
+  trailing_supply: 'var(--hint-trailing-supply)',
+  note_only:       'var(--hint-note-only)',
+  accumulation:    'var(--hint-accumulation)',
 };
 
 type Period = '5d' | '1mo' | '3mo' | '6mo' | '1y';

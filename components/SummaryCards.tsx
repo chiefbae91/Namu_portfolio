@@ -52,12 +52,12 @@ function CompactCard({ label, value, color, krwRate, eurRate, showKrw, showEur, 
         {loading ? <span style={{ fontSize: 14, color: 'var(--muted)' }}>Loading...</span> : fmtUSD(value)}
       </div>
       {showKrw && !loading && (
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#fbbf24', marginTop: 3 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-krw)', marginTop: 3 }}>
           {fmtKRW(value, krwRate)}
         </div>
       )}
       {showEur && !loading && (
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#34d399', marginTop: 3 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-eur)', marginTop: 3 }}>
           {fmtEUR(value, eurRate)}
         </div>
       )}
@@ -93,12 +93,12 @@ function CompactDailyCard({ change, prevClose, krwRate, eurRate, showKrw, showEu
         }
       </div>
       {showKrw && hasData && (
-        <div style={{ fontSize: 13, fontWeight: 600, color: isUp ? '#fbbf24' : 'var(--red)', marginTop: 3 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: isUp ? 'var(--color-krw)' : 'var(--red)', marginTop: 3 }}>
           {fmtKRW(change, krwRate, true)}
         </div>
       )}
       {showEur && hasData && (
-        <div style={{ fontSize: 13, fontWeight: 600, color: isUp ? '#34d399' : 'var(--red)', marginTop: 3 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: isUp ? 'var(--color-eur)' : 'var(--red)', marginTop: 3 }}>
           {fmtEUR(change, eurRate, true)}
         </div>
       )}
@@ -129,7 +129,7 @@ export default function SummaryCards({
       {/* Top row: 4 cards + toggle button */}
       <div className="summary-top-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr) auto', gap: 12, alignItems: 'stretch' }}>
         <CompactCard
-          label="Total Assets" value={totalNow} color="#e2e8f0"
+          label="Total Assets" value={totalNow} color="var(--color-total-assets)"
           krwRate={krwRate} eurRate={eurRate} showKrw={showKrw} showEur={showEur} loading={loading}
         />
         <CompactDailyCard
@@ -141,7 +141,7 @@ export default function SummaryCards({
           krwRate={krwRate} eurRate={eurRate} showKrw={showKrw} showEur={showEur} loading={loading}
         />
         <CompactCard
-          label="Cash" value={cash} color="#60a5fa"
+          label="Cash" value={cash} color="var(--color-cash)"
           krwRate={krwRate} eurRate={eurRate} showKrw={showKrw} showEur={showEur} loading={loading}
         />
 
@@ -215,19 +215,19 @@ export default function SummaryCards({
                     <div style={{ textAlign: 'right', fontWeight: 600 }}>
                       {loading ? '—' : fmtUSD(total)}
                       {showKrw && !loading && (
-                        <div style={{ fontSize: 11, color: '#fbbf24' }}>{fmtKRW(total, krwRate)}</div>
+                        <div style={{ fontSize: 11, color: 'var(--color-krw)' }}>{fmtKRW(total, krwRate)}</div>
                       )}
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       {loading ? '—' : fmtUSD(acc.stock_value)}
                       {showKrw && !loading && (
-                        <div style={{ fontSize: 11, color: '#fbbf24' }}>{fmtKRW(acc.stock_value, krwRate)}</div>
+                        <div style={{ fontSize: 11, color: 'var(--color-krw)' }}>{fmtKRW(acc.stock_value, krwRate)}</div>
                       )}
                     </div>
-                    <div style={{ textAlign: 'right', color: '#60a5fa' }}>
+                    <div style={{ textAlign: 'right', color: 'var(--color-cash)' }}>
                       {loading ? '—' : fmtUSD(acc.cash)}
                       {showKrw && !loading && (
-                        <div style={{ fontSize: 11, color: '#fbbf24' }}>{fmtKRW(acc.cash, krwRate)}</div>
+                        <div style={{ fontSize: 11, color: 'var(--color-krw)' }}>{fmtKRW(acc.cash, krwRate)}</div>
                       )}
                     </div>
                   </div>
@@ -244,19 +244,19 @@ export default function SummaryCards({
                 <div style={{ textAlign: 'right' }}>
                   {loading ? '—' : fmtUSD(totalNow)}
                   {showKrw && !loading && (
-                    <div style={{ fontSize: 11, color: '#fbbf24', fontWeight: 600 }}>{fmtKRW(totalNow, krwRate)}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-krw)', fontWeight: 600 }}>{fmtKRW(totalNow, krwRate)}</div>
                   )}
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   {loading ? '—' : fmtUSD(stockValue)}
                   {showKrw && !loading && (
-                    <div style={{ fontSize: 11, color: '#fbbf24', fontWeight: 600 }}>{fmtKRW(stockValue, krwRate)}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-krw)', fontWeight: 600 }}>{fmtKRW(stockValue, krwRate)}</div>
                   )}
                 </div>
-                <div style={{ textAlign: 'right', color: '#60a5fa' }}>
+                <div style={{ textAlign: 'right', color: 'var(--color-cash)' }}>
                   {loading ? '—' : fmtUSD(cash)}
                   {showKrw && !loading && (
-                    <div style={{ fontSize: 11, color: '#fbbf24', fontWeight: 600 }}>{fmtKRW(cash, krwRate)}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-krw)', fontWeight: 600 }}>{fmtKRW(cash, krwRate)}</div>
                   )}
                 </div>
               </div>

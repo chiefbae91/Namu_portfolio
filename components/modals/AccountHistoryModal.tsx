@@ -152,9 +152,9 @@ export default function AccountHistoryModal({ accountId, accountName, onClose }:
                 })()}
               />
               <Tooltip
-                contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12, maxWidth: 200, overflow: 'auto' }}
-                labelStyle={{ color: '#94a3b8', marginBottom: 4, fontSize: 11 }}
-                itemStyle={{ color: '#e2e8f0' }}
+                contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, maxWidth: 200, overflow: 'auto' }}
+                labelStyle={{ color: 'var(--muted)', marginBottom: 4, fontSize: 11 }}
+                itemStyle={{ color: 'var(--text)' }}
                 formatter={(v: number) => [fmtUSD(v), 'Portfolio Value']}
                 labelFormatter={fmtTooltipLabel}
               />

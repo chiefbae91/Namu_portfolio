@@ -25,9 +25,9 @@ export default function NoteTooltip({ note }: { note: string }) {
       {anchor && createPortal(
         <div style={{
           position: 'fixed', top: tipTop, left: Math.max(8, tipLeft), zIndex: 9999,
-          background: '#1e293b', border: '1px solid #334155', borderRadius: 6,
+          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6,
           padding: '8px 10px', maxWidth: 300,
-          fontSize: 12, color: '#e2e8f0', lineHeight: 1.6,
+          fontSize: 12, color: 'var(--text)', lineHeight: 1.6,
           wordBreak: 'break-word', whiteSpace: 'pre-wrap',
           boxShadow: '0 4px 16px rgba(0,0,0,0.5)', pointerEvents: 'none',
         }}>

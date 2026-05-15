@@ -12,18 +12,72 @@
   --accent: #6366f1;
   --green: #10b981;
   --red: #ef4444;
+
+  /* Hint type text colors — dark mode */
+  --hint-resistance: #ff5252;
+  --hint-support: #00e676;
+  --hint-supply-level: #f59e0b;
+  --hint-short-target: #60a5fa;
+  --hint-long-target: #818cf8;
+  --hint-buy-stop: #ef4444;
+  --hint-trailing-supply: #fb923c;
+  --hint-accumulation: #22d3ee;
+  --hint-note-only: #64748b;
+  --hint-faded-supply: #a78bfa;
+  --hint-last-buy-zone: #f43f5e;
+
+  /* Adaptive colors — dark mode values */
+  --color-total-assets: #e2e8f0;
+  --color-cash: #60a5fa;
+  --color-krw: #fbbf24;
+  --color-eur: #34d399;
+  --color-price-up: #00e676;
+  --color-price-down: #ff5252;
+  --color-oil: #fb923c;
+  --color-gold-commodity: #f59e0b;
+  --color-bond: #a78bfa;
+  --color-dividend: #f59e0b;
+  --color-transfer-in: #34d399;
+  --color-transfer-out: #f87171;
 }
 
 html.light {
   --bg: #ffffff;
   --surface: #f8fafc;
   --header-bg: #f1f5f9;
-  --border: #e2e8f0;
+  --border: #cbd5e1;
   --text: #0f172a;
-  --muted: #64748b;
+  --muted: #475569;
   --accent: #4f46e5;
   --green: #059669;
   --red: #dc2626;
+
+  /* Hint type text colors — light mode (WCAG AA on white) */
+  --hint-resistance: #b91c1c;
+  --hint-support: #15803d;
+  --hint-supply-level: #92400e;
+  --hint-short-target: #1d4ed8;
+  --hint-long-target: #3730a3;
+  --hint-buy-stop: #b91c1c;
+  --hint-trailing-supply: #9a3412;
+  --hint-accumulation: #0e7490;
+  --hint-note-only: #334155;
+  --hint-faded-supply: #5b21b6;
+  --hint-last-buy-zone: #9f1239;
+
+  /* Adaptive colors — light mode values (WCAG AA compliant on white) */
+  --color-total-assets: #0f172a;
+  --color-cash: #1d4ed8;
+  --color-krw: #92400e;
+  --color-eur: #065f46;
+  --color-price-up: #15803d;
+  --color-price-down: #b91c1c;
+  --color-oil: #9a3412;
+  --color-gold-commodity: #92400e;
+  --color-bond: #5b21b6;
+  --color-dividend: #92400e;
+  --color-transfer-in: #065f46;
+  --color-transfer-out: #991b1b;
 }
 
 * { box-sizing: border-box; }
@@ -148,11 +202,28 @@ html.light .modal {
   background: #ffffff;
   box-shadow: 0 8px 32px rgba(0,0,0,0.12);
 }
+/* Tables: stronger borders, alternating rows, dark text */
+html.light th {
+  color: #334155;
+  border-bottom-color: #cbd5e1;
+}
+html.light td {
+  color: #0f172a;
+  border-bottom-color: #e2e8f0;
+}
+html.light tbody tr:nth-child(odd) td {
+  background: #ffffff;
+}
 html.light tbody tr:nth-child(even) td {
-  background: rgba(241,245,249,0.7);
+  background: #f8fafc;
 }
 html.light tr:hover td {
   background: rgba(79,70,229,0.05) !important;
+}
+/* Inputs and selects: slightly stronger border */
+html.light input, html.light select, html.light textarea {
+  border-color: #cbd5e1;
+  color: #0f172a;
 }
 html.light .tab {
   color: #475569;
@@ -160,6 +231,8 @@ html.light .tab {
 html.light .tab.active {
   color: white;
 }
+/* Muted text elements */
+html.light .muted { color: #475569; }
 
 /* ===== Mobile Responsive (≤450px) ===== */
 .mobile-only { display: none; }

@@ -47,7 +47,7 @@ export default function OptionsPositions({ options, currency, rates }: Props) {
                 <td>{o.account_name}</td>
                 <td style={{ fontWeight: 600 }}>{o.ticker}</td>
                 <td>
-                  <span style={{ color: o.option_type === 'call' ? '#10b981' : '#f59e0b', fontWeight: 500 }}>
+                  <span style={{ color: o.option_type === 'call' ? 'var(--green)' : 'var(--color-dividend)', fontWeight: 500 }}>
                     {o.option_type.toUpperCase()}
                   </span>
                 </td>

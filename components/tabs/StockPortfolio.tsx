@@ -15,7 +15,7 @@ type SortDir = 'asc' | 'desc';
 
 function SortIndicator({ active, dir }: { active: boolean; dir: SortDir }) {
   return (
-    <span style={{ marginLeft: 3, fontSize: 9, color: active ? 'var(--accent)' : '#334155' }}>
+    <span style={{ marginLeft: 3, fontSize: 9, color: active ? 'var(--accent)' : 'var(--muted)' }}>
       {active ? (dir === 'asc' ? '▲' : '▼') : '↕'}
     </span>
   );
@@ -75,9 +75,9 @@ function PriceChange({ current, prev }: { current: number; prev: number }) {
   if (!current || !prev) return null;
   const diff = current - prev;
   const pct = (diff / prev) * 100;
-  if (Math.abs(diff) < 0.001) return <div style={{ fontSize: 11, color: '#666' }}>→ 0.00 (0.00%)</div>;
+  if (Math.abs(diff) < 0.001) return <div style={{ fontSize: 11, color: 'var(--muted)' }}>→ 0.00 (0.00%)</div>;
   const up = diff > 0;
-  const color = up ? '#00e676' : '#ff5252';
+  const color = up ? 'var(--color-price-up)' : 'var(--color-price-down)';
   return (
     <div style={{ fontSize: 11, color, marginTop: 2 }}>
       {up ? '▲' : '▼'} {up ? '+' : ''}${Math.abs(diff).toFixed(2)} ({up ? '+' : ''}{pct.toFixed(2)}%)

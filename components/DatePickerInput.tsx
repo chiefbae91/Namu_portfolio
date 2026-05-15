@@ -97,8 +97,8 @@ export default function DatePickerInput({ value, onChange, error, inputWidth = 1
           top: dropPos.top,
           left: dropPos.left,
           zIndex: 10000,
-          background: '#1a1d27',
-          border: '1px solid #2a2d3a',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
           borderRadius: 8,
           padding: 12,
           boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
@@ -108,14 +108,14 @@ export default function DatePickerInput({ value, onChange, error, inputWidth = 1
           {/* Month nav */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <button type="button" onClick={prevMonth}
-              style={{ background: 'none', color: '#e2e8f0', padding: '2px 6px' }}>
+              style={{ background: 'none', color: 'var(--text)', padding: '2px 6px' }}>
               <ChevronLeft size={14} />
             </button>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
               {MONTHS[viewMonth]} {viewYear}
             </span>
             <button type="button" onClick={nextMonth}
-              style={{ background: 'none', color: '#e2e8f0', padding: '2px 6px' }}>
+              style={{ background: 'none', color: 'var(--text)', padding: '2px 6px' }}>
               <ChevronRight size={14} />
             </button>
           </div>
@@ -148,7 +148,7 @@ export default function DatePickerInput({ value, onChange, error, inputWidth = 1
                   borderRadius: 4,
                   cursor: 'pointer',
                   background: isSel ? '#6366f1' : isToday ? 'rgba(99,102,241,0.25)' : 'transparent',
-                  color: isSel ? '#ffffff' : isToday ? '#818cf8' : '#e2e8f0',
+                  color: isSel ? '#ffffff' : isToday ? 'var(--accent)' : 'var(--text)',
                   fontWeight: isSel || isToday ? 600 : 400,
                 }}>
                   {day}
