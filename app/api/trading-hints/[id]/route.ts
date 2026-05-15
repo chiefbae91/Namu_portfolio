@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabase-admin';
 import { getAuthUser, unauthorized } from '@/lib/auth';
 
-function parseHintPrice(raw: unknown): number[] | null {
+function parseHintPrice(raw: unknown): string | null {
   if (raw == null || raw === '') return null;
-  const nums = String(raw).trim().split(/[\s,]+/)
+  const input = Array.isArray(raw) ? raw.join(' ') : String(raw);
+  const nums = input.trim().split(/[\s,]+/)
     .map(s => parseFloat(s.replace(/,/g, '')))
     .filter(n => !isNaN(n) && n > 0);
-  return nums.length > 0 ? nums : null;
+  return nums.length > 0 ? nums.join(' ') : null;
 }
 
 async function canEdit(supabase: ReturnType<typeof import('@/lib/supabase-admin').getAdminClient>, id: string, userId: string): Promise<boolean> {
