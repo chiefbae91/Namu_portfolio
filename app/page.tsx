@@ -579,23 +579,6 @@ export default function Home() {
 
         {accountsLoaded && accounts.length === 0 ? (
           <>
-            {/* No accounts: prompt to create one */}
-            <div className="card" style={{ textAlign: 'center', padding: '60px 20px', marginBottom: 20 }}>
-              <div style={{ fontSize: 48, marginBottom: 16 }}>🏦</div>
-              <h2 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
-                첫 계좌를 생성해주세요
-              </h2>
-              <p style={{ color: 'var(--muted)', fontSize: 14, margin: '0 0 24px' }}>
-                계좌를 추가하면 포트폴리오와 거래내역을 관리할 수 있습니다.
-              </p>
-              <button
-                onClick={() => setAccountSettingsOpen(true)}
-                style={{ background: 'var(--accent)', color: 'white', padding: '10px 24px', fontWeight: 600, fontSize: 14 }}
-              >
-                + 계좌 관리
-              </button>
-            </div>
-
             {/* Only show Trading Hints tab */}
             <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
               <button className="tab active">Trading Hint</button>
