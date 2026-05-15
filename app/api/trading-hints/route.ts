@@ -3,13 +3,11 @@ import { getAdminClient } from '@/lib/supabase-admin';
 import { getAuthUser, unauthorized } from '@/lib/auth';
 
 export async function GET() {
-  const user = await getAuthUser();
-  if (!user) return unauthorized();
   const supabase = getAdminClient();
   const { data, error } = await supabase
     .from('trading_hints')
     .select('*')
-    .eq('created_by', user.id)
+    .eq('is_public', true)
     .order('hint_date', { ascending: false })
     .order('created_at', { ascending: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
