@@ -435,10 +435,10 @@ export default function Home() {
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
                 <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>ES</span>
                 <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
-                  {rates.ES.toFixed(2)}
+                  {rates.ES.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
                 <span style={{ fontSize: 13, fontWeight: 600, color: esColor, fontVariantNumeric: 'tabular-nums' }}>
-                  {esChange >= 0 ? '+' : ''}{esChange.toFixed(2)} ({esChange >= 0 ? '+' : ''}{esChangePct.toFixed(2)}%)
+                  {esChange >= 0 ? '+' : ''}{esChange.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({esChange >= 0 ? '+' : ''}{esChangePct.toFixed(2)}%)
                 </span>
               </div>
             );
@@ -447,21 +447,21 @@ export default function Home() {
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>WTI</span>
             <span style={{ fontSize: 22, fontWeight: 700, color: '#fb923c', fontVariantNumeric: 'tabular-nums' }}>
-              ${rates.WTI.toFixed(2)}
+              ${rates.WTI.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
           <div style={{ width: 1, height: 28, background: 'var(--border)' }} />
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>GOLD</span>
             <span style={{ fontSize: 22, fontWeight: 700, color: '#f59e0b', fontVariantNumeric: 'tabular-nums' }}>
-              ${rates.GOLD.toFixed(2)}
+              ${rates.GOLD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
           <div style={{ width: 1, height: 28, background: 'var(--border)' }} />
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>DXY</span>
             <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
-              {rates.DXY.toFixed(2)}
+              {rates.DXY.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
           {showKrw && <div style={{ width: 1, height: 28, background: 'var(--border)' }} />}
