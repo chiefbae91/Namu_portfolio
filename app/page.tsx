@@ -311,7 +311,7 @@ export default function Home() {
   return (
     <div style={{ minHeight: '100vh', padding: '0 0 40px' }}>
       {/* Header */}
-      <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <div style={{ background: 'var(--header-bg)', borderBottom: '1px solid var(--border)', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         {appNameEditing ? (
           <input
             autoFocus
@@ -441,7 +441,7 @@ export default function Home() {
       </div>
 
       {/* Mobile-only: account dropdown + settings below header */}
-      <div className="mobile-only-flex" style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '8px 14px', gap: 8, alignItems: 'center' }}>
+      <div className="mobile-only-flex" style={{ background: 'var(--header-bg)', borderBottom: '1px solid var(--border)', padding: '8px 14px', gap: 8, alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1 }}>
           <button
             onClick={() => setAccountDropdownOpen(o => !o)}
