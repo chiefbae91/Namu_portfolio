@@ -196,7 +196,7 @@ export default function Home() {
         const tfId = String(editingTx.id).slice(TRANSFER_PREFIX.length);
         await fetch(`/api/transfers/${tfId}`, {
           method: 'PUT', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ amount: data.price, date: data.date, type: cfType }),
+          body: JSON.stringify({ account_id: data.account_id, amount: data.price, date: data.date, type: cfType }),
         });
         setEditingTx(null);
       } else {
