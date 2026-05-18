@@ -332,19 +332,19 @@ export default function CandlestickChart({ candles, transactions = [], chartHint
             OHLC
           </span>
           <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-            <svg width={10} height={12} style={{ display: 'block' }}><polygon points="5,1 0,11 10,11" fill="#10b981" stroke="white" strokeWidth={2} opacity={0.9} /></svg>
+            <svg width={12} height={14} style={{ display: 'block' }}><polygon points="6,2 1,12 11,12" fill="#10b981" stroke="white" strokeWidth={2} opacity={0.9} /></svg>
             Buy
           </span>
           <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-            <svg width={10} height={12} style={{ display: 'block' }}><polygon points="0,1 10,1 5,11" fill="#ef4444" stroke="white" strokeWidth={2} opacity={0.9} /></svg>
+            <svg width={12} height={14} style={{ display: 'block' }}><polygon points="1,2 11,2 6,12" fill="#ef4444" stroke="white" strokeWidth={2} opacity={0.9} /></svg>
             Sell
           </span>
           <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-            <svg width={10} height={10} style={{ display: 'block' }}><circle cx="5" cy="5" r="4.5" fill="#f59e0b" stroke="white" strokeWidth={2} opacity={0.9} /></svg>
+            <svg width={12} height={12} style={{ display: 'block' }}><circle cx="6" cy="6" r="4.5" fill="#f59e0b" stroke="white" strokeWidth={2} opacity={0.9} /></svg>
             Dividend
           </span>
           <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-            <svg width={10} height={10} style={{ display: 'block' }}><circle cx="5" cy="5" r="4.5" fill="#f97316" stroke="white" strokeWidth={2} opacity={0.9} /></svg>
+            <svg width={12} height={12} style={{ display: 'block' }}><circle cx="6" cy="6" r="4.5" fill="#f97316" stroke="white" strokeWidth={2} opacity={0.9} /></svg>
             Div. Reinvest
           </span>
         </div>
