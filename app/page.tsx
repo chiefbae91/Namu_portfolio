@@ -18,7 +18,7 @@ import AccountBanner from '@/components/AccountBanner';
 import ThemeToggle from '@/components/ThemeToggle';
 import PriceAlertToasts, { PriceAlert } from '@/components/PriceAlertToasts';
 
-const TRANSFER_OFFSET = 1_000_000;
+const TRANSFER_PREFIX = 'tf-';
 
 export default function Home() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -133,7 +133,7 @@ export default function Home() {
     const tfs: any[] = await tfRes.json();
 
     const transfers: Transaction[] = tfs.map(tf => ({
-      id: TRANSFER_OFFSET + tf.id,
+      id: `${TRANSFER_PREFIX}${tf.id}`,
       account_id: tf.account_id,
       account_name: tf.account_name,
       date: tf.date,
@@ -191,16 +191,20 @@ export default function Home() {
 
   const handleTransactionSubmit = async (data: any) => {
     if (data.type === 'transfer_deposit' || data.type === 'transfer_withdraw') {
-      await fetch('/api/transfers', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          account_id: data.account_id,
-          date: data.date,
-          amount: data.price,
-          type: data.type === 'transfer_deposit' ? 'DEPOSIT' : 'WITHDRAW',
-          description: data.notes,
-        }),
-      });
+      const cfType = data.type === 'transfer_deposit' ? 'DEPOSIT' : 'WITHDRAW';
+      if (editingTx) {
+        const tfId = String(editingTx.id).slice(TRANSFER_PREFIX.length);
+        await fetch(`/api/transfers/${tfId}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: data.price, date: data.date, type: cfType }),
+        });
+        setEditingTx(null);
+      } else {
+        await fetch('/api/transfers', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ account_id: data.account_id, date: data.date, amount: data.price, type: cfType }),
+        });
+      }
     } else if (editingTx) {
       await fetch(`/api/transactions/${editingTx.id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
@@ -261,19 +265,19 @@ export default function Home() {
     setTxModalOpen(true);
   };
 
-  const deleteOne = (id: number) => {
-    if (id >= TRANSFER_OFFSET) {
-      return fetch(`/api/transfers/${id - TRANSFER_OFFSET}`, { method: 'DELETE' });
+  const deleteOne = (id: string | number) => {
+    if (typeof id === 'string' && id.startsWith(TRANSFER_PREFIX)) {
+      return fetch(`/api/transfers/${id.slice(TRANSFER_PREFIX.length)}`, { method: 'DELETE' });
     }
     return fetch(`/api/transactions/${id}`, { method: 'DELETE' });
   };
 
-  const handleDeleteTx = async (id: number) => {
+  const handleDeleteTx = async (id: string | number) => {
     await deleteOne(id);
     refreshAll();
   };
 
-  const handleDeleteMany = async (ids: number[]) => {
+  const handleDeleteMany = async (ids: (string | number)[]) => {
     await Promise.all(ids.map(deleteOne));
     refreshAll();
   };

@@ -214,7 +214,12 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
   // Load editing tx
   useEffect(() => {
     if (editingTx) {
-      setType(editingTx.type);
+      if (editingTx.type === 'transfer_deposit' || editingTx.type === 'transfer_withdraw') {
+        setType('transfer');
+        setTransferDir(editingTx.type === 'transfer_deposit' ? 'DEPOSIT' : 'WITHDRAW');
+      } else {
+        setType(editingTx.type);
+      }
       setAccountId(editingTx.account_id);
       setTicker(editingTx.ticker);
       setDate(ymdToDisplay(editingTx.date));
@@ -340,7 +345,11 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
           {/* Header */}
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
             <h2 style={{ margin:0, fontSize:17, fontWeight:700 }}>
-              {isEditing ? `Edit Trade #${editingTx!.id}` : 'Add Trading History'}
+              {isEditing
+                ? (editingTx!.type === 'transfer_deposit' || editingTx!.type === 'transfer_withdraw')
+                  ? 'Edit Transfer'
+                  : `Edit Trade #${editingTx!.id}`
+                : 'Add Trading History'}
             </h2>
             <button type="button" onClick={onClose} style={{ background:'none', color:'var(--muted)', padding:4 }}>
               <X size={18} />

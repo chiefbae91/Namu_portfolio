@@ -330,8 +330,7 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
                     {tx.notes ? <NoteTooltip note={tx.notes} /> : <span className="muted">—</span>}
                   </td>
                   <td style={{ display: 'flex', gap: 6 }}>
-                    {tx.type !== 'transfer_deposit' && tx.type !== 'transfer_withdraw'
-                      && tx.type !== 'dividend' && tx.subtype !== 'DIVIDEND_REINVEST' && (
+                    {tx.type !== 'dividend' && tx.subtype !== 'DIVIDEND_REINVEST' && (
                       <button style={{ background: 'none', color: 'var(--accent)', padding: 4 }}
                         onClick={() => onEdit(tx)} title="수정"><Pencil size={13} /></button>
                     )}
@@ -360,8 +359,7 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
           const isTransfer = tx.type === 'transfer_deposit' || tx.type === 'transfer_withdraw';
           const total = (tx.type === 'cash' || isTransfer) ? tx.price : tx.quantity * tx.price;
           const isSelected = selected.has(tx.id);
-          const canEditTx = tx.type !== 'transfer_deposit' && tx.type !== 'transfer_withdraw'
-            && tx.type !== 'dividend' && tx.subtype !== 'DIVIDEND_REINVEST';
+          const canEditTx = tx.type !== 'dividend' && tx.subtype !== 'DIVIDEND_REINVEST';
           return (
             <div key={tx.id} className="mobile-card" style={{ background: isSelected ? 'rgba(99,102,241,0.08)' : 'var(--surface)' }}>
               {/* Row 1: checkbox, badge, ticker, date */}
