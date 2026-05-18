@@ -60,7 +60,7 @@ const StockChart = memo(function StockChart({ ticker, period, interval, hideTran
         const newTxs: TxRow[] = data.transactions ?? [];
         const ri: string = data.resolvedInterval ?? interval;
         setCandles(newCandles);
-        setChartTxs(newTxs.map(tx => ({ date: tx.date, type: tx.type, subtype: tx.subtype, price: tx.price, quantity: tx.quantity, notes: tx.notes })));
+        setChartTxs(newTxs.map(tx => ({ date: tx.date, type: tx.type.toLowerCase(), subtype: tx.subtype, price: tx.price, quantity: tx.quantity, notes: tx.notes })));
         setResolvedInterval(ri);
         onLoadedRef.current?.({ price: data.price ?? 0, transactions: newTxs, resolvedInterval: ri, holdings: data.holdings ?? [] });
       })
