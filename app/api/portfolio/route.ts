@@ -112,7 +112,7 @@ export async function GET(req: NextRequest) {
     const t = (tx.type as string).toLowerCase();
     const delta = t === 'sell' ? tx.quantity * tx.price - tx.fee
       : t === 'buy' ? -(tx.quantity * tx.price + tx.fee)
-      : t === 'dividend' ? tx.quantity * tx.price
+      : t === 'dividend' ? (tx.quantity > 0 ? tx.quantity * tx.price : tx.price)
       : t === 'cash' ? tx.price : 0;
     accCashMap[tx.account_id] = (accCashMap[tx.account_id] || 0) + delta;
   }

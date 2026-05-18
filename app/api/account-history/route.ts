@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
       const tx = txs[ti++];
       if (tx.type === 'buy') { holdings[tx.ticker!] = (holdings[tx.ticker!] ?? 0) + tx.quantity; cash -= tx.quantity * tx.price + (tx.fee ?? 0); }
       else if (tx.type === 'sell') { holdings[tx.ticker!] = (holdings[tx.ticker!] ?? 0) - tx.quantity; cash += tx.quantity * tx.price - (tx.fee ?? 0); }
-      else if (tx.type === 'dividend') { cash += tx.quantity * tx.price; }
+      else if (tx.type === 'dividend') { cash += tx.quantity > 0 ? tx.quantity * tx.price : tx.price; }
       else if (tx.type === 'cash') { cash += tx.price; }
     }
     while (fi < flows.length && flows[fi].date <= date) {

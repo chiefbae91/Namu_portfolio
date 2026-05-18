@@ -19,8 +19,9 @@ interface Props {
 
 function fmtUSD(v: number, signed = false) {
   const abs = `$${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (v < 0) return `-${abs}`;
   if (!signed) return abs;
-  return v >= 0 ? `+${abs}` : `-${abs}`;
+  return `+${abs}`;
 }
 function fmtKRW(usd: number, rate: number, signed = false) {
   const abs = `₩${Math.round(Math.abs(usd) * rate).toLocaleString('en-US')}`;
