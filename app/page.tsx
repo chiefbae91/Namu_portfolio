@@ -23,7 +23,7 @@ const TRANSFER_PREFIX = 'tf-';
 export default function Home() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountFilter, setAccountFilter] = useState<string>(''); // '' = all, '1,2,3' = subset
-const [rates, setRates] = useState<ExchangeRates>({ USD: 1, KRW: 1380, EUR: 0.92, DXY: 104, WTI: 78, GOLD: 2300, ES: 5800, ES_PREV: 5800, T5Y: 4.25, T10Y: 4.50, T30Y: 4.75 });
+  const [rates, setRates] = useState<ExchangeRates>({ USD: 1, KRW: 1380, KRW_PREV: 1380, EUR: 0.92, DXY: 104, DXY_PREV: 104, WTI: 78, WTI_PREV: 78, GOLD: 2300, GOLD_PREV: 2300, ES: 5800, ES_PREV: 5800, T5Y: 4.25, T10Y: 4.50, T30Y: 4.75 });
   const [showKrw, setShowKrw] = useState(true);
   const [showEur, setShowEur] = useState(false);
   const [activeTab, setActiveTab] = useState<'portfolio' | 'history' | 'hints'>('portfolio');
@@ -473,36 +473,74 @@ const [rates, setRates] = useState<ExchangeRates>({ USD: 1, KRW: 1380, EUR: 0.92
                 </div>
               );
             })()}
-            <div className="market-sep" style={{ width: 1, height: 20, background: 'var(--border)' }} />
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-              <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>WTI</span>
-              <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-oil)', fontVariantNumeric: 'tabular-nums' }}>
-                ${rates.WTI.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-            <div className="market-sep" style={{ width: 1, height: 20, background: 'var(--border)' }} />
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-              <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>GOLD</span>
-              <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-gold-commodity)', fontVariantNumeric: 'tabular-nums' }}>
-                ${rates.GOLD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-            <div className="market-sep" style={{ width: 1, height: 20, background: 'var(--border)' }} />
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-              <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>DXY</span>
-              <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
-                {rates.DXY.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-            {showKrw && <div className="market-sep" style={{ width: 1, height: 20, background: 'var(--border)' }} />}
-            {showKrw && (
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-krw)', fontVariantNumeric: 'tabular-nums' }}>
-                  ₩{Math.round(rates.KRW).toLocaleString('en-US')}
-                </span>
-                <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}>/USD</span>
-              </div>
-            )}
+            {(() => {
+              const chg = rates.WTI - rates.WTI_PREV;
+              const pct = rates.WTI_PREV !== 0 ? (chg / rates.WTI_PREV) * 100 : 0;
+              const col = chg >= 0 ? 'var(--green)' : 'var(--red)';
+              return (<>
+                <div className="market-sep" style={{ width: 1, height: 20, background: 'var(--border)' }} />
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>WTI</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-oil)', fontVariantNumeric: 'tabular-nums' }}>
+                    ${rates.WTI.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: col, fontVariantNumeric: 'tabular-nums' }}>
+                    {chg >= 0 ? '+' : ''}{chg.toFixed(2)} ({chg >= 0 ? '+' : ''}{pct.toFixed(2)}%)
+                  </span>
+                </div>
+              </>);
+            })()}
+            {(() => {
+              const chg = rates.GOLD - rates.GOLD_PREV;
+              const pct = rates.GOLD_PREV !== 0 ? (chg / rates.GOLD_PREV) * 100 : 0;
+              const col = chg >= 0 ? 'var(--green)' : 'var(--red)';
+              return (<>
+                <div className="market-sep" style={{ width: 1, height: 20, background: 'var(--border)' }} />
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>GOLD</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-gold-commodity)', fontVariantNumeric: 'tabular-nums' }}>
+                    ${rates.GOLD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: col, fontVariantNumeric: 'tabular-nums' }}>
+                    {chg >= 0 ? '+' : ''}{chg.toFixed(2)} ({chg >= 0 ? '+' : ''}{pct.toFixed(2)}%)
+                  </span>
+                </div>
+              </>);
+            })()}
+            {(() => {
+              const chg = rates.DXY - rates.DXY_PREV;
+              const pct = rates.DXY_PREV !== 0 ? (chg / rates.DXY_PREV) * 100 : 0;
+              const col = chg >= 0 ? 'var(--green)' : 'var(--red)';
+              return (<>
+                <div className="market-sep" style={{ width: 1, height: 20, background: 'var(--border)' }} />
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>DXY</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
+                    {rates.DXY.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: col, fontVariantNumeric: 'tabular-nums' }}>
+                    {chg >= 0 ? '+' : ''}{chg.toFixed(2)} ({chg >= 0 ? '+' : ''}{pct.toFixed(2)}%)
+                  </span>
+                </div>
+              </>);
+            })()}
+            {showKrw && (() => {
+              const chg = rates.KRW - rates.KRW_PREV;
+              const pct = rates.KRW_PREV !== 0 ? (chg / rates.KRW_PREV) * 100 : 0;
+              const col = chg >= 0 ? 'var(--red)' : 'var(--green)';
+              return (<>
+                <div className="market-sep" style={{ width: 1, height: 20, background: 'var(--border)' }} />
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-krw)', fontVariantNumeric: 'tabular-nums' }}>
+                    ₩{Math.round(rates.KRW).toLocaleString('en-US')}
+                  </span>
+                  <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}>/USD</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: col, fontVariantNumeric: 'tabular-nums' }}>
+                    {chg >= 0 ? '+' : ''}{Math.round(chg)} ({chg >= 0 ? '+' : ''}{pct.toFixed(2)}%)
+                  </span>
+                </div>
+              </>);
+            })()}
             {showEur && <div className="market-sep" style={{ width: 1, height: 20, background: 'var(--border)' }} />}
             {showEur && (
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>

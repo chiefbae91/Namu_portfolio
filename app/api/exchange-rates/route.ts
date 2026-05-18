@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAuthUser, unauthorized } from '@/lib/auth';
 
-const FALLBACK: Record<string, number> = { USD: 1, KRW: 1380, EUR: 0.92, DXY: 104, WTI: 78, GOLD: 2300, ES: 5800, ES_PREV: 5800, T5Y: 4.25, T10Y: 4.50, T30Y: 4.75 };
+const FALLBACK: Record<string, number> = { USD: 1, KRW: 1380, KRW_PREV: 1380, EUR: 0.92, DXY: 104, DXY_PREV: 104, WTI: 78, WTI_PREV: 78, GOLD: 2300, GOLD_PREV: 2300, ES: 5800, ES_PREV: 5800, T5Y: 4.25, T10Y: 4.50, T30Y: 4.75 };
 
 async function yahooRate(symbol: string): Promise<number | null> {
   try {
@@ -43,11 +43,11 @@ export async function GET() {
   // USDKRW=X → 1 USD = X KRW (direct)
   // EURUSD=X → 1 EUR = X USD → invert to get USD→EUR rate
   const [krw, eurusd, dxy, wti, gold, es, t5y, t10y, t30y] = await Promise.all([
-    yahooRate('USDKRW=X'),
+    yahooQuote('USDKRW=X'),
     yahooRate('EURUSD=X'),
-    yahooRate('DX-Y.NYB'),
-    yahooRate('CL=F'),
-    yahooRate('GC=F'),
+    yahooQuote('DX-Y.NYB'),
+    yahooQuote('CL=F'),
+    yahooQuote('GC=F'),
     yahooQuote('ES=F'),
     yahooRate('^FVX'),
     yahooRate('^TNX'),
@@ -56,11 +56,15 @@ export async function GET() {
 
   return NextResponse.json({
     USD: 1,
-    KRW: krw ?? FALLBACK.KRW,
+    KRW: krw?.price ?? FALLBACK.KRW,
+    KRW_PREV: krw?.prevClose ?? FALLBACK.KRW_PREV,
     EUR: eurusd != null ? 1 / eurusd : FALLBACK.EUR,
-    DXY: dxy ?? FALLBACK.DXY,
-    WTI: wti ?? FALLBACK.WTI,
-    GOLD: gold ?? FALLBACK.GOLD,
+    DXY: dxy?.price ?? FALLBACK.DXY,
+    DXY_PREV: dxy?.prevClose ?? FALLBACK.DXY_PREV,
+    WTI: wti?.price ?? FALLBACK.WTI,
+    WTI_PREV: wti?.prevClose ?? FALLBACK.WTI_PREV,
+    GOLD: gold?.price ?? FALLBACK.GOLD,
+    GOLD_PREV: gold?.prevClose ?? FALLBACK.GOLD_PREV,
     ES: es?.price ?? FALLBACK.ES,
     ES_PREV: es?.prevClose ?? FALLBACK.ES_PREV,
     T5Y: t5y ?? FALLBACK.T5Y,

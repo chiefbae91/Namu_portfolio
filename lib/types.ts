@@ -89,10 +89,14 @@ export interface OptionPosition {
 export interface ExchangeRates {
   USD: number;
   KRW: number;
+  KRW_PREV: number;
   EUR: number;
   DXY: number;
+  DXY_PREV: number;
   WTI: number;
+  WTI_PREV: number;
   GOLD: number;
+  GOLD_PREV: number;
   ES: number;
   ES_PREV: number;
   T5Y: number;
