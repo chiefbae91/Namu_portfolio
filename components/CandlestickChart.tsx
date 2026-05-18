@@ -239,12 +239,14 @@ export default function CandlestickChart({ candles, transactions = [], chartHint
                   const txX = cx + txXOffset(j);
                   const isDR = tx.subtype === 'DIVIDEND_REINVEST';
 
+                  // Buy ▲ below candle low, Sell ▼ above candle high — always visible, never camouflaged by candle body
                   let txY: number;
-                  if (tx.type === 'dividend' || isDR) {
-                    txY = PAD.top + toY(c.close);
+                  if (tx.type === 'buy') {
+                    txY = PAD.top + toY(c.low) + 10;
+                  } else if (tx.type === 'sell') {
+                    txY = PAD.top + toY(c.high) - 10;
                   } else {
-                    if (tx.price < yMin || tx.price > yMax) return null;
-                    txY = PAD.top + toY(tx.price);
+                    txY = PAD.top + toY(c.close);
                   }
                   txY = Math.max(PAD.top + 8, Math.min(PAD.top + ch - 8, txY));
 
