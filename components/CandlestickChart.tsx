@@ -263,14 +263,14 @@ export default function CandlestickChart({ candles, transactions = [], chartHint
                     return (
                       <polygon key={j}
                         points={`${txX},${txY - 7} ${txX - 5},${txY + 4} ${txX + 5},${txY + 4}`}
-                        fill="#10b981" stroke="white" strokeWidth={2} opacity={0.9} {...markerHandlers}
+                        fill="#10b981" stroke="white" strokeWidth={2} strokeLinejoin="round" opacity={0.9} {...markerHandlers}
                       />
                     );
                   } else if (tx.type === 'sell') {
                     return (
                       <polygon key={j}
                         points={`${txX - 5},${txY - 4} ${txX + 5},${txY - 4} ${txX},${txY + 7}`}
-                        fill="#ef4444" stroke="white" strokeWidth={2} opacity={0.9} {...markerHandlers}
+                        fill="#ef4444" stroke="white" strokeWidth={2} strokeLinejoin="round" opacity={0.9} {...markerHandlers}
                       />
                     );
                   } else {
@@ -332,11 +332,11 @@ export default function CandlestickChart({ candles, transactions = [], chartHint
             OHLC
           </span>
           <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-            <svg width={12} height={14} style={{ display: 'block' }}><polygon points="6,2 1,12 11,12" fill="#10b981" stroke="white" strokeWidth={2} opacity={0.9} /></svg>
+            <svg width={12} height={14} style={{ display: 'block' }}><polygon points="6,2 1,12 11,12" fill="#10b981" stroke="white" strokeWidth={2} strokeLinejoin="round" opacity={0.9} /></svg>
             Buy
           </span>
           <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-            <svg width={12} height={14} style={{ display: 'block' }}><polygon points="1,2 11,2 6,12" fill="#ef4444" stroke="white" strokeWidth={2} opacity={0.9} /></svg>
+            <svg width={12} height={14} style={{ display: 'block' }}><polygon points="1,2 11,2 6,12" fill="#ef4444" stroke="white" strokeWidth={2} strokeLinejoin="round" opacity={0.9} /></svg>
             Sell
           </span>
           <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
