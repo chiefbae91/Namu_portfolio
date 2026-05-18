@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, Settings, FileUp, RefreshCw, LogOut, HelpCircle } from 'lucide-react';
+import { Settings, FileUp, RefreshCw, LogOut, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
 import { Account, AccountBreakdown, ExchangeRates, PortfolioPosition, SummaryData, Transaction, TradingHint } from '@/lib/types';
@@ -23,9 +23,7 @@ const TRANSFER_PREFIX = 'tf-';
 export default function Home() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountFilter, setAccountFilter] = useState<string>(''); // '' = all, '1,2,3' = subset
-  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
-  const accountDropdownRef = useRef<HTMLDivElement>(null);
-  const [rates, setRates] = useState<ExchangeRates>({ USD: 1, KRW: 1380, EUR: 0.92, DXY: 104, WTI: 78, GOLD: 2300, ES: 5800, ES_PREV: 5800, T5Y: 4.25, T10Y: 4.50, T30Y: 4.75 });
+const [rates, setRates] = useState<ExchangeRates>({ USD: 1, KRW: 1380, EUR: 0.92, DXY: 104, WTI: 78, GOLD: 2300, ES: 5800, ES_PREV: 5800, T5Y: 4.25, T10Y: 4.50, T30Y: 4.75 });
   const [showKrw, setShowKrw] = useState(true);
   const [showEur, setShowEur] = useState(false);
   const [activeTab, setActiveTab] = useState<'portfolio' | 'history' | 'hints'>('portfolio');
@@ -176,18 +174,24 @@ export default function Home() {
 
   useEffect(() => { fetchPortfolio(); fetchTransactions(); }, [accountFilter]);
 
-  // Close account dropdown on outside click
-  useEffect(() => {
-    if (!accountDropdownOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (accountDropdownRef.current && !accountDropdownRef.current.contains(e.target as Node))
-        setAccountDropdownOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [accountDropdownOpen]);
-
   const refreshAll = () => { fetchPortfolio(); fetchTransactions(); };
+
+  const handleAccountSelect = (id: string) => {
+    setAccountFilter(id);
+    localStorage.setItem('namu_account_filter', id);
+  };
+
+  // Restore saved account filter after accounts load
+  useEffect(() => {
+    if (!accountsLoaded) return;
+    const saved = localStorage.getItem('namu_account_filter') ?? '';
+    if (!saved) return;
+    if (visibleAccounts.some(a => String(a.id) === saved)) {
+      setAccountFilter(saved);
+    } else {
+      localStorage.removeItem('namu_account_filter');
+    }
+  }, [accountsLoaded]);
 
   const handleTransactionSubmit = async (data: any) => {
     if (data.type === 'transfer_deposit' || data.type === 'transfer_withdraw') {
@@ -307,10 +311,6 @@ export default function Home() {
   };
 
   const visibleAccounts = accounts.filter(a => !a.hidden);
-  const checkedIds: Set<string | number> = accountFilter === ''
-    ? new Set(visibleAccounts.map(a => a.id))
-    : new Set(accountFilter.split(','));
-  const allChecked = visibleAccounts.every(a => checkedIds.has(a.id));
 
   return (
     <div style={{ minHeight: '100vh', padding: '0 0 40px' }}>
@@ -342,44 +342,7 @@ export default function Home() {
           >{appName}</h1>
         )}
 
-        <div ref={accountDropdownRef} className="mobile-hide" style={{ position: 'relative' }}>
-          <button
-            onClick={() => setAccountDropdownOpen(o => !o)}
-            style={{ minWidth: 160, padding: '6px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 13 }}
-          >
-            <span>
-              {allChecked ? 'All Accounts' : checkedIds.size === 1
-                ? visibleAccounts.find(a => checkedIds.has(a.id))?.name ?? '1 Account'
-                : `${checkedIds.size} Accounts`}
-            </span>
-            <ChevronDown size={13} style={{ flexShrink: 0, transform: accountDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
-          </button>
-          {accountDropdownOpen && (
-            <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, minWidth: 200, boxShadow: '0 4px 16px rgba(0,0,0,0.4)', padding: '4px 0' }}>
-              {visibleAccounts.map(a => (
-                <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', cursor: 'pointer', fontSize: 13 }}>
-                  <input
-                    type="checkbox"
-                    checked={checkedIds.has(a.id)}
-                    style={{ cursor: 'pointer', accentColor: 'var(--accent)' }}
-                    onChange={e => {
-                      const next = new Set(checkedIds);
-                      if (e.target.checked) next.add(a.id); else next.delete(a.id);
-                      if (next.size === 0) {
-                        alert('At least one account must be selected.');
-                        return;
-                      }
-                      const nowAll = visibleAccounts.every(acc => next.has(acc.id));
-                      setAccountFilter(nowAll ? '' : [...next].sort().join(','));
-                    }}
-                  />
-                  {a.name}
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
-        <button className="mobile-hide" onClick={() => setAccountSettingsOpen(true)}
+        <button onClick={() => setAccountSettingsOpen(true)}
           style={{ background: 'var(--border)', color: 'var(--muted)', padding: '6px 10px' }}
           title="Manage Accounts"><Settings size={15} /></button>
 
@@ -445,46 +408,44 @@ export default function Home() {
         </button>
       </div>
 
-      {/* Mobile-only: account dropdown + settings below header */}
-      <div className="mobile-only-flex" style={{ background: 'var(--header-bg)', borderBottom: '1px solid var(--border)', padding: '8px 14px', gap: 8, alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: 1 }}>
-          <button
-            onClick={() => setAccountDropdownOpen(o => !o)}
-            style={{ width: '100%', padding: '8px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 13 }}
-          >
-            <span>
-              {allChecked ? 'All Accounts' : checkedIds.size === 1
-                ? visibleAccounts.find(a => checkedIds.has(a.id))?.name ?? '1 Account'
-                : `${checkedIds.size} Accounts`}
-            </span>
-            <ChevronDown size={13} style={{ flexShrink: 0, transform: accountDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
-          </button>
-          {accountDropdownOpen && (
-            <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, minWidth: 200, width: '100%', boxShadow: '0 4px 16px rgba(0,0,0,0.4)', padding: '4px 0' }}>
-              {visibleAccounts.map(a => (
-                <label key={`mob-${a.id}`} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', cursor: 'pointer', fontSize: 13 }}>
-                  <input
-                    type="checkbox"
-                    checked={checkedIds.has(a.id)}
-                    style={{ cursor: 'pointer', accentColor: 'var(--accent)' }}
-                    onChange={e => {
-                      const next = new Set(checkedIds);
-                      if (e.target.checked) next.add(a.id); else next.delete(a.id);
-                      if (next.size === 0) { alert('At least one account must be selected.'); return; }
-                      const nowAll = visibleAccounts.every(acc => next.has(acc.id));
-                      setAccountFilter(nowAll ? '' : [...next].sort().join(','));
-                    }}
-                  />
-                  {a.name}
-                </label>
-              ))}
-            </div>
-          )}
+      {/* Account Tab Bar */}
+      {accountsLoaded && visibleAccounts.length > 0 && (
+        <div style={{
+          background: 'var(--header-bg)',
+          borderBottom: '1px solid var(--border)',
+          padding: '0 12px',
+          display: 'flex',
+          alignItems: 'stretch',
+          overflowX: 'auto',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+        } as React.CSSProperties}>
+          {([{ id: '', name: 'All Accounts' }, ...visibleAccounts] as Array<{ id: string | number; name: string }>).map(acct => {
+            const isActive = accountFilter === String(acct.id);
+            return (
+              <button
+                key={String(acct.id) || 'all'}
+                onClick={() => handleAccountSelect(String(acct.id))}
+                style={{
+                  padding: '10px 18px',
+                  fontSize: 13,
+                  fontWeight: isActive ? 700 : 400,
+                  color: isActive ? 'var(--accent)' : 'var(--muted)',
+                  background: 'none',
+                  border: 'none',
+                  borderBottom: isActive ? '2px solid var(--accent)' : '2px solid transparent',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  transition: 'color 0.15s',
+                }}
+              >
+                {acct.name}
+              </button>
+            );
+          })}
         </div>
-        <button onClick={() => setAccountSettingsOpen(true)}
-          style={{ background: 'var(--border)', color: 'var(--muted)', padding: '8px 10px', minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6 }}
-          title="Manage Accounts"><Settings size={15} /></button>
-      </div>
+      )}
 
       {/* Onboarding banner — only when no accounts */}
       {accountsLoaded && accounts.length === 0 && (
