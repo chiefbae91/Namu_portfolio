@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { getAuthUser, unauthorized } from '@/lib/auth';
 
 const FALLBACK: Record<string, number> = { USD: 1, KRW: 1380, KRW_PREV: 1380, EUR: 0.92, DXY: 104, DXY_PREV: 104, WTI: 78, WTI_PREV: 78, GOLD: 2300, GOLD_PREV: 2300, ES: 5800, ES_PREV: 5800, T5Y: 4.25, T10Y: 4.50, T30Y: 4.75 };
 
@@ -39,7 +38,6 @@ async function yahooQuote(symbol: string): Promise<{ price: number; prevClose: n
 }
 
 export async function GET() {
-  if (!await getAuthUser()) return unauthorized();
   // USDKRW=X → 1 USD = X KRW (direct)
   // EURUSD=X → 1 EUR = X USD → invert to get USD→EUR rate
   const [krw, eurusd, dxy, wti, gold, es, t5y, t10y, t30y] = await Promise.all([
