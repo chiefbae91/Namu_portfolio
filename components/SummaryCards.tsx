@@ -199,21 +199,21 @@ export default function SummaryCards({
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
               {/* Header */}
-              <div style={{
+              <div className="breakdown-grid" style={{
                 display: 'grid', gridTemplateColumns: '1fr repeat(3, 120px)',
                 fontSize: 11, color: 'var(--muted)', fontWeight: 600,
                 paddingBottom: 6, borderBottom: '1px solid var(--border)', marginBottom: 4,
               }}>
                 <span>Account</span>
                 <span style={{ textAlign: 'right' }}>Total Assets</span>
-                <span style={{ textAlign: 'right' }}>Market Value</span>
-                <span style={{ textAlign: 'right' }}>Cash</span>
+                <span className="breakdown-col-hide" style={{ textAlign: 'right' }}>Market Value</span>
+                <span className="breakdown-col-hide" style={{ textAlign: 'right' }}>Cash</span>
               </div>
 
               {visibleBreakdown.map(acc => {
                 const total = acc.cash + acc.stock_value;
                 return (
-                  <div key={acc.account_id} style={{
+                  <div key={acc.account_id} className="breakdown-grid" style={{
                     display: 'grid', gridTemplateColumns: '1fr repeat(3, 120px)',
                     fontSize: 13, padding: '5px 0',
                     borderBottom: '1px solid var(--border)',
@@ -240,13 +240,13 @@ export default function SummaryCards({
                         <div style={{ fontSize: 11, color: 'var(--color-krw)' }}>{fmtKRW(total, krwRate)}</div>
                       )}
                     </div>
-                    <div style={{ textAlign: 'right' }}>
+                    <div className="breakdown-col-hide" style={{ textAlign: 'right' }}>
                       {loading ? '—' : fmtUSD(acc.stock_value)}
                       {showKrw && !loading && (
                         <div style={{ fontSize: 11, color: 'var(--color-krw)' }}>{fmtKRW(acc.stock_value, krwRate)}</div>
                       )}
                     </div>
-                    <div style={{ textAlign: 'right', color: 'var(--color-cash)' }}>
+                    <div className="breakdown-col-hide" style={{ textAlign: 'right', color: 'var(--color-cash)' }}>
                       {loading ? '—' : fmtUSD(acc.cash)}
                       {showKrw && !loading && (
                         <div style={{ fontSize: 11, color: 'var(--color-krw)' }}>{fmtKRW(acc.cash, krwRate)}</div>
@@ -257,7 +257,7 @@ export default function SummaryCards({
               })}
 
               {/* Totals row */}
-              <div style={{
+              <div className="breakdown-grid" style={{
                 display: 'grid', gridTemplateColumns: '1fr repeat(3, 120px)',
                 fontSize: 13, padding: '6px 0 2px',
                 fontWeight: 700, color: 'var(--text)',
@@ -269,13 +269,13 @@ export default function SummaryCards({
                     <div style={{ fontSize: 11, color: 'var(--color-krw)', fontWeight: 600 }}>{fmtKRW(totalNow, krwRate)}</div>
                   )}
                 </div>
-                <div style={{ textAlign: 'right' }}>
+                <div className="breakdown-col-hide" style={{ textAlign: 'right' }}>
                   {loading ? '—' : fmtUSD(stockValue)}
                   {showKrw && !loading && (
                     <div style={{ fontSize: 11, color: 'var(--color-krw)', fontWeight: 600 }}>{fmtKRW(stockValue, krwRate)}</div>
                   )}
                 </div>
-                <div style={{ textAlign: 'right', color: 'var(--color-cash)' }}>
+                <div className="breakdown-col-hide" style={{ textAlign: 'right', color: 'var(--color-cash)' }}>
                   {loading ? '—' : fmtUSD(cash)}
                   {showKrw && !loading && (
                     <div style={{ fontSize: 11, color: 'var(--color-krw)', fontWeight: 600 }}>{fmtKRW(cash, krwRate)}</div>

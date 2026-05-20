@@ -262,8 +262,12 @@ html.light .muted { color: #475569; }
   .market-row-2 { gap: 12px !important; padding: 6px 12px !important; }
 
   /* Summary cards: vertical stack */
-  .summary-top-grid { grid-template-columns: 1fr !important; }
-  .summary-toggle-btn { min-height: 44px; justify-content: center !important; }
+  .summary-top-grid { grid-template-columns: 1fr 1fr !important; }
+  .summary-toggle-btn { grid-column: span 2; min-height: 44px; justify-content: center !important; }
+
+  /* Account breakdown: hide Market Value + Cash columns, show only Account + Total */
+  .breakdown-grid { grid-template-columns: 1fr 100px !important; }
+  .breakdown-col-hide { display: none !important; }
 
   /* Table columns to hide on mobile */
   .col-hide-mobile { display: none !important; }
