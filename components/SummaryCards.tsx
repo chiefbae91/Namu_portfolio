@@ -104,9 +104,14 @@ function CompactDailyCard({ change, prevClose, krwRate, eurRate, showKrw, showEu
           ? <span style={{ fontSize: 14, color: 'var(--muted)' }}>Loading...</span>
           : !hasData
           ? <span style={{ fontSize: 14, color: 'var(--muted)' }}>—</span>
-          : <>{fmtUSD(change, true)} <span style={{ fontSize: 14, fontWeight: 600 }}>({isUp ? '+' : ''}{pct.toFixed(2)}%)</span></>
+          : fmtUSD(change, true)
         }
       </div>
+      {hasData && (
+        <div style={{ fontSize: 12, fontWeight: 600, color, marginTop: 2 }}>
+          {isUp ? '+' : ''}{pct.toFixed(2)}%
+        </div>
+      )}
       {showKrw && hasData && (
         <div style={{ fontSize: 13, fontWeight: 600, color: isUp ? 'var(--color-krw)' : 'var(--red)', marginTop: 3 }}>
           {fmtKRW(change, krwRate, true)}
