@@ -206,7 +206,7 @@ export default function Home() {
       } else {
         await fetch('/api/transfers', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ account_id: data.account_id, date: data.date, amount: data.price, type: cfType }),
+          body: JSON.stringify({ account_id: data.account_id, date: data.date, amount: data.price, type: cfType, notes: data.notes }),
         });
       }
     } else if (editingTx) {
