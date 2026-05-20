@@ -85,9 +85,10 @@ interface Props {
   onDelete: (id: string | number) => void;
   onSymbolClick?: (ticker: string) => void;
   onAddHint?: () => void;
+  isLoggedIn?: boolean;
 }
 
-export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, onAddHint }: Props) {
+export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, onAddHint, isLoggedIn = false }: Props) {
   const [tickerFilter, setTickerFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [dateMode, setDateMode] = useState<DateRangeMode>('last_month');
@@ -304,20 +305,22 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, o
                   {hint.note ? <NoteTooltip note={hint.note} /> : <span className="muted">—</span>}
                 </td>
                 <td style={{ display: 'flex', gap: 6, whiteSpace: 'nowrap' }}>
-                  <button
-                    style={{ background: 'none', color: 'var(--accent)', padding: 4 }}
-                    onClick={() => onEdit(hint)}
-                    title="Edit"
-                  >
-                    <Pencil size={13} />
-                  </button>
-                  <button
-                    style={{ background: 'none', color: 'var(--red)', padding: 4 }}
-                    onClick={() => onDelete(hint.id)}
-                    title="Delete"
-                  >
-                    <Trash2 size={13} />
-                  </button>
+                  {isLoggedIn && (<>
+                    <button
+                      style={{ background: 'none', color: 'var(--accent)', padding: 4 }}
+                      onClick={() => onEdit(hint)}
+                      title="Edit"
+                    >
+                      <Pencil size={13} />
+                    </button>
+                    <button
+                      style={{ background: 'none', color: 'var(--red)', padding: 4 }}
+                      onClick={() => onDelete(hint.id)}
+                      title="Delete"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </>)}
                 </td>
               </tr>
             ))}
@@ -373,20 +376,22 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, o
               </span>
             </div>
             {/* Row 3: actions */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4, marginTop: 8 }}>
-              <button
-                style={{ background: 'none', color: 'var(--accent)', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, minHeight: 36 }}
-                onClick={() => onEdit(hint)}
-              >
-                <Pencil size={13} /> Edit
-              </button>
-              <button
-                style={{ background: 'none', color: 'var(--red)', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, minHeight: 36 }}
-                onClick={() => onDelete(hint.id)}
-              >
-                <Trash2 size={13} /> Delete
-              </button>
-            </div>
+            {isLoggedIn && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4, marginTop: 8 }}>
+                <button
+                  style={{ background: 'none', color: 'var(--accent)', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, minHeight: 36 }}
+                  onClick={() => onEdit(hint)}
+                >
+                  <Pencil size={13} /> Edit
+                </button>
+                <button
+                  style={{ background: 'none', color: 'var(--red)', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, minHeight: 36 }}
+                  onClick={() => onDelete(hint.id)}
+                >
+                  <Trash2 size={13} /> Delete
+                </button>
+              </div>
+            )}
           </div>
         ))}
       </div>

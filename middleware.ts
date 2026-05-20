@@ -32,8 +32,11 @@ export async function middleware(request: NextRequest) {
   }
 
   const isPublic =
+    pathname === '/' ||
     pathname === '/login' ||
     pathname.startsWith('/api/auth') ||
+    pathname.startsWith('/api/trading-hints') ||
+    pathname.startsWith('/api/exchange-rates') ||
     pathname.startsWith('/_next') ||
     pathname === '/favicon.ico';
 

@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Settings, FileUp, RefreshCw, LogOut, HelpCircle } from 'lucide-react';
+import { Settings, FileUp, RefreshCw, LogOut, LogIn, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
 import { Account, AccountBreakdown, ExchangeRates, PortfolioPosition, SummaryData, Transaction, TradingHint } from '@/lib/types';
@@ -151,13 +151,17 @@ export default function Home() {
 
   useEffect(() => {
     createClient().auth.getUser().then(({ data: { user } }) => {
-      if (!user) { window.location.href = '/login'; return; }
-      setUserEmail(user.email ?? null);
+      if (user) {
+        setUserEmail(user.email ?? null);
+        fetchAccounts();
+        fetch('/api/settings?key=app_name')
+          .then(r => r.json())
+          .then(d => { if (d.value) { setAppName(d.value); document.title = d.value; } });
+      } else {
+        setAccountsLoaded(true);
+      }
     });
-    fetchAccounts(); fetchRates(); fetchTradingHints();
-    fetch('/api/settings?key=app_name')
-      .then(r => r.json())
-      .then(d => { if (d.value) { setAppName(d.value); document.title = d.value; } });
+    fetchRates(); fetchTradingHints();
   }, []);
 
   // Auto-refresh rates every 5 minutes
@@ -168,11 +172,15 @@ export default function Home() {
 
   // Auto-refresh portfolio prices every 60s (silent, no loading spinner)
   useEffect(() => {
+    if (!userEmail) return;
     const id = setInterval(() => fetchPortfolio(false), 60_000);
     return () => clearInterval(id);
-  }, [fetchPortfolio]);
+  }, [fetchPortfolio, userEmail]);
 
-  useEffect(() => { fetchPortfolio(); fetchTransactions(); }, [accountFilter]);
+  useEffect(() => {
+    if (!userEmail) return;
+    fetchPortfolio(); fetchTransactions();
+  }, [accountFilter, userEmail]);
 
   const refreshAll = () => { fetchPortfolio(); fetchTransactions(); };
 
@@ -342,9 +350,11 @@ export default function Home() {
           >{appName}</h1>
         )}
 
-        <button onClick={() => setAccountSettingsOpen(true)}
-          style={{ background: 'var(--border)', color: 'var(--muted)', padding: '6px 10px' }}
-          title="Manage Accounts"><Settings size={15} /></button>
+        {!!userEmail && (
+          <button onClick={() => setAccountSettingsOpen(true)}
+            style={{ background: 'var(--border)', color: 'var(--muted)', padding: '6px 10px' }}
+            title="Manage Accounts"><Settings size={15} /></button>
+        )}
 
         <div className="mobile-hide" style={{ flex: 1 }} />
 
@@ -374,10 +384,12 @@ export default function Home() {
           <RefreshCw size={13} style={{ animation: ratesRefreshing ? 'spin 0.6s linear infinite' : 'none' }} />
         </button>
 
-        <button className="mobile-hide" onClick={() => setCsvImportOpen(true)}
-          style={{ background: 'var(--border)', color: 'var(--muted)', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
-          <FileUp size={14} /> CSV Import
-        </button>
+        {!!userEmail && (
+          <button className="mobile-hide" onClick={() => setCsvImportOpen(true)}
+            style={{ background: 'var(--border)', color: 'var(--muted)', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
+            <FileUp size={14} /> CSV Import
+          </button>
+        )}
 
         {userEmail && (
           <span className="mobile-hide" style={{ fontSize: 11, color: 'var(--muted)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -396,16 +408,23 @@ export default function Home() {
           <HelpCircle size={15} />
         </Link>
 
-        <button
-          onClick={async () => {
-            await createClient().auth.signOut();
-            window.location.href = '/login';
-          }}
-          title="Sign out"
-          style={{ background: 'none', color: 'var(--muted)', padding: '6px 8px', display: 'flex', alignItems: 'center' }}
-        >
-          <LogOut size={15} />
-        </button>
+        {userEmail ? (
+          <button
+            onClick={async () => {
+              await createClient().auth.signOut();
+              window.location.href = '/login';
+            }}
+            title="Sign out"
+            style={{ background: 'none', color: 'var(--muted)', padding: '6px 8px', display: 'flex', alignItems: 'center' }}
+          >
+            <LogOut size={15} />
+          </button>
+        ) : (
+          <Link href="/login" title="Sign in"
+            style={{ background: 'none', color: 'var(--muted)', padding: '6px 8px', display: 'flex', alignItems: 'center' }}>
+            <LogIn size={15} />
+          </Link>
+        )}
       </div>
 
       {/* Account Tab Bar */}
@@ -448,7 +467,7 @@ export default function Home() {
       )}
 
       {/* Onboarding banner — only when no accounts */}
-      {accountsLoaded && accounts.length === 0 && (
+      {accountsLoaded && accounts.length === 0 && !!userEmail && (
         <AccountBanner onOpenAccounts={() => setAccountSettingsOpen(true)} />
       )}
 
@@ -606,7 +625,8 @@ export default function Home() {
                 onEdit={handleEditHint}
                 onDelete={handleDeleteHint}
                 onSymbolClick={ticker => { setAnalysisInitialTab('hints'); setAnalysisTicker(ticker); }}
-                onAddHint={() => { setEditingHint(null); setTradingHintOpen(true); }}
+                onAddHint={!!userEmail ? () => { setEditingHint(null); setTradingHintOpen(true); } : undefined}
+                isLoggedIn={!!userEmail}
               />
             </div>
           </>
@@ -645,7 +665,8 @@ export default function Home() {
                   onEdit={handleEditHint}
                   onDelete={handleDeleteHint}
                   onSymbolClick={ticker => { setAnalysisInitialTab('hints'); setAnalysisTicker(ticker); }}
-                  onAddHint={() => { setEditingHint(null); setTradingHintOpen(true); }}
+                  onAddHint={!!userEmail ? () => { setEditingHint(null); setTradingHintOpen(true); } : undefined}
+                  isLoggedIn={!!userEmail}
                 />
               )}
             </div>
