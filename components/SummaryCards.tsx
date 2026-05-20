@@ -43,15 +43,29 @@ interface CompactCardProps {
   showKrw: boolean;
   showEur: boolean;
   loading?: boolean;
+  prevValue?: number;
 }
 
-function CompactCard({ label, value, color, krwRate, eurRate, showKrw, showEur, loading }: CompactCardProps) {
+function CompactCard({ label, value, color, krwRate, eurRate, showKrw, showEur, loading, prevValue }: CompactCardProps) {
+  const hasChange = !loading && prevValue != null && prevValue > 0;
+  const change = hasChange ? value - prevValue! : 0;
+  const pct = hasChange ? (change / prevValue!) * 100 : 0;
+  const changeColor = change >= 0 ? 'var(--green)' : 'var(--red)';
+
   return (
     <div className="card" style={{ minWidth: 0 }}>
       <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6, fontWeight: 500 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1.2 }}>
         {loading ? <span style={{ fontSize: 14, color: 'var(--muted)' }}>Loading...</span> : fmtUSD(value)}
       </div>
+      {hasChange && (
+        <div style={{ fontSize: 12, fontWeight: 600, color: changeColor, marginTop: 2 }}>
+          {change >= 0 ? '+' : ''}{pct.toFixed(2)}%
+          <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--muted)', marginLeft: 4 }}>
+            ({fmtUSD(change, true)})
+          </span>
+        </div>
+      )}
       {showKrw && !loading && (
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-krw)', marginTop: 3 }}>
           {fmtKRW(value, krwRate)}
@@ -132,6 +146,7 @@ export default function SummaryCards({
         <CompactCard
           label="Total Assets" value={totalNow} color="var(--color-total-assets)"
           krwRate={krwRate} eurRate={eurRate} showKrw={showKrw} showEur={showEur} loading={loading}
+          prevValue={totalPrevClose}
         />
         <CompactDailyCard
           change={dailyChange} prevClose={totalPrevClose}
@@ -140,6 +155,7 @@ export default function SummaryCards({
         <CompactCard
           label="Market Value" value={stockValue} color="#6366f1"
           krwRate={krwRate} eurRate={eurRate} showKrw={showKrw} showEur={showEur} loading={loading}
+          prevValue={prevCloseStockValue}
         />
         <CompactCard
           label="Cash" value={cash} color="var(--color-cash)"
