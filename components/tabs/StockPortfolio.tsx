@@ -151,8 +151,8 @@ export default function StockPortfolio({ positions, currency, rates, onTickerCli
       <table>
         <thead>
           <tr>
-            <th className="col-hide-mobile" style={{ width: 1, whiteSpace: 'nowrap', padding: '0 4px' }}></th>
-            <th {...th('ticker', 'left')}>Symbol <SortIndicator active={sortKey === 'ticker'} dir={sortDir} /></th>
+            <th className="col-hide-mobile" style={{ width: 1, whiteSpace: 'nowrap', padding: 0 }}></th>
+            <th {...th('ticker', 'left')} style={{ ...th('ticker', 'left').style, paddingLeft: 0 }}>Symbol <SortIndicator active={sortKey === 'ticker'} dir={sortDir} /></th>
             <th {...thStatic()}>Price</th>
             <th {...thStatic()}>Shares</th>
             <th className="col-hide-mobile" {...thStatic()}>Avg Cost</th>
@@ -170,10 +170,10 @@ export default function StockPortfolio({ positions, currency, rates, onTickerCli
             const barPct = maxWeight > 0 ? (weight / maxWeight) * 100 : 0;
             return (
               <tr key={p.ticker}>
-                <td className="col-hide-mobile" style={{ textAlign: 'center', width: 1, whiteSpace: 'nowrap', padding: '0 4px' }}>
+                <td className="col-hide-mobile" style={{ textAlign: 'center', width: 1, whiteSpace: 'nowrap', padding: 0 }}>
                   <MoveBadge current={p.current_price} prev={p.prev_close} />
                 </td>
-                <td>
+                <td style={{ paddingLeft: 0 }}>
                   <button
                     onClick={() => onTickerClick(p.ticker)}
                     style={{ background: 'none', color: 'var(--accent)', fontWeight: 600, fontSize: 14, padding: 0, textDecoration: 'underline' }}
