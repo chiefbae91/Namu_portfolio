@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Settings, FileUp, RefreshCw, LogOut, LogIn, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
-import { Account, AccountBreakdown, ExchangeRates, PortfolioPosition, SummaryData, Transaction, TradingHint } from '@/lib/types';
+import { Account, AccountBreakdown, ExchangeRates, PortfolioPosition, SummaryData, Transaction, TradingHint, WatchlistQuote } from '@/lib/types';
 import StockPortfolio from '@/components/tabs/StockPortfolio';
 import TransactionHistory from '@/components/tabs/TransactionHistory';
 import TradingHints from '@/components/tabs/TradingHints';
@@ -23,6 +23,10 @@ const TRANSFER_PREFIX = 'tf-';
 export default function Home() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountFilter, setAccountFilter] = useState<string>(''); // '' = all, '1,2,3' = subset
+  const [watchlist, setWatchlist] = useState<string[]>([]);
+  const [watchlistQuotes, setWatchlistQuotes] = useState<WatchlistQuote[]>([]);
+  const [watchlistAdding, setWatchlistAdding] = useState(false);
+  const [watchlistInput, setWatchlistInput] = useState('');
   const [rates, setRates] = useState<ExchangeRates>({ USD: 1, KRW: 1380, KRW_PREV: 1380, EUR: 0.92, DXY: 104, DXY_PREV: 104, WTI: 78, WTI_PREV: 78, GOLD: 2300, GOLD_PREV: 2300, ES: 5800, ES_PREV: 5800, ES_MARKET_STATE: 'REGULAR', ES_EXT_PRICE: null, ES_EXT_CHG_PCT: null, T5Y: 4.25, T10Y: 4.50, T30Y: 4.75 });
   const [showKrw, setShowKrw] = useState(true);
   const [showEur, setShowEur] = useState(false);
@@ -60,6 +64,14 @@ export default function Home() {
     const res = await fetch('/api/trading-hints');
     setTradingHints(await res.json());
     setHintRefreshTrigger(t => t + 1);
+  }, []);
+
+  const fetchWatchlistQuotes = useCallback(async (tickers: string[]) => {
+    if (tickers.length === 0) { setWatchlistQuotes([]); return; }
+    try {
+      const res = await fetch(`/api/quotes?tickers=${tickers.join(',')}`);
+      if (res.ok) setWatchlistQuotes(await res.json());
+    } catch {}
   }, []);
 
   const fetchAccounts = useCallback(async () => {
@@ -162,6 +174,14 @@ export default function Home() {
       }
     });
     fetchRates(); fetchTradingHints();
+    try {
+      const stored = localStorage.getItem('namu_watchlist');
+      if (stored) {
+        const tickers: string[] = JSON.parse(stored);
+        setWatchlist(tickers);
+        fetchWatchlistQuotes(tickers);
+      }
+    } catch {}
   }, []);
 
   // Auto-refresh rates every 5 minutes
@@ -169,6 +189,12 @@ export default function Home() {
     const id = setInterval(fetchRates, 300_000);
     return () => clearInterval(id);
   }, [fetchRates]);
+
+  // Auto-refresh watchlist quotes every 5 minutes
+  useEffect(() => {
+    const id = setInterval(() => fetchWatchlistQuotes(watchlist), 300_000);
+    return () => clearInterval(id);
+  }, [fetchWatchlistQuotes, watchlist]);
 
   // Auto-refresh portfolio prices every 60s (silent, no loading spinner)
   useEffect(() => {
@@ -316,6 +342,22 @@ export default function Home() {
     const res = await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('failed');
     await fetchAccounts();
+  };
+
+  const addToWatchlist = (ticker: string) => {
+    const t = ticker.trim().toUpperCase();
+    if (!t || watchlist.includes(t)) return;
+    const next = [...watchlist, t];
+    setWatchlist(next);
+    localStorage.setItem('namu_watchlist', JSON.stringify(next));
+    fetchWatchlistQuotes(next);
+  };
+
+  const removeFromWatchlist = (ticker: string) => {
+    const next = watchlist.filter(t => t !== ticker);
+    setWatchlist(next);
+    localStorage.setItem('namu_watchlist', JSON.stringify(next));
+    setWatchlistQuotes(prev => prev.filter(q => q.ticker !== ticker));
   };
 
   const visibleAccounts = accounts.filter(a => !a.hidden);
@@ -610,6 +652,56 @@ export default function Home() {
                 </span>
               </div>
             ))}
+          </div>
+
+          {/* Row 3: Watchlist */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '6px 16px', borderTop: '1px solid var(--border)', flexWrap: 'wrap', minHeight: 34 }}>
+            {watchlistQuotes.map(q => {
+              const change = q.price - q.prevClose;
+              const changePct = q.prevClose > 0 ? (change / q.prevClose) * 100 : 0;
+              const isExt = q.marketState === 'PRE' || q.marketState === 'POST' || q.marketState === 'POSTPOST';
+              const displayPrice = isExt && q.extPrice != null ? q.extPrice : q.price;
+              const displayPct = isExt && q.extChangePct != null ? q.extChangePct : changePct;
+              const pctColor = displayPct >= 0 ? 'var(--green)' : 'var(--red)';
+              const badgeColor = q.marketState === 'PRE' ? '#f59e0b' : '#818cf8';
+              return (
+                <div key={q.ticker} style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>{q.ticker}</span>
+                  {isExt && (
+                    <span style={{ fontSize: 9, fontWeight: 700, color: badgeColor, border: `1px solid ${badgeColor}`, borderRadius: 3, padding: '0 3px', lineHeight: '14px' }}>
+                      {q.marketState === 'PRE' ? 'PRE' : 'POST'}
+                    </span>
+                  )}
+                  <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
+                    {q.error ? '—' : `$${displayPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                  </span>
+                  {!q.error && (
+                    <span style={{ fontSize: 11, fontWeight: 600, color: pctColor, fontVariantNumeric: 'tabular-nums' }}>
+                      {displayPct >= 0 ? '+' : ''}{displayPct.toFixed(2)}%
+                    </span>
+                  )}
+                  <button onClick={() => removeFromWatchlist(q.ticker)}
+                    style={{ background: 'none', color: 'var(--muted)', padding: '0 2px', fontSize: 13, lineHeight: 1, opacity: 0.6 }}
+                    title={`Remove ${q.ticker}`}>×</button>
+                </div>
+              );
+            })}
+            {watchlistAdding ? (
+              <input autoFocus value={watchlistInput}
+                onChange={e => setWatchlistInput(e.target.value.toUpperCase())}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') { addToWatchlist(watchlistInput); setWatchlistInput(''); setWatchlistAdding(false); }
+                  if (e.key === 'Escape') { setWatchlistAdding(false); setWatchlistInput(''); }
+                }}
+                onBlur={() => { if (watchlistInput) addToWatchlist(watchlistInput); setWatchlistAdding(false); setWatchlistInput(''); }}
+                placeholder="AAPL"
+                style={{ width: 64, fontSize: 12, padding: '2px 6px', borderRadius: 4 }} />
+            ) : (
+              <button onClick={() => setWatchlistAdding(true)}
+                style={{ fontSize: 11, color: 'var(--muted)', background: 'none', padding: '1px 4px', opacity: 0.7 }}>
+                + Add
+              </button>
+            )}
           </div>
         </div>
 

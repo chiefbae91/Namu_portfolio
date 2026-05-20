@@ -37,6 +37,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/api/trading-hints') ||
     pathname.startsWith('/api/exchange-rates') ||
+    pathname.startsWith('/api/quotes') ||
     pathname.startsWith('/_next') ||
     pathname === '/favicon.ico';
 

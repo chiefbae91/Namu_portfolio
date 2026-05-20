@@ -107,6 +107,16 @@ export interface ExchangeRates {
   T30Y: number;
 }
 
+export interface WatchlistQuote {
+  ticker: string;
+  price: number;
+  prevClose: number;
+  marketState: string;
+  extPrice: number | null;
+  extChangePct: number | null;
+  error?: boolean;
+}
+
 export interface SummaryData {
   cash: number;
   stock: number;
