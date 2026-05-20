@@ -17,7 +17,15 @@ async function yahooRate(symbol: string): Promise<number | null> {
   }
 }
 
-async function yahooQuote(symbol: string): Promise<{ price: number; prevClose: number } | null> {
+interface Quote {
+  price: number;
+  prevClose: number;
+  marketState: string;
+  extPrice: number | null;
+  extChangePct: number | null;
+}
+
+async function yahooQuote(symbol: string): Promise<Quote | null> {
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1m&range=1d`;
     const res = await fetch(url, {
@@ -31,7 +39,20 @@ async function yahooQuote(symbol: string): Promise<{ price: number; prevClose: n
     const price: number = meta.regularMarketPrice;
     const prevClose: number = meta.chartPreviousClose ?? meta.regularMarketPreviousClose ?? price;
     if (price == null) return null;
-    return { price, prevClose };
+
+    const marketState: string = meta.marketState ?? 'REGULAR';
+    let extPrice: number | null = null;
+    let extChangePct: number | null = null;
+
+    if (marketState === 'PRE' && meta.preMarketPrice != null) {
+      extPrice = meta.preMarketPrice;
+      extChangePct = meta.preMarketChangePercent ?? null;
+    } else if ((marketState === 'POST' || marketState === 'POSTPOST') && meta.postMarketPrice != null) {
+      extPrice = meta.postMarketPrice;
+      extChangePct = meta.postMarketChangePercent ?? null;
+    }
+
+    return { price, prevClose, marketState, extPrice, extChangePct };
   } catch {
     return null;
   }
@@ -65,6 +86,9 @@ export async function GET() {
     GOLD_PREV: gold?.prevClose ?? FALLBACK.GOLD_PREV,
     ES: es?.price ?? FALLBACK.ES,
     ES_PREV: es?.prevClose ?? FALLBACK.ES_PREV,
+    ES_MARKET_STATE: es?.marketState ?? 'REGULAR',
+    ES_EXT_PRICE: es?.extPrice ?? null,
+    ES_EXT_CHG_PCT: es?.extChangePct ?? null,
     T5Y: t5y ?? FALLBACK.T5Y,
     T10Y: t10y ?? FALLBACK.T10Y,
     T30Y: t30y ?? FALLBACK.T30Y,

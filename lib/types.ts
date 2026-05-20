@@ -99,6 +99,9 @@ export interface ExchangeRates {
   GOLD_PREV: number;
   ES: number;
   ES_PREV: number;
+  ES_MARKET_STATE: string;
+  ES_EXT_PRICE: number | null;
+  ES_EXT_CHG_PCT: number | null;
   T5Y: number;
   T10Y: number;
   T30Y: number;

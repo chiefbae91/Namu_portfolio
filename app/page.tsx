@@ -23,7 +23,7 @@ const TRANSFER_PREFIX = 'tf-';
 export default function Home() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountFilter, setAccountFilter] = useState<string>(''); // '' = all, '1,2,3' = subset
-  const [rates, setRates] = useState<ExchangeRates>({ USD: 1, KRW: 1380, KRW_PREV: 1380, EUR: 0.92, DXY: 104, DXY_PREV: 104, WTI: 78, WTI_PREV: 78, GOLD: 2300, GOLD_PREV: 2300, ES: 5800, ES_PREV: 5800, T5Y: 4.25, T10Y: 4.50, T30Y: 4.75 });
+  const [rates, setRates] = useState<ExchangeRates>({ USD: 1, KRW: 1380, KRW_PREV: 1380, EUR: 0.92, DXY: 104, DXY_PREV: 104, WTI: 78, WTI_PREV: 78, GOLD: 2300, GOLD_PREV: 2300, ES: 5800, ES_PREV: 5800, ES_MARKET_STATE: 'REGULAR', ES_EXT_PRICE: null, ES_EXT_CHG_PCT: null, T5Y: 4.25, T10Y: 4.50, T30Y: 4.75 });
   const [showKrw, setShowKrw] = useState(true);
   const [showEur, setShowEur] = useState(false);
   const [activeTab, setActiveTab] = useState<'portfolio' | 'history' | 'hints'>('portfolio');
@@ -480,15 +480,32 @@ export default function Home() {
               const esChange = rates.ES - rates.ES_PREV;
               const esChangePct = rates.ES_PREV !== 0 ? (esChange / rates.ES_PREV) * 100 : 0;
               const esColor = esChange >= 0 ? 'var(--green)' : 'var(--red)';
+              const ms = rates.ES_MARKET_STATE;
+              const isExt = ms === 'PRE' || ms === 'POST' || ms === 'POSTPOST';
+              const extPrice = rates.ES_EXT_PRICE;
+              const extPct = rates.ES_EXT_CHG_PCT;
+              const extColor = extPct != null ? (extPct >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--muted)';
+              const badgeColor = ms === 'PRE' ? '#f59e0b' : '#818cf8';
               return (
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>ES</span>
+                  {isExt && (
+                    <span style={{ fontSize: 9, fontWeight: 700, color: badgeColor, border: `1px solid ${badgeColor}`, borderRadius: 3, padding: '0 3px', letterSpacing: '0.04em', lineHeight: '14px' }}>
+                      {ms === 'PRE' ? 'PRE' : 'POST'}
+                    </span>
+                  )}
                   <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
-                    {rates.ES.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {(isExt && extPrice != null ? extPrice : rates.ES).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: esColor, fontVariantNumeric: 'tabular-nums' }}>
-                    {esChange >= 0 ? '+' : ''}{esChange.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({esChange >= 0 ? '+' : ''}{esChangePct.toFixed(2)}%)
-                  </span>
+                  {isExt && extPrice != null ? (
+                    <span style={{ fontSize: 11, fontWeight: 600, color: extColor, fontVariantNumeric: 'tabular-nums' }}>
+                      {extPct != null ? `${extPct >= 0 ? '+' : ''}${extPct.toFixed(2)}%` : ''}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: 11, fontWeight: 600, color: esColor, fontVariantNumeric: 'tabular-nums' }}>
+                      {esChange >= 0 ? '+' : ''}{esChange.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({esChange >= 0 ? '+' : ''}{esChangePct.toFixed(2)}%)
+                    </span>
+                  )}
                 </div>
               );
             })()}
