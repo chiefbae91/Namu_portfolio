@@ -141,7 +141,7 @@ export default function Home() {
       price: tf.amount,
       fee: 0,
       currency: 'USD',
-      notes: tf.description,
+      notes: tf.note ?? '',
     }));
 
     const combined = [...txs, ...transfers]
@@ -200,7 +200,7 @@ export default function Home() {
         const tfId = String(editingTx.id).slice(TRANSFER_PREFIX.length);
         await fetch(`/api/transfers/${tfId}`, {
           method: 'PUT', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ account_id: data.account_id, amount: data.price, date: data.date, type: cfType }),
+          body: JSON.stringify({ account_id: data.account_id, amount: data.price, date: data.date, type: cfType, notes: data.notes }),
         });
         setEditingTx(null);
       } else {

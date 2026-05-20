@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabase
     .from('cash_flow')
-    .select('id, account_id, type, amount, flow_date')
+    .select('id, account_id, type, amount, flow_date, note')
     .eq('user_id', user.id)
     .order('flow_date', { ascending: false })
     .order('id', { ascending: false });
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json((data || []).map(r => ({
     ...r,
     date: r.flow_date,
-    description: '',
+    note: r.note ?? '',
     account_name: nameMap[r.account_id] ?? cfAcctLabel[r.account_id] ?? '—',
   })));
 }
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   const user = await getAuthUser();
   if (!user) return unauthorized();
   const supabase = getAdminClient();
-  const { account_id, date, amount, type } = await req.json();
+  const { account_id, date, amount, type, notes } = await req.json();
 
   if (!account_id || !date || !amount || !type) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabase
     .from('cash_flow')
-    .insert({ account_id, flow_date: date, amount, type, user_id: user.id })
+    .insert({ account_id, flow_date: date, amount, type, note: notes || '', user_id: user.id })
     .select('id')
     .single();
 
