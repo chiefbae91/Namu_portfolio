@@ -54,15 +54,20 @@ function getAccountInitials(name: string): string {
 const TYPE_LABELS: Record<string, string> = {
   buy: 'Buy', sell: 'Sell', dividend: 'Dividend', cash: 'Cash',
   transfer_deposit: 'Transfer - Deposit', transfer_withdraw: 'Transfer - Withdraw',
+  split: 'Split', consolidation: 'Reverse Split',
 };
 const TYPE_COLORS: Record<string, string> = {
   buy: 'var(--green)', sell: 'var(--red)', dividend: 'var(--color-dividend)', cash: 'var(--color-cash)',
   transfer_deposit: 'var(--color-transfer-in)', transfer_withdraw: 'var(--color-transfer-out)',
+  split: '#6366f1', consolidation: '#f59e0b',
 };
 
-function txLabel(tx: { type: string; subtype?: string | null }): string {
+function txLabel(tx: { type: string; subtype?: string | null; quantity?: number }): string {
   if (tx.subtype === 'DIVIDEND_REINVEST') return 'Div. Reinvest';
-  return TYPE_LABELS[tx.type.toLowerCase()] || tx.type;
+  const t = tx.type.toLowerCase();
+  if (t === 'split') return `${tx.quantity ?? ''}:1 Split`;
+  if (t === 'consolidation') return `1:${tx.quantity ?? ''} Reverse Split`;
+  return TYPE_LABELS[t] || tx.type;
 }
 function txColor(tx: { type: string; subtype?: string | null }): string {
   if (tx.subtype === 'DIVIDEND_REINVEST') return 'var(--color-transfer-in)';
@@ -322,10 +327,21 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
                       {txLabel(tx)}
                     </span>
                   </td>
-                  <td style={{ textAlign: 'right' }}>{tx.quantity > 0 ? tx.quantity : '-'}</td>
-                  <td style={{ textAlign: 'right' }}>{tx.price > 0 ? fmt(tx.price) : '-'}</td>
-                  <td style={{ textAlign: 'right' }}>{fmt(total)}</td>
-                  <td style={{ textAlign: 'right' }} className="muted">{tx.fee > 0 ? fmt(tx.fee) : '-'}</td>
+                  {tx.type === 'split' || tx.type === 'consolidation' ? (
+                    <>
+                      <td style={{ textAlign: 'right', color: TYPE_COLORS[tx.type] }} colSpan={3}>
+                        {tx.type === 'split' ? `×${tx.quantity}` : `÷${tx.quantity}`}
+                      </td>
+                      <td className="muted" style={{ textAlign: 'right' }}>—</td>
+                    </>
+                  ) : (
+                    <>
+                      <td style={{ textAlign: 'right' }}>{tx.quantity > 0 ? tx.quantity : '-'}</td>
+                      <td style={{ textAlign: 'right' }}>{tx.price > 0 ? fmt(tx.price) : '-'}</td>
+                      <td style={{ textAlign: 'right' }}>{fmt(total)}</td>
+                      <td style={{ textAlign: 'right' }} className="muted">{tx.fee > 0 ? fmt(tx.fee) : '-'}</td>
+                    </>
+                  )}
                   <td style={{ overflow: 'hidden', maxWidth: 0 }}>
                     {tx.notes ? <NoteTooltip note={tx.notes} /> : <span className="muted">—</span>}
                   </td>
@@ -385,10 +401,18 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
                 <span style={{ color: txColor(tx), fontWeight: 500, fontSize: 12 }}>{txLabel(tx)}</span>
                 <span style={{ flex: 1 }} />
-                {tx.quantity > 0 && tx.price > 0 && (
-                  <span style={{ fontSize: 12, color: 'var(--muted)' }}>{tx.quantity} @ {fmt(tx.price)}</span>
+                {(tx.type === 'split' || tx.type === 'consolidation') ? (
+                  <span style={{ fontSize: 12, color: TYPE_COLORS[tx.type], fontWeight: 600 }}>
+                    {tx.type === 'split' ? `×${tx.quantity}` : `÷${tx.quantity}`}
+                  </span>
+                ) : (
+                  <>
+                    {tx.quantity > 0 && tx.price > 0 && (
+                      <span style={{ fontSize: 12, color: 'var(--muted)' }}>{tx.quantity} @ {fmt(tx.price)}</span>
+                    )}
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{fmt(total)}</span>
+                  </>
                 )}
-                <span style={{ fontSize: 13, fontWeight: 600 }}>{fmt(total)}</span>
               </div>
               {/* Row 3: actions */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4, marginTop: 6 }}>

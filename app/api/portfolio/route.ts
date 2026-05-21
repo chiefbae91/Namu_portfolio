@@ -47,39 +47,65 @@ export async function GET(req: NextRequest) {
   const [
     { data: buyRows },
     { data: sellRows },
+    { data: splitRows },
     { data: allTxRows },
     { data: cashFlowRows },
   ] = await Promise.all([
     supabase.from('transactions').select('id, transaction_date, ticker, account_id, quantity, price, fee')
       .eq('user_id', user.id).ilike('type', 'buy').order('transaction_date').order('id'),
-    supabase.from('transactions').select('id, ticker, quantity, account_id')
+    supabase.from('transactions').select('id, transaction_date, ticker, account_id, quantity')
       .eq('user_id', user.id).ilike('type', 'sell').order('transaction_date').order('id'),
+    supabase.from('transactions').select('id, transaction_date, ticker, account_id, quantity, type')
+      .eq('user_id', user.id).or('type.ilike.split,type.ilike.consolidation').order('transaction_date').order('id'),
     supabase.from('transactions').select('account_id, type, quantity, price, fee').eq('user_id', user.id),
     supabase.from('cash_flow').select('account_id, amount, type').eq('user_id', user.id),
   ]);
 
   interface Lot { id: string; ticker: string; account_id: string; quantity: number; price: number; fee: number; remaining: number; }
-  const lots: Lot[] = (buyRows || []).map((r: any) => ({ ...r, remaining: r.quantity }));
+  const lots: Lot[] = [];
 
-  // Apply sells FIFO — same account first, then cross-account fallback for mismatched UUIDs
-  for (const sell of sellRows || []) {
-    let need = sell.quantity;
-    // Pass 1: same account_id
-    for (const lot of lots) {
-      if (need <= 0) break;
-      if (lot.ticker !== sell.ticker || lot.account_id !== sell.account_id || lot.remaining < 0.00001) continue;
-      const use = Math.min(lot.remaining, need);
-      lot.remaining -= use;
-      need -= use;
-    }
-    // Pass 2: any account (handles old imported data where buy/sell have different UUIDs)
-    if (need > 0.00001) {
+  // Build unified timeline: buys + sells + splits, sorted chronologically
+  type BuyEvent   = { _kind: 'buy';           id: string; transaction_date: string; ticker: string; account_id: string; quantity: number; price: number; fee: number; };
+  type SellEvent  = { _kind: 'sell';          id: string; transaction_date: string; ticker: string; account_id: string; quantity: number; };
+  type SplitEvent = { _kind: 'split' | 'consolidation'; id: string; transaction_date: string; ticker: string; account_id: string; quantity: number; };
+
+  const timeline: (BuyEvent | SellEvent | SplitEvent)[] = [
+    ...(buyRows  || []).map((r: any) => ({ ...r, _kind: 'buy'  as const })),
+    ...(sellRows || []).map((r: any) => ({ ...r, _kind: 'sell' as const })),
+    ...(splitRows || []).map((r: any) => ({ ...r, _kind: r.type.toLowerCase() as 'split' | 'consolidation' })),
+  ].sort((a, b) => a.transaction_date.localeCompare(b.transaction_date) || String(a.id).localeCompare(String(b.id)));
+
+  for (const ev of timeline) {
+    if (ev._kind === 'buy') {
+      lots.push({ id: ev.id, ticker: ev.ticker, account_id: ev.account_id, quantity: ev.quantity, price: ev.price, fee: (ev as any).fee, remaining: ev.quantity });
+    } else if (ev._kind === 'split' || ev._kind === 'consolidation') {
+      const ratio = ev.quantity;
+      for (const lot of lots) {
+        if (lot.ticker !== ev.ticker || lot.account_id !== ev.account_id || lot.remaining < 0.00001) continue;
+        if (ev._kind === 'split') {
+          lot.quantity  *= ratio;
+          lot.remaining *= ratio;
+          lot.price     /= ratio;
+        } else {
+          lot.quantity  /= ratio;
+          lot.remaining /= ratio;
+          lot.price     *= ratio;
+        }
+      }
+    } else {
+      // sell — FIFO same account first, then cross-account fallback
+      let need = ev.quantity;
       for (const lot of lots) {
         if (need <= 0) break;
-        if (lot.ticker !== sell.ticker || lot.remaining < 0.00001) continue;
-        const use = Math.min(lot.remaining, need);
-        lot.remaining -= use;
-        need -= use;
+        if (lot.ticker !== ev.ticker || lot.account_id !== ev.account_id || lot.remaining < 0.00001) continue;
+        const use = Math.min(lot.remaining, need); lot.remaining -= use; need -= use;
+      }
+      if (need > 0.00001) {
+        for (const lot of lots) {
+          if (need <= 0) break;
+          if (lot.ticker !== ev.ticker || lot.remaining < 0.00001) continue;
+          const use = Math.min(lot.remaining, need); lot.remaining -= use; need -= use;
+        }
       }
     }
   }

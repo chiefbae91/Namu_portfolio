@@ -17,6 +17,8 @@ const TX_TYPES = [
   { value: 'sell', label: '주식매도' },
   { value: 'dividend', label: '배당' },
   { value: 'cash', label: '현금' },
+  { value: 'split', label: '주식분할' },
+  { value: 'consolidation', label: '주식병합' },
 ];
 
 const LOT_METHODS: { value: TaxLotMethod; label: string }[] = [
@@ -328,9 +330,23 @@ export default function TransactionForm({ accounts, currency, editingTx, onSubmi
       }
     }
 
+    if ((type === 'split' || type === 'consolidation') && parseFloat(qty || '0') <= 1) {
+      alert('비율은 1보다 큰 숫자여야 합니다. (예: 2:1 분할이면 2 입력)');
+      return;
+    }
+
     setLoading(true);
     try {
       const ymd = displayToYmd(date);
+      if (type === 'split' || type === 'consolidation') {
+        await onSubmit({
+          account_id: accountId, date: ymd,
+          ticker: ticker.toUpperCase(),
+          type, quantity: parseFloat(qty), price: 0, fee: 0, notes: '',
+        });
+        if (!editingTx) reset();
+        return;
+      }
       if (type === 'option') {
         await onSubmit({
           account_id: accountId, date: ymd, ticker: ticker.toUpperCase(),
@@ -416,8 +432,18 @@ export default function TransactionForm({ accounts, currency, editingTx, onSubmi
             />
           </div>
 
+          {/* Ratio (split / consolidation) */}
+          {(type === 'split' || type === 'consolidation') && (
+            <div className="form-group">
+              <label>{type === 'split' ? '분할 비율' : '병합 비율'}</label>
+              <input value={qty} onChange={e => setQty(e.target.value)}
+                type="number" step="any" min="1.0001" placeholder={type === 'split' ? '2 (2:1)' : '10 (1:10)'}
+                style={{ width: 100 }} required title="1보다 큰 숫자 입력 (예: 2:1 분할이면 2)" />
+            </div>
+          )}
+
           {/* Quantity */}
-          {type !== 'cash' && type !== 'dividend' && (
+          {type !== 'cash' && type !== 'dividend' && type !== 'split' && type !== 'consolidation' && (
             <div className="form-group">
               <label>수량{type === 'option' ? ' (계약)' : ''}</label>
               <input value={qty} onChange={e => setQty(e.target.value)}
@@ -426,16 +452,18 @@ export default function TransactionForm({ accounts, currency, editingTx, onSubmi
           )}
 
           {/* Price */}
-          <div className="form-group">
-            <label>
-              {type === 'cash' ? `금액 (${sym})` : type === 'dividend' ? `배당금 (${sym})` : type === 'option' ? `프리미엄 (${sym})` : `단가 (${sym})`}
-            </label>
-            <input value={price} onChange={e => setPrice(e.target.value)}
-              type="number" step="any" min="0" placeholder="0.00" style={{ width: 100 }} />
-          </div>
+          {type !== 'split' && type !== 'consolidation' && (
+            <div className="form-group">
+              <label>
+                {type === 'cash' ? `금액 (${sym})` : type === 'dividend' ? `배당금 (${sym})` : type === 'option' ? `프리미엄 (${sym})` : `단가 (${sym})`}
+              </label>
+              <input value={price} onChange={e => setPrice(e.target.value)}
+                type="number" step="any" min="0" placeholder="0.00" style={{ width: 100 }} />
+            </div>
+          )}
 
           {/* Fee */}
-          {type !== 'cash' && (
+          {type !== 'cash' && type !== 'split' && type !== 'consolidation' && (
             <div className="form-group">
               <label>수수료 ({sym})</label>
               <input value={fee} onChange={e => setFee(e.target.value)}
