@@ -8,9 +8,9 @@ export async function GET(req: NextRequest) {
   const supabase = getAdminClient();
   const { searchParams } = new URL(req.url);
   const ticker = searchParams.get('ticker');
+  const accountIds = searchParams.get('account_ids');
 
   const { data: accounts } = await supabase.from('accounts').select('id, name, hidden').eq('user_id', user.id);
-  const visibleAccounts = (accounts || []).filter((a: any) => !a.hidden);
   // Include all accounts (hidden too) so old imported UUIDs can still resolve
   const nameMap: Record<string, string> = Object.fromEntries((accounts || []).map((a: any) => [a.id, a.name]));
 
@@ -22,6 +22,10 @@ export async function GET(req: NextRequest) {
     .order('id', { ascending: false });
 
   if (ticker) query = query.eq('ticker', ticker);
+  if (accountIds) {
+    const ids = accountIds.split(',').filter(Boolean);
+    if (ids.length > 0) query = query.in('account_id', ids);
+  }
 
   const { data: txData, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

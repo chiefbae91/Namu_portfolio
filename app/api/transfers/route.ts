@@ -6,15 +6,25 @@ export async function GET(req: NextRequest) {
   const user = await getAuthUser();
   if (!user) return unauthorized();
   const supabase = getAdminClient();
+  const { searchParams } = new URL(req.url);
+  const accountIds = searchParams.get('account_ids');
+
   const { data: accounts } = await supabase.from('accounts').select('id, name, hidden').eq('user_id', user.id);
   const nameMap: Record<string, string> = Object.fromEntries((accounts || []).map((a: any) => [a.id, a.name]));
 
-  const { data, error } = await supabase
+  let cfQuery = supabase
     .from('cash_flow')
     .select('id, account_id, type, amount, flow_date, note')
     .eq('user_id', user.id)
     .order('flow_date', { ascending: false })
     .order('id', { ascending: false });
+
+  if (accountIds) {
+    const ids = accountIds.split(',').filter(Boolean);
+    if (ids.length > 0) cfQuery = cfQuery.in('account_id', ids);
+  }
+
+  const { data, error } = await cfQuery;
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
