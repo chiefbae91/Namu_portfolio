@@ -37,38 +37,33 @@ function dupCheckSync(existing: any[], date: string, ticker: string, type: strin
   );
 }
 
-// ─── Format detection ─────────────────────────────────────────────
-function detectFormat(headers: string[]): 'robinhood' | 'new' | 'webull' | 'ib' {
-  const lower = headers.map(h => h.toLowerCase().trim());
+// ─── IB helpers ───────────────────────────────────────────────────
 
-  // IB Activity Statement: first col = section name, second col = "Header" or "Data"
-  const ibSections = ['statement', 'trades', 'dividends', 'positions', 'deposits & withdrawals', 'cash transactions'];
-  if (ibSections.includes(lower[0]) && (lower[1] === 'header' || lower[1] === 'data')) return 'ib';
+// Known IB Activity Statement section names (first column values)
+const IB_SECTION_NAMES = new Set([
+  'header', 'account', 'trades', 'dividends', 'statement', 'positions',
+  'open positions', 'closed positions', 'changeinNav', 'changeinnavchange',
+  'deposits & withdrawals', 'cash transactions', 'financial instrument information',
+  'interest accruals', 'fees', 'net asset value', 'mark-to-market',
+]);
 
-  // IB Flex Query flat export: characteristic column names
-  if (lower.some(h => h === 'ibcommission' || h === 'ib commission') ||
-      (lower.some(h => h === 'buysell' || h === 'buy/sell') &&
-       lower.some(h => h === 'tradedate' || h === 'trade date' || h === 'tradeprice' || h === 'trade price'))) return 'ib';
-
-  // Webull
-  if (lower.some(h => h === 'side') && lower.some(h => h === 'filled time' || h === 'placed time')) return 'webull';
-  if (lower.some(h => h === 'side') && lower.some(h => h.includes('filled qty') || h === 'qty')) return 'webull';
-
-  // Generic new format
-  if (lower.some(h => h === 'costbasis' || h === 'cost basis')) return 'new';
-  if (lower.some(h => h === 'trans code' || h === 'trans_code' || h === 'instrument')) return 'robinhood';
-  if (lower.includes('type') && !lower.includes('trans code')) return 'new';
-  return 'robinhood';
+// Detect IB Activity Statement: any row where col[0] is a known IB section
+// AND col[1] is 'Data' or 'Header'
+function isIBActivityStatement(rawRows: string[][]): boolean {
+  return rawRows.some(r => {
+    const s = (r[0] || '').trim().toLowerCase();
+    const c1 = (r[1] || '').trim().toLowerCase();
+    return IB_SECTION_NAMES.has(s) && (c1 === 'data' || c1 === 'header');
+  });
 }
 
-// ─── IB helpers ───────────────────────────────────────────────────
 function parseIBDate(s: string): string {
   if (!s) return '';
   const clean = s.trim();
-  // Activity Statement: "2024-01-15, 09:30:00"
+  // "2024-01-15, 09:30:00" or "2024-01-15 09:30:00"
   let m = clean.match(/^(\d{4}-\d{2}-\d{2})/);
   if (m) return m[1];
-  // Flex Query compact: "20240115" or "20240115;093000" or "20240115,093000"
+  // Flex Query compact: "20240115" or "20240115;093000"
   m = clean.replace(/[;,\s].*$/, '').match(/^(\d{4})(\d{2})(\d{2})$/);
   if (m) return `${m[1]}-${m[2]}-${m[3]}`;
   return '';
@@ -79,20 +74,16 @@ function parseIBNum(s: string): number {
   return parseFloat(s.replace(/[,$\s"]/g, '')) || 0;
 }
 
-// Column value getter: tries multiple alternative names case-insensitively
-function ibGet(obj: Record<string, string>, ...keys: string[]): string {
-  for (const k of keys) {
-    const v = obj[k];
-    if (v !== undefined) return v.trim();
-    // Case-insensitive fallback
-    const kl = k.toLowerCase();
-    const found = Object.keys(obj).find(ok => ok.toLowerCase().trim() === kl);
-    if (found && obj[found] !== undefined) return obj[found].trim();
-  }
-  return '';
-}
-
-// ─── IB Activity Statement parser (multi-section CSV) ────────────
+// ─── IB Activity Statement parser ────────────────────────────────
+//
+// Handles two header layouts that IB uses:
+//   Format A (classic):  col[0]=Section, col[1]='Header'|'Data', col[2]=first-field
+//   Format B (custom):   col[0]=Section, col[1]='Data', col[2]='Header'|discriminator, col[3]=first-field
+//
+// Because both layouts store real values at the same positional offsets as
+// their header rows, we capture the full raw header row and map data rows
+// index-by-index — this works for both formats without any special branching.
+//
 function parseIBActivityStatement(allRows: string[][], existing: any[]): CsvPreviewRow[] {
   const preview: CsvPreviewRow[] = [];
   const sectionHeaders: Record<string, string[]> = {};
@@ -100,13 +91,23 @@ function parseIBActivityStatement(allRows: string[][], existing: any[]): CsvPrev
   for (const row of allRows) {
     if (row.length < 3) continue;
     const section = row[0]?.trim();
-    const rowType = row[1]?.trim();
+    const col1 = row[1]?.trim();
+    const col2 = row[2]?.trim();
 
-    if (rowType === 'Header') {
+    // ── Header row detection (both Format A and Format B) ──
+    // Format A: Section,Header,col,...
+    // Format B: Section,Data,Header,col,...
+    const isHeaderRow = col1 === 'Header' || (col1 === 'Data' && col2 === 'Header');
+    if (isHeaderRow) {
       sectionHeaders[section] = row.map(h => h.trim());
       continue;
     }
-    if (rowType !== 'Data') continue;
+
+    // Process only 'Data' rows
+    if (col1 !== 'Data') continue;
+
+    // Skip aggregation rows (Total, SubTotal) that IB inserts
+    if (col2 === 'Total' || col2 === 'SubTotal' || col2 === 'Summary') continue;
 
     const hdrs = sectionHeaders[section];
     if (!hdrs) continue;
@@ -114,26 +115,28 @@ function parseIBActivityStatement(allRows: string[][], existing: any[]): CsvPrev
     const obj: Record<string, string> = {};
     hdrs.forEach((h, i) => { obj[h] = row[i]?.trim() ?? ''; });
 
-    // ── Trades ──────────────────────────────────────────────────
+    // ── Trades ──────────────────────────────────────────────
     if (section === 'Trades') {
-      const discriminator = obj['DataDiscriminator'] || '';
-      // Skip subtotals, summaries, and cancelled trades
-      if (discriminator && discriminator !== 'Order') continue;
+      // DataDiscriminator can be at obj['DataDiscriminator'] (Format A) or
+      // the col[2] value which lands in obj['Header'] (Format B)
+      const discriminator = obj['DataDiscriminator'] || obj['Header'] || '';
+      if (discriminator && discriminator !== 'Order' && discriminator !== 'order') continue;
 
-      const assetCat = (obj['Asset Category'] || '').toLowerCase();
-      // Only import equity/stocks; skip options, forex, futures
-      if (assetCat && !assetCat.includes('stock') && !assetCat.includes('equit')) continue;
+      const assetCat = (obj['Asset Category'] || obj['AssetClass'] || '').toLowerCase();
+      // Allow: Stocks, Equity, STK
+      if (assetCat && !assetCat.includes('stock') && !assetCat.includes('equit') && assetCat !== 'stk') continue;
 
       const symbol = (obj['Symbol'] || '').toUpperCase().replace(/\s+/g, '');
       if (!symbol) continue;
 
-      const dateStr = parseIBDate(obj['Date/Time'] || '');
+      const dateStr = parseIBDate(obj['Date/Time'] || obj['DateTime'] || '');
       if (!dateStr) continue;
 
       const rawQty = parseIBNum(obj['Quantity']);
       const qty = Math.abs(rawQty);
-      const price = Math.abs(parseIBNum(obj['T. Price']));
-      const fee = Math.abs(parseIBNum(obj['Comm/Fee']));
+      const price = Math.abs(parseIBNum(obj['T. Price'] || obj['TradePrice'] || obj['Price'] || ''));
+      // IB uses 'Comm/Fee' in some exports, 'Commission' in others
+      const fee = Math.abs(parseIBNum(obj['Comm/Fee'] || obj['Commission'] || obj['IBCommission'] || ''));
 
       if (qty === 0 || price === 0) continue;
 
@@ -147,17 +150,17 @@ function parseIBActivityStatement(allRows: string[][], existing: any[]): CsvPrev
       });
     }
 
-    // ── Dividends ────────────────────────────────────────────────
+    // ── Dividends ────────────────────────────────────────────
     else if (section === 'Dividends') {
       const dateStr = (obj['Date'] || '').substring(0, 10);
       if (!dateStr) continue;
 
       const description = obj['Description'] || '';
       const amount = parseIBNum(obj['Amount']);
-      if (amount <= 0) continue; // negative = withholding tax adjustment
+      if (amount <= 0) continue; // negative = withholding tax adj
 
       // Extract ticker: "AAPL(US0378331005) Cash Dividend..." or "AAPL Cash Dividend..."
-      const tickerMatch = description.match(/^([A-Z][A-Z0-9./]{0,9})\s*(?:\(|[\s])/);
+      const tickerMatch = description.match(/^([A-Z][A-Z0-9./]{0,9})\s*[\s(]/);
       const symbol = tickerMatch ? tickerMatch[1] : '';
       if (!symbol) continue;
 
@@ -171,15 +174,13 @@ function parseIBActivityStatement(allRows: string[][], existing: any[]): CsvPrev
       });
     }
 
-    // ── Deposits & Withdrawals ────────────────────────────────────
+    // ── Deposits & Withdrawals ────────────────────────────────
     else if (section === 'Deposits & Withdrawals') {
       const dateStr = (obj['Settle Date'] || obj['Date'] || '').substring(0, 10);
       if (!dateStr) continue;
-
       const description = (obj['Description'] || '').trim();
       const amount = parseIBNum(obj['Amount']);
       if (amount === 0) continue;
-      // Skip withholding tax adjustments
       if (description.toLowerCase().includes('withholding') || description.toLowerCase().includes('tax')) continue;
 
       const type: TransactionType = amount > 0 ? 'transfer_deposit' : 'transfer_withdraw';
@@ -196,9 +197,19 @@ function parseIBActivityStatement(allRows: string[][], existing: any[]): CsvPrev
 }
 
 // ─── IB Flex Query parser (flat CSV) ─────────────────────────────
+function ibGet(obj: Record<string, string>, ...keys: string[]): string {
+  for (const k of keys) {
+    const v = obj[k];
+    if (v !== undefined) return v.trim();
+    const kl = k.toLowerCase();
+    const found = Object.keys(obj).find(ok => ok.toLowerCase().trim() === kl);
+    if (found !== undefined) return obj[found].trim();
+  }
+  return '';
+}
+
 function parseIBFlexQuery(rows: Record<string, string>[], existing: any[]): CsvPreviewRow[] {
   const preview: CsvPreviewRow[] = [];
-
   for (const row of rows) {
     const assetClass = ibGet(row, 'AssetClass', 'Asset Class', 'AssetCategory', 'Asset Category', 'Instrument Type');
     if (assetClass && !assetClass.toLowerCase().includes('stk') &&
@@ -217,7 +228,6 @@ function parseIBFlexQuery(rows: Record<string, string>[], existing: any[]): CsvP
     const qty = Math.abs(parseIBNum(ibGet(row, 'Quantity', 'Qty', 'FilledQty', 'Filled Qty')));
     const price = Math.abs(parseIBNum(ibGet(row, 'TradePrice', 'Trade Price', 'T. Price', 'Price')));
     const fee = Math.abs(parseIBNum(ibGet(row, 'IBCommission', 'IB Commission', 'Comm/Fee', 'Commission', 'Fee')));
-
     if (qty === 0 || price === 0) continue;
 
     const type: TransactionType = buySell === 'BUY' ? 'buy' : 'sell';
@@ -229,26 +239,24 @@ function parseIBFlexQuery(rows: Record<string, string>[], existing: any[]): CsvP
       raw_code: buySell,
     });
   }
-
   return preview;
 }
 
-// ─── IB entry point ───────────────────────────────────────────────
-function parseIBRows(text: string, existing: any[]): CsvPreviewRow[] {
-  // Parse without headers to inspect structure
-  const rawParsed = Papa.parse<string[]>(text, { header: false, skipEmptyLines: true, quoteChar: '"' });
-  const allRows = rawParsed.data;
+// ─── Format detection (for non-IB flat CSVs) ─────────────────────
+function detectFormat(headers: string[]): 'robinhood' | 'new' | 'webull' | 'ib' {
+  const lower = headers.map(h => h.toLowerCase().trim());
 
-  // Activity Statement: has rows where col[1] === 'Header' or 'Data'
-  const isActivityStatement = allRows.some(r => r[1]?.trim() === 'Header' || r[1]?.trim() === 'Data');
+  // IB Flex Query flat export
+  if (lower.some(h => h === 'ibcommission' || h === 'ib commission') ||
+      (lower.some(h => h === 'buysell' || h === 'buy/sell') &&
+       lower.some(h => h === 'tradedate' || h === 'trade date' || h === 'tradeprice' || h === 'trade price'))) return 'ib';
 
-  if (isActivityStatement) {
-    return parseIBActivityStatement(allRows, existing);
-  }
-
-  // Flex Query flat format
-  const flatParsed = Papa.parse<Record<string, string>>(text, { header: true, skipEmptyLines: true, quoteChar: '"' });
-  return parseIBFlexQuery(flatParsed.data, existing);
+  if (lower.some(h => h === 'side') && lower.some(h => h === 'filled time' || h === 'placed time')) return 'webull';
+  if (lower.some(h => h === 'side') && lower.some(h => h.includes('filled qty') || h === 'qty')) return 'webull';
+  if (lower.some(h => h === 'costbasis' || h === 'cost basis')) return 'new';
+  if (lower.some(h => h === 'trans code' || h === 'trans_code' || h === 'instrument')) return 'robinhood';
+  if (lower.includes('type') && !lower.includes('trans code')) return 'new';
+  return 'robinhood';
 }
 
 // ─── Webull parser ────────────────────────────────────────────────
@@ -316,7 +324,6 @@ function parseNewRows(rows: Record<string, string>[], ticker: string, accountId:
     const price = Math.abs(parseAmount(row['Price'] || row['price'] || '0'));
     const costBasis = Math.abs(parseAmount(row['CostBasis'] || row['Cost Basis'] || row['costbasis'] || '0'));
     const fee = Math.max(0, Math.abs(costBasis - qty * price));
-
     if (mappedType === 'dividend_reinvest') {
       const divAmount = costBasis || qty * price;
       preview.push({ date, ticker, type: 'dividend', quantity: 0, price: divAmount, amount: divAmount, fee: 0, notes: 'Dividend Reinvest (배당)', skip: false, duplicate: dupCheckSync(existing, date, ticker, 'dividend', 0, divAmount), raw_code: rawType });
@@ -351,6 +358,26 @@ export async function POST(req: NextRequest) {
   if (!ownedAccount) return NextResponse.json({ error: 'Account not found' }, { status: 404 });
 
   const text = await file.text();
+
+  const { data: existingTxs } = await supabase.from('transactions').select('transaction_date, ticker, type, quantity, price').eq('account_id', accId);
+  const existing = existingTxs || [];
+
+  // ── Step 1: check for IB Activity Statement using raw (no-header) parse ──
+  // IB Activity Statement has section names in col[0] and 'Data'/'Header' in col[1].
+  // This must run before the header:true parse because IB files often start with
+  // metadata rows (Header,Version,...) whose first row would mislead detectFormat.
+  const rawParsed = Papa.parse<string[]>(text, { header: false, skipEmptyLines: true, quoteChar: '"' });
+  const rawRows = rawParsed.data;
+
+  if (isIBActivityStatement(rawRows)) {
+    const preview = parseIBActivityStatement(rawRows, existing);
+    const format = 'ib';
+    const action = formData.get('action');
+    if (action === 'import') return doImport(supabase, accId, user.id, preview);
+    return NextResponse.json({ preview, total: preview.length, format });
+  }
+
+  // ── Step 2: header:true parse for all other formats ──
   const parsed = Papa.parse<Record<string, string>>(text, { header: true, skipEmptyLines: true, quoteChar: '"' });
   const rows = parsed.data;
   if (!rows.length) return NextResponse.json({ error: '데이터 없음' }, { status: 400 });
@@ -360,46 +387,45 @@ export async function POST(req: NextRequest) {
 
   if (format === 'new' && !tickerInput) return NextResponse.json({ error: 'ticker_required', format }, { status: 400 });
 
-  const { data: existingTxs } = await supabase.from('transactions').select('transaction_date, ticker, type, quantity, price').eq('account_id', accId);
-  const existing = existingTxs || [];
-
   const preview =
-    format === 'ib'      ? parseIBRows(text, existing)
+    format === 'ib'       ? parseIBFlexQuery(rows, existing)
     : format === 'webull' ? parseWebullRows(rows, accId, existing)
     : format === 'new'    ? parseNewRows(rows, tickerInput, accId, existing)
     :                       parseRobinhoodRows(rows, accId, existing);
 
   const action = formData.get('action');
-  if (action === 'import') {
-    // Transfer-type rows go to cash_flow table; everything else to transactions
-    const transferRows = preview.filter(p => !p.skip && !p.duplicate && (p.type === 'transfer_deposit' || p.type === 'transfer_withdraw'));
-    const txRows = preview.filter(p => !p.skip && !p.duplicate && p.type !== 'transfer_deposit' && p.type !== 'transfer_withdraw');
+  if (action === 'import') return doImport(supabase, accId, user.id, preview);
+  return NextResponse.json({ preview, total: preview.length, format });
+}
 
-    let importedCount = 0;
+// ─── Shared import handler ────────────────────────────────────────
+async function doImport(supabase: any, accId: string, userId: string, preview: CsvPreviewRow[]) {
+  const importable = preview.filter(p => !p.skip && !p.duplicate);
+  const transferRows = importable.filter(p => p.type === 'transfer_deposit' || p.type === 'transfer_withdraw');
+  const txRows = importable.filter(p => p.type !== 'transfer_deposit' && p.type !== 'transfer_withdraw');
 
-    if (txRows.length) {
-      const toInsert = txRows.map(p => ({
-        account_id: accId, transaction_date: p.date, ticker: p.ticker, type: p.type,
-        quantity: p.quantity, price: p.price, fee: p.fee, note: p.notes, user_id: user.id,
-      }));
-      const { error } = await supabase.from('transactions').insert(toInsert);
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      importedCount += toInsert.length;
-    }
+  let importedCount = 0;
 
-    if (transferRows.length) {
-      const cfInsert = transferRows.map(p => ({
-        account_id: accId, amount: p.price,
-        type: p.type === 'transfer_deposit' ? 'DEPOSIT' : 'WITHDRAWAL',
-        date: p.date, note: p.notes, user_id: user.id,
-      }));
-      const { error } = await supabase.from('cash_flow').insert(cfInsert);
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      importedCount += cfInsert.length;
-    }
-
-    return NextResponse.json({ imported: importedCount, total: preview.length });
+  if (txRows.length) {
+    const toInsert = txRows.map(p => ({
+      account_id: accId, transaction_date: p.date, ticker: p.ticker, type: p.type,
+      quantity: p.quantity, price: p.price, fee: p.fee, note: p.notes, user_id: userId,
+    }));
+    const { error } = await supabase.from('transactions').insert(toInsert);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    importedCount += toInsert.length;
   }
 
-  return NextResponse.json({ preview, total: preview.length, format });
+  if (transferRows.length) {
+    const cfInsert = transferRows.map(p => ({
+      account_id: accId, amount: p.price,
+      type: p.type === 'transfer_deposit' ? 'DEPOSIT' : 'WITHDRAWAL',
+      date: p.date, note: p.notes, user_id: userId,
+    }));
+    const { error } = await supabase.from('cash_flow').insert(cfInsert);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    importedCount += cfInsert.length;
+  }
+
+  return NextResponse.json({ imported: importedCount, total: preview.length });
 }
