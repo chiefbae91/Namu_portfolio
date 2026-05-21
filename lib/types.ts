@@ -110,8 +110,11 @@ export interface ExchangeRates {
   ES_EXT_PRICE: number | null;
   ES_EXT_CHG_PCT: number | null;
   T5Y: number;
+  T5Y_PREV: number;
   T10Y: number;
+  T10Y_PREV: number;
   T30Y: number;
+  T30Y_PREV: number;
 }
 
 export interface WatchlistQuote {

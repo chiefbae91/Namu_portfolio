@@ -28,7 +28,7 @@ export default function Home() {
   const [watchlistQuotes, setWatchlistQuotes] = useState<WatchlistQuote[]>([]);
   const [watchlistAdding, setWatchlistAdding] = useState(false);
   const [watchlistInput, setWatchlistInput] = useState('');
-  const [rates, setRates] = useState<ExchangeRates>({ USD: 1, KRW: 1380, KRW_PREV: 1380, EUR: 0.92, DXY: 104, DXY_PREV: 104, WTI: 78, WTI_PREV: 78, GOLD: 2300, GOLD_PREV: 2300, ES: 5800, ES_PREV: 5800, ES_MARKET_STATE: 'REGULAR', ES_EXT_PRICE: null, ES_EXT_CHG_PCT: null, T5Y: 4.25, T10Y: 4.50, T30Y: 4.75 });
+  const [rates, setRates] = useState<ExchangeRates>({ USD: 1, KRW: 1380, KRW_PREV: 1380, EUR: 0.92, DXY: 104, DXY_PREV: 104, WTI: 78, WTI_PREV: 78, GOLD: 2300, GOLD_PREV: 2300, ES: 5800, ES_PREV: 5800, ES_MARKET_STATE: 'REGULAR', ES_EXT_PRICE: null, ES_EXT_CHG_PCT: null, T5Y: 4.25, T5Y_PREV: 4.25, T10Y: 4.50, T10Y_PREV: 4.50, T30Y: 4.75, T30Y_PREV: 4.75 });
   const [showKrw, setShowKrw] = useState(true);
   const [showEur, setShowEur] = useState(false);
   const [activeTab, setActiveTab] = useState<'portfolio' | 'history' | 'hints'>('portfolio');
@@ -698,18 +698,30 @@ export default function Home() {
             <span className="market-treasury-label" style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>US TREASURY</span>
             <div className="market-sep" style={{ width: 1, height: 16, background: 'var(--border)' }} />
             {([
-              { label: '5Y', value: rates.T5Y },
-              { label: '10Y', value: rates.T10Y },
-              { label: '30Y', value: rates.T30Y },
-            ] as const).map(({ label, value }, i) => (
-              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                {i > 0 && <div className="market-sep" style={{ width: 1, height: 16, background: 'var(--border)', marginRight: 16 }} />}
-                <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)' }}>{label}</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-bond)', fontVariantNumeric: 'tabular-nums' }}>
-                  {value.toFixed(2)}%
-                </span>
-              </div>
-            ))}
+              { label: '5Y',  value: rates.T5Y,  prev: rates.T5Y_PREV,  ticker: '^FVX' },
+              { label: '10Y', value: rates.T10Y, prev: rates.T10Y_PREV, ticker: '^TNX' },
+              { label: '30Y', value: rates.T30Y, prev: rates.T30Y_PREV, ticker: '^TYX' },
+            ] as const).map(({ label, value, prev, ticker }, i) => {
+              const chg = value - prev;
+              const col = chg >= 0 ? 'var(--green)' : 'var(--red)';
+              return (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {i > 0 && <div className="market-sep" style={{ width: 1, height: 16, background: 'var(--border)', marginRight: 16 }} />}
+                  <div
+                    onClick={() => { setAnalysisInitialTab('history'); setAnalysisTicker(ticker); }}
+                    style={{ display: 'flex', alignItems: 'baseline', gap: 4, cursor: 'pointer' }}
+                  >
+                    <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)' }}>{label}</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-bond)', fontVariantNumeric: 'tabular-nums' }}>
+                      {value.toFixed(2)}%
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: col, fontVariantNumeric: 'tabular-nums' }}>
+                      {chg >= 0 ? '+' : ''}{chg.toFixed(3)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Row 3: Watchlist */}

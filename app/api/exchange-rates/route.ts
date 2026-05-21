@@ -68,9 +68,9 @@ export async function GET() {
     yahooQuote('CL=F'),
     yahooQuote('GC=F'),
     yahooQuote('ES=F'),
-    yahooRate('^FVX'),
-    yahooRate('^TNX'),
-    yahooRate('^TYX'),
+    yahooQuote('^FVX'),
+    yahooQuote('^TNX'),
+    yahooQuote('^TYX'),
   ]);
 
   return NextResponse.json({
@@ -89,8 +89,11 @@ export async function GET() {
     ES_MARKET_STATE: es?.marketState ?? 'REGULAR',
     ES_EXT_PRICE: es?.extPrice ?? null,
     ES_EXT_CHG_PCT: es?.extChangePct ?? null,
-    T5Y: t5y ?? FALLBACK.T5Y,
-    T10Y: t10y ?? FALLBACK.T10Y,
-    T30Y: t30y ?? FALLBACK.T30Y,
+    T5Y: t5y?.price ?? FALLBACK.T5Y,
+    T5Y_PREV: t5y?.prevClose ?? FALLBACK.T5Y,
+    T10Y: t10y?.price ?? FALLBACK.T10Y,
+    T10Y_PREV: t10y?.prevClose ?? FALLBACK.T10Y,
+    T30Y: t30y?.price ?? FALLBACK.T30Y,
+    T30Y_PREV: t30y?.prevClose ?? FALLBACK.T30Y,
   });
 }
