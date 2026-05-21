@@ -62,23 +62,27 @@ export async function GET(req: NextRequest) {
   ]);
 
   interface Lot { id: string; ticker: string; account_id: string; quantity: number; price: number; fee: number; remaining: number; }
-  const lots: Lot[] = [];
 
-  // Build unified timeline: buys + sells + splits, sorted chronologically
-  type BuyEvent   = { _kind: 'buy';           id: string; transaction_date: string; ticker: string; account_id: string; quantity: number; price: number; fee: number; };
-  type SellEvent  = { _kind: 'sell';          id: string; transaction_date: string; ticker: string; account_id: string; quantity: number; };
+  // Pass 1: create all lots from buys regardless of date order
+  // (handles bad data where sell date < buy date)
+  const lots: Lot[] = (buyRows || []).map((r: any) => ({ ...r, remaining: r.quantity }));
+
+  // Pass 2: process sells and splits in chronological order
+  type SellEvent  = { _kind: 'sell';                     id: string; transaction_date: string; ticker: string; account_id: string; quantity: number; };
   type SplitEvent = { _kind: 'split' | 'consolidation'; id: string; transaction_date: string; ticker: string; account_id: string; quantity: number; };
 
-  const timeline: (BuyEvent | SellEvent | SplitEvent)[] = [
-    ...(buyRows  || []).map((r: any) => ({ ...r, _kind: 'buy'  as const })),
-    ...(sellRows || []).map((r: any) => ({ ...r, _kind: 'sell' as const })),
+  const timeline: (SellEvent | SplitEvent)[] = [
+    ...(sellRows  || []).map((r: any) => ({ ...r, _kind: 'sell' as const })),
     ...(splitRows || []).map((r: any) => ({ ...r, _kind: r.type.toLowerCase() as 'split' | 'consolidation' })),
-  ].sort((a, b) => a.transaction_date.localeCompare(b.transaction_date) || String(a.id).localeCompare(String(b.id)));
+  ].sort((a, b) => {
+    const d = a.transaction_date.localeCompare(b.transaction_date);
+    if (d !== 0) return d;
+    const na = Number(a.id), nb = Number(b.id);
+    return (!isNaN(na) && !isNaN(nb)) ? na - nb : String(a.id).localeCompare(String(b.id));
+  });
 
   for (const ev of timeline) {
-    if (ev._kind === 'buy') {
-      lots.push({ id: ev.id, ticker: ev.ticker, account_id: ev.account_id, quantity: ev.quantity, price: ev.price, fee: (ev as any).fee, remaining: ev.quantity });
-    } else if (ev._kind === 'split' || ev._kind === 'consolidation') {
+    if (ev._kind === 'split' || ev._kind === 'consolidation') {
       const ratio = ev.quantity;
       for (const lot of lots) {
         if (lot.ticker !== ev.ticker || lot.account_id !== ev.account_id || lot.remaining < 0.00001) continue;
