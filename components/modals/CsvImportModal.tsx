@@ -72,11 +72,22 @@ export default function CsvImportModal({ accounts, onClose, onImported }: Props)
     finally { setImporting(false); }
   };
 
-  const typeLabel = (t: string) => ({ buy: 'Buy', sell: 'Sell', dividend: 'Dividend', cash: 'Cash', skip: 'Skip' }[t] ?? t);
-  const typeColor = (t: string) => ({ buy: 'var(--green)', sell: 'var(--red)', dividend: 'var(--color-dividend)', cash: 'var(--color-cash)', skip: 'var(--muted)' }[t] ?? 'var(--muted)');
+  const typeLabel = (t: string) => ({
+    buy: 'Buy', sell: 'Sell', dividend: 'Dividend', cash: 'Cash',
+    transfer_deposit: 'Deposit', transfer_withdraw: 'Withdraw', skip: 'Skip',
+  }[t] ?? t);
+  const typeColor = (t: string) => ({
+    buy: 'var(--green)', sell: 'var(--red)', dividend: 'var(--color-dividend)',
+    cash: 'var(--color-cash)', transfer_deposit: 'var(--green)', transfer_withdraw: 'var(--red)',
+    skip: 'var(--muted)',
+  }[t] ?? 'var(--muted)');
 
   const importable = preview?.filter(r => !r.skip && !r.duplicate) ?? [];
-  const formatLabel = format === 'new' ? 'Generic' : format === 'robinhood' ? 'Robinhood' : format === 'webull' ? 'Webull' : '';
+  const formatLabel =
+    format === 'ib'        ? 'Interactive Brokers' :
+    format === 'new'       ? 'Generic' :
+    format === 'robinhood' ? 'Robinhood' :
+    format === 'webull'    ? 'Webull' : '';
 
   return (
     <div className="modal-overlay" onClick={onClose}>
