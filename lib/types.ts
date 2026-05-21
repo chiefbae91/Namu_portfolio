@@ -28,11 +28,18 @@ export interface LotsResponse {
   avg_cost_all: number;
 }
 
+export interface AccountType {
+  id: string | number;
+  name: string;
+  color: string;
+}
+
 export interface Account {
   id: string | number;
   name: string;
   currency: string;
   hidden: number | boolean;
+  type_id?: string | number | null;
 }
 
 export interface Transaction {

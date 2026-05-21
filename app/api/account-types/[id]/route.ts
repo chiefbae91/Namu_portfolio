@@ -6,21 +6,19 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const user = await getAuthUser();
   if (!user) return unauthorized();
   const supabase = getAdminClient();
-  const { name, hidden, type_id } = await req.json();
-  const id = params.id;
+  const { name, color } = await req.json();
 
   const updates: Record<string, unknown> = {};
   if (name !== undefined) {
     if (!name.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 });
     updates.name = name.trim();
   }
-  if (hidden !== undefined) updates.hidden = !!hidden;
-  if (type_id !== undefined) updates.type_id = type_id ?? null;
+  if (color !== undefined) updates.color = color;
 
   const { data, error } = await supabase
-    .from('accounts')
+    .from('account_types')
     .update(updates)
-    .eq('id', id)
+    .eq('id', params.id)
     .eq('user_id', user.id)
     .select()
     .single();
@@ -37,18 +35,20 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   const user = await getAuthUser();
   if (!user) return unauthorized();
   const supabase = getAdminClient();
-  const id = params.id;
 
-  const { data: account } = await supabase.from('accounts').select('id').eq('id', id).eq('user_id', user.id).single();
-  if (!account) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  // Deassign from all accounts first
+  await supabase
+    .from('accounts')
+    .update({ type_id: null })
+    .eq('type_id', params.id)
+    .eq('user_id', user.id);
 
-  const { count } = await supabase
-    .from('transactions')
-    .select('*', { count: 'exact', head: true })
-    .eq('account_id', id);
+  const { error } = await supabase
+    .from('account_types')
+    .delete()
+    .eq('id', params.id)
+    .eq('user_id', user.id);
 
-  if (count && count > 0) return NextResponse.json({ error: 'Account has transactions' }, { status: 409 });
-
-  await supabase.from('accounts').delete().eq('id', id).eq('user_id', user.id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

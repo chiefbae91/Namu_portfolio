@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Settings, FileUp, RefreshCw, LogOut, LogIn, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
-import { Account, AccountBreakdown, ExchangeRates, PortfolioPosition, SummaryData, Transaction, TradingHint, WatchlistQuote } from '@/lib/types';
+import { Account, AccountBreakdown, AccountType, ExchangeRates, PortfolioPosition, SummaryData, Transaction, TradingHint, WatchlistQuote } from '@/lib/types';
 import StockPortfolio from '@/components/tabs/StockPortfolio';
 import TransactionHistory from '@/components/tabs/TransactionHistory';
 import TradingHints from '@/components/tabs/TradingHints';
@@ -22,6 +22,7 @@ const TRANSFER_PREFIX = 'tf-';
 
 export default function Home() {
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accountTypes, setAccountTypes] = useState<AccountType[]>([]);
   const [accountFilter, setAccountFilter] = useState<string>(''); // '' = all, '1,2,3' = subset
   const [watchlist, setWatchlist] = useState<string[]>([]);
   const [watchlistQuotes, setWatchlistQuotes] = useState<WatchlistQuote[]>([]);
@@ -78,6 +79,11 @@ export default function Home() {
     const res = await fetch('/api/accounts');
     setAccounts(await res.json());
     setAccountsLoaded(true);
+  }, []);
+
+  const fetchAccountTypes = useCallback(async () => {
+    const res = await fetch('/api/account-types');
+    if (res.ok) setAccountTypes(await res.json());
   }, []);
 
   const fetchRates = useCallback(async () => {
@@ -166,6 +172,7 @@ export default function Home() {
       if (user) {
         setUserEmail(user.email ?? null);
         fetchAccounts();
+        fetchAccountTypes();
         fetch('/api/settings?key=app_name')
           .then(r => r.json())
           .then(d => { if (d.value) { setAppName(d.value); document.title = d.value; } });
@@ -341,6 +348,28 @@ export default function Home() {
   const handleDeleteAccount = async (id: number) => {
     const res = await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('failed');
+    await fetchAccounts();
+  };
+
+  const handleAddType = async (name: string, color: string) => {
+    const res = await fetch('/api/account-types', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, color }) });
+    if (!res.ok) throw new Error('failed');
+    await fetchAccountTypes();
+  };
+
+  const handleRenameType = async (id: string | number, name: string, color: string) => {
+    const res = await fetch(`/api/account-types/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, color }) });
+    if (!res.ok) throw new Error('failed');
+    await fetchAccountTypes();
+  };
+
+  const handleDeleteType = async (id: string | number) => {
+    await fetch(`/api/account-types/${id}`, { method: 'DELETE' });
+    await Promise.all([fetchAccountTypes(), fetchAccounts()]);
+  };
+
+  const handleAssignType = async (accountId: string | number, typeId: string | number | null) => {
+    await fetch(`/api/accounts/${accountId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type_id: typeId }) });
     await fetchAccounts();
   };
 
@@ -803,11 +832,16 @@ export default function Home() {
       {accountSettingsOpen && (
         <AccountSettingsModal
           accounts={accounts}
+          accountTypes={accountTypes}
           onClose={() => setAccountSettingsOpen(false)}
           onAddAccount={handleAddAccount}
           onRename={handleRenameAccount}
           onToggleHidden={handleToggleHidden}
           onDelete={handleDeleteAccount}
+          onAddType={handleAddType}
+          onRenameType={handleRenameType}
+          onDeleteType={handleDeleteType}
+          onAssignType={handleAssignType}
         />
       )}
       {historyAccount && (

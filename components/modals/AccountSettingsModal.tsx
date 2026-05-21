@@ -1,23 +1,48 @@
 'use client';
 import { useState } from 'react';
 import { X, Trash2, EyeOff, Eye, Edit2, Check } from 'lucide-react';
-import { Account } from '@/lib/types';
+import { Account, AccountType } from '@/lib/types';
 import { getLabelMap, setLabelMap } from '@/lib/accountLabelMap';
+
+const COLOR_PALETTE = [
+  '#6366f1', '#3b82f6', '#10b981', '#14b8a6',
+  '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899',
+];
 
 interface Props {
   accounts: Account[];
+  accountTypes: AccountType[];
   onClose: () => void;
   onAddAccount: (name: string) => Promise<void>;
   onRename: (id: string | number, name: string) => Promise<void>;
   onToggleHidden: (id: string | number, hidden: boolean) => Promise<void>;
   onDelete: (id: string | number) => Promise<void>;
+  onAddType: (name: string, color: string) => Promise<void>;
+  onRenameType: (id: string | number, name: string, color: string) => Promise<void>;
+  onDeleteType: (id: string | number) => Promise<void>;
+  onAssignType: (accountId: string | number, typeId: string | number | null) => Promise<void>;
 }
 
-export default function AccountSettingsModal({ accounts, onClose, onAddAccount, onRename, onToggleHidden, onDelete }: Props) {
+export default function AccountSettingsModal({
+  accounts, accountTypes, onClose,
+  onAddAccount, onRename, onToggleHidden, onDelete,
+  onAddType, onRenameType, onDeleteType, onAssignType,
+}: Props) {
+  // Account state
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState<string | number | null>(null);
   const [editName, setEditName] = useState('');
   const [error, setError] = useState('');
+
+  // Type state
+  const [newTypeName, setNewTypeName] = useState('');
+  const [newTypeColor, setNewTypeColor] = useState(COLOR_PALETTE[0]);
+  const [editingTypeId, setEditingTypeId] = useState<string | number | null>(null);
+  const [editTypeName, setEditTypeName] = useState('');
+  const [editTypeColor, setEditTypeColor] = useState(COLOR_PALETTE[0]);
+  const [typeError, setTypeError] = useState('');
+
+  // Legacy mapping state
   const [showLegacy, setShowLegacy] = useState(false);
   const [legacyGroups, setLegacyGroups] = useState<{ label: string; tickers: string[] }[]>([]);
   const [mapping, setMapping] = useState<Record<string, string>>(getLabelMap);
@@ -39,13 +64,10 @@ export default function AccountSettingsModal({ accounts, onClose, onAddAccount, 
     setShowLegacy(true);
   };
 
-  const saveMapping = () => {
-    setLabelMap(mapping);
-    setShowLegacy(false);
-  };
-
+  const saveMapping = () => { setLabelMap(mapping); setShowLegacy(false); };
   const visibleNames = accounts.filter(a => !a.hidden).map(a => a.name);
 
+  // Account handlers
   const handleAdd = async () => {
     if (!newName.trim()) return;
     try { await onAddAccount(newName.trim()); setNewName(''); setError(''); }
@@ -64,19 +86,84 @@ export default function AccountSettingsModal({ accounts, onClose, onAddAccount, 
     catch { setError('Cannot delete an account with transactions. Set it to Hidden instead.'); }
   };
 
+  // Type handlers
+  const handleAddType = async () => {
+    if (!newTypeName.trim()) return;
+    try { await onAddType(newTypeName.trim(), newTypeColor); setNewTypeName(''); setNewTypeColor(COLOR_PALETTE[0]); setTypeError(''); }
+    catch { setTypeError('Type name already exists.'); }
+  };
+
+  const handleRenameType = async (id: string | number) => {
+    if (!editTypeName.trim()) return;
+    try { await onRenameType(id, editTypeName.trim(), editTypeColor); setEditingTypeId(null); setTypeError(''); }
+    catch { setTypeError('Type name already exists.'); }
+  };
+
+  const handleDeleteType = async (id: string | number, name: string) => {
+    if (!confirm(`Delete type "${name}"? It will be removed from all accounts.`)) return;
+    await onDeleteType(id);
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: 500 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>⚙️ Account Management</h2>
           <button onClick={onClose} style={{ background: 'none', color: 'var(--muted)' }}><X size={18} /></button>
         </div>
 
-        {error && <div style={{ color: 'var(--red)', marginBottom: 12, fontSize: 13 }}>{error}</div>}
+        {/* ── Account Types ── */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>Account Types</div>
+          {typeError && <div style={{ color: 'var(--red)', marginBottom: 8, fontSize: 13 }}>{typeError}</div>}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+            {accountTypes.map(t => (
+              <div key={t.id} className="card" style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                {editingTypeId === t.id ? (
+                  <>
+                    <ColorPicker value={editTypeColor} onChange={setEditTypeColor} />
+                    <input value={editTypeName} onChange={e => setEditTypeName(e.target.value)}
+                      style={{ flex: 1, fontSize: 13 }} onKeyDown={e => e.key === 'Enter' && handleRenameType(t.id)} autoFocus />
+                    <button className="btn-primary btn-sm" onClick={() => handleRenameType(t.id)}><Check size={13} /></button>
+                    <button className="btn-secondary btn-sm" onClick={() => setEditingTypeId(null)}>Cancel</button>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: t.color, flexShrink: 0 }} />
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>{t.name}</span>
+                    <button style={{ background: 'none', color: 'var(--muted)', padding: 3 }}
+                      onClick={() => { setEditingTypeId(t.id); setEditTypeName(t.name); setEditTypeColor(t.color); }}>
+                      <Edit2 size={13} />
+                    </button>
+                    <button style={{ background: 'none', color: 'var(--red)', padding: 3 }}
+                      onClick={() => handleDeleteType(t.id, t.name)}>
+                      <Trash2 size={13} />
+                    </button>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <ColorPicker value={newTypeColor} onChange={setNewTypeColor} />
+            <input value={newTypeName} onChange={e => setNewTypeName(e.target.value)}
+              placeholder="New type name" style={{ flex: 1, fontSize: 13 }}
+              onKeyDown={e => e.key === 'Enter' && handleAddType()} />
+            <button className="btn-primary btn-sm" onClick={handleAddType}>Add</button>
+          </div>
+        </div>
+
+        <div style={{ borderTop: '1px solid var(--border)', marginBottom: 20 }} />
+
+        {/* ── Accounts ── */}
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>Accounts</div>
+        {error && <div style={{ color: 'var(--red)', marginBottom: 8, fontSize: 13 }}>{error}</div>}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
           {accounts.map(acc => (
-            <div key={acc.id} className="card" style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div key={acc.id} className="card" style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
               {editingId === acc.id ? (
                 <>
                   <input value={editName} onChange={e => setEditName(e.target.value)}
@@ -86,17 +173,22 @@ export default function AccountSettingsModal({ accounts, onClose, onAddAccount, 
                 </>
               ) : (
                 <>
-                  <span style={{ flex: 1, fontWeight: 500, opacity: acc.hidden ? 0.4 : 1 }}>{acc.name}</span>
-                  {!!acc.hidden && <span style={{ fontSize: 11, color: 'var(--muted)', background: 'var(--border)', padding: '2px 6px', borderRadius: 4 }}>Hidden</span>}
-                  <button style={{ background: 'none', color: 'var(--muted)', padding: 4 }}
-                    onClick={() => { setEditingId(acc.id); setEditName(acc.name); }}><Edit2 size={14} /></button>
-                  <button style={{ background: 'none', color: 'var(--muted)', padding: 4 }}
+                  <span style={{ flex: 1, fontWeight: 500, fontSize: 14, opacity: acc.hidden ? 0.4 : 1 }}>{acc.name}</span>
+                  {!!acc.hidden && <span style={{ fontSize: 10, color: 'var(--muted)', background: 'var(--border)', padding: '2px 5px', borderRadius: 4 }}>Hidden</span>}
+                  <TypeBadge
+                    accountTypes={accountTypes}
+                    typeId={acc.type_id ?? null}
+                    onChange={typeId => onAssignType(acc.id, typeId)}
+                  />
+                  <button style={{ background: 'none', color: 'var(--muted)', padding: 3 }}
+                    onClick={() => { setEditingId(acc.id); setEditName(acc.name); }}><Edit2 size={13} /></button>
+                  <button style={{ background: 'none', color: 'var(--muted)', padding: 3 }}
                     onClick={() => onToggleHidden(acc.id, !acc.hidden)}
                     title={acc.hidden ? 'Show' : 'Hide'}>
-                    {acc.hidden ? <Eye size={14} /> : <EyeOff size={14} />}
+                    {acc.hidden ? <Eye size={13} /> : <EyeOff size={13} />}
                   </button>
-                  <button style={{ background: 'none', color: 'var(--red)', padding: 4 }}
-                    onClick={() => handleDelete(acc.id, acc.name)}><Trash2 size={14} /></button>
+                  <button style={{ background: 'none', color: 'var(--red)', padding: 3 }}
+                    onClick={() => handleDelete(acc.id, acc.name)}><Trash2 size={13} /></button>
                 </>
               )}
             </div>
@@ -109,6 +201,7 @@ export default function AccountSettingsModal({ accounts, onClose, onAddAccount, 
           <button className="btn-primary" onClick={handleAdd}>Add</button>
         </div>
 
+        {/* ── Legacy mapping ── */}
         <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
           {!showLegacy ? (
             <button className="btn-secondary btn-sm" onClick={loadLegacyGroups} style={{ fontSize: 12 }}>
@@ -127,11 +220,7 @@ export default function AccountSettingsModal({ accounts, onClose, onAddAccount, 
                       <span style={{ fontSize: 11, color: 'var(--muted)', flex: 1 }}>
                         {grp.tickers.join(', ')}{grp.tickers.length >= 4 ? '…' : ''}
                       </span>
-                      <select
-                        value={mapping[grp.label] ?? ''}
-                        onChange={e => setMapping(prev => ({ ...prev, [grp.label]: e.target.value }))}
-                        style={{ minWidth: 140 }}
-                      >
+                      <select value={mapping[grp.label] ?? ''} onChange={e => setMapping(prev => ({ ...prev, [grp.label]: e.target.value }))} style={{ minWidth: 140 }}>
                         <option value="">Keep as {grp.label}</option>
                         {visibleNames.map(n => <option key={n} value={n}>{n}</option>)}
                       </select>
@@ -148,5 +237,43 @@ export default function AccountSettingsModal({ accounts, onClose, onAddAccount, 
         </div>
       </div>
     </div>
+  );
+}
+
+function ColorPicker({ value, onChange }: { value: string; onChange: (c: string) => void }) {
+  return (
+    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+      {COLOR_PALETTE.map(c => (
+        <button key={c} onClick={() => onChange(c)} style={{
+          width: 16, height: 16, borderRadius: '50%', background: c, border: 'none', padding: 0, cursor: 'pointer',
+          outline: value === c ? `2px solid var(--text)` : 'none', outlineOffset: 1,
+        }} />
+      ))}
+    </div>
+  );
+}
+
+function TypeBadge({ accountTypes, typeId, onChange }: {
+  accountTypes: AccountType[];
+  typeId: string | number | null;
+  onChange: (id: string | number | null) => void;
+}) {
+  const current = accountTypes.find(t => String(t.id) === String(typeId));
+  return (
+    <select
+      value={typeId != null ? String(typeId) : ''}
+      onChange={e => onChange(e.target.value || null)}
+      style={{
+        fontSize: 11, padding: '2px 6px', borderRadius: 4, cursor: 'pointer',
+        border: current ? `1px solid ${current.color}` : '1px solid var(--border)',
+        color: current ? current.color : 'var(--muted)',
+        background: 'var(--surface)', fontWeight: 600, minWidth: 0,
+      }}
+    >
+      <option value="">— None</option>
+      {accountTypes.map(t => (
+        <option key={t.id} value={String(t.id)}>{t.name}</option>
+      ))}
+    </select>
   );
 }
