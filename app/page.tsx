@@ -529,7 +529,7 @@ export default function Home() {
               const extColor = extPct != null ? (extPct >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--muted)';
               const badgeColor = ms === 'PRE' ? '#f59e0b' : '#818cf8';
               return (
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
+                <div onClick={() => { setAnalysisInitialTab('history'); setAnalysisTicker('ES=F'); }} style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap', cursor: 'pointer' }}>
                   <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>ES</span>
                   {isExt && (
                     <span style={{ fontSize: 9, fontWeight: 700, color: badgeColor, border: `1px solid ${badgeColor}`, borderRadius: 3, padding: '0 3px', letterSpacing: '0.04em', lineHeight: '14px' }}>
@@ -557,7 +557,7 @@ export default function Home() {
               const col = chg >= 0 ? 'var(--green)' : 'var(--red)';
               return (<>
                 <div className="market-sep" style={{ width: 1, height: 20, background: 'var(--border)' }} />
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
+                <div onClick={() => { setAnalysisInitialTab('history'); setAnalysisTicker('CL=F'); }} style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap', cursor: 'pointer' }}>
                   <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>WTI</span>
                   <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-oil)', fontVariantNumeric: 'tabular-nums' }}>
                     ${rates.WTI.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -574,7 +574,7 @@ export default function Home() {
               const col = chg >= 0 ? 'var(--green)' : 'var(--red)';
               return (<>
                 <div className="market-sep" style={{ width: 1, height: 20, background: 'var(--border)' }} />
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
+                <div onClick={() => { setAnalysisInitialTab('history'); setAnalysisTicker('GC=F'); }} style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap', cursor: 'pointer' }}>
                   <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>GOLD</span>
                   <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-gold-commodity)', fontVariantNumeric: 'tabular-nums' }}>
                     ${rates.GOLD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -591,7 +591,7 @@ export default function Home() {
               const col = chg >= 0 ? 'var(--green)' : 'var(--red)';
               return (<>
                 <div className="market-sep" style={{ width: 1, height: 20, background: 'var(--border)' }} />
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
+                <div onClick={() => { setAnalysisInitialTab('history'); setAnalysisTicker('DX-Y.NYB'); }} style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap', cursor: 'pointer' }}>
                   <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.05em' }}>DXY</span>
                   <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
                     {rates.DXY.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
