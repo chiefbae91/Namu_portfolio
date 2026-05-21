@@ -499,43 +499,72 @@ export default function Home() {
       </div>
 
       {/* Account Tab Bar */}
-      {accountsLoaded && visibleAccounts.length > 0 && (
-        <div style={{
-          background: 'var(--header-bg)',
-          borderBottom: '1px solid var(--border)',
-          padding: '0 12px',
+      {accountsLoaded && visibleAccounts.length > 0 && (() => {
+        const filterSorted = accountFilter.split(',').filter(Boolean).sort().join(',');
+        const typeTabsToShow = accountTypes.filter(t =>
+          visibleAccounts.some(a => String(a.type_id) === String(t.id))
+        );
+        const tabStyle = (isActive: boolean, accentColor?: string): React.CSSProperties => ({
+          padding: '10px 14px',
+          fontSize: 13,
+          fontWeight: isActive ? 700 : 400,
+          color: isActive ? (accentColor ?? 'var(--accent)') : 'var(--muted)',
+          background: 'none',
+          border: 'none',
+          borderBottom: isActive ? `2px solid ${accentColor ?? 'var(--accent)'}` : '2px solid transparent',
+          cursor: 'pointer',
+          whiteSpace: 'nowrap',
+          flexShrink: 0,
+          transition: 'color 0.15s',
           display: 'flex',
-          alignItems: 'stretch',
-          overflowX: 'auto',
-          scrollbarWidth: 'none',
-          msOverflowStyle: 'none',
-        } as React.CSSProperties}>
-          {([{ id: '', name: 'All Accounts' }, ...visibleAccounts] as Array<{ id: string | number; name: string }>).map(acct => {
-            const isActive = accountFilter === String(acct.id);
-            return (
-              <button
-                key={String(acct.id) || 'all'}
-                onClick={() => handleAccountSelect(String(acct.id))}
-                style={{
-                  padding: '10px 18px',
-                  fontSize: 13,
-                  fontWeight: isActive ? 700 : 400,
-                  color: isActive ? 'var(--accent)' : 'var(--muted)',
-                  background: 'none',
-                  border: 'none',
-                  borderBottom: isActive ? '2px solid var(--accent)' : '2px solid transparent',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                  transition: 'color 0.15s',
-                }}
-              >
-                {acct.name}
-              </button>
-            );
-          })}
-        </div>
-      )}
+          alignItems: 'center',
+          gap: 5,
+        });
+        const sep = <div style={{ width: 1, height: 18, background: 'var(--border)', alignSelf: 'center', margin: '0 2px', flexShrink: 0 }} />;
+        return (
+          <div style={{
+            background: 'var(--header-bg)',
+            borderBottom: '1px solid var(--border)',
+            padding: '0 12px',
+            display: 'flex',
+            alignItems: 'stretch',
+            overflowX: 'auto',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+          } as React.CSSProperties}>
+            {/* All */}
+            <button onClick={() => handleAccountSelect('')} style={tabStyle(accountFilter === '')}>
+              All Accounts
+            </button>
+
+            {/* Type tabs */}
+            {typeTabsToShow.length > 0 && sep}
+            {typeTabsToShow.map(t => {
+              const ids = visibleAccounts
+                .filter(a => String(a.type_id) === String(t.id))
+                .map(a => String(a.id)).sort().join(',');
+              const isActive = filterSorted === ids;
+              return (
+                <button key={`type-${t.id}`} onClick={() => handleAccountSelect(ids)} style={tabStyle(isActive, t.color)}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: t.color, flexShrink: 0 }} />
+                  {t.name}
+                </button>
+              );
+            })}
+
+            {/* Individual account tabs */}
+            {sep}
+            {visibleAccounts.map(acct => {
+              const isActive = accountFilter === String(acct.id);
+              return (
+                <button key={String(acct.id)} onClick={() => handleAccountSelect(String(acct.id))} style={tabStyle(isActive)}>
+                  {acct.name}
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* Onboarding banner — only when no accounts */}
       {accountsLoaded && accounts.length === 0 && !!userEmail && (
