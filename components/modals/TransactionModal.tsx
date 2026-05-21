@@ -22,6 +22,8 @@ const TX_TYPES = [
   { value: 'sell', label: 'Sell' },
   { value: 'dividend', label: 'Dividend' },
   { value: 'transfer', label: 'Transfer' },
+  { value: 'split', label: 'Split' },
+  { value: 'consolidation', label: 'Reverse Split' },
 ];
 
 const LOT_METHODS: { value: TaxLotMethod; label: string }[] = [
@@ -275,7 +277,11 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
     try {
       const ymd = displayToYmd(date);
 
-      if (type === 'transfer') {
+      if (type === 'split' || type === 'consolidation') {
+        const ratio = parseFloat(qty || '0');
+        if (ratio <= 1) { alert('Ratio must be greater than 1 (e.g. enter 2 for a 2:1 split)'); return false; }
+        await onSubmit({ account_id: accountId, date: ymd, ticker: ticker.toUpperCase(), type, quantity: ratio, price: 0, fee: 0, notes: '' });
+      } else if (type === 'transfer') {
         await onSubmit({
           account_id: accountId, date: ymd,
           type: transferDir === 'DEPOSIT' ? 'transfer_deposit' : 'transfer_withdraw',
@@ -422,7 +428,17 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
                 </div>
               )}
 
-              {type !== 'transfer' && type !== 'dividend' && (
+              {(type === 'split' || type === 'consolidation') && (
+                <div className="form-group">
+                  <label>Ratio</label>
+                  <input value={qty} onChange={e => setQty(e.target.value)}
+                    type="number" step="any" min="1.0001"
+                    placeholder={type === 'split' ? '2  (2:1 split)' : '10  (1:10 reverse)'}
+                    style={{ width: 160 }} required />
+                </div>
+              )}
+
+              {type !== 'transfer' && type !== 'dividend' && type !== 'split' && type !== 'consolidation' && (
                 <div className="form-group">
                   <label>Shares</label>
                   <input value={qty} onChange={e => setQty(e.target.value)}
@@ -430,13 +446,15 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
                 </div>
               )}
 
-              <div className="form-group">
-                <label>{type==='transfer'?`Amount (${sym})`:type==='dividend'?`Dividend (${sym})`:`Price (${sym})`}</label>
-                <input value={price} onChange={e => setPrice(formatPriceInput(e.target.value))}
-                  type="text" inputMode="decimal" placeholder="0.00" style={{ width:110 }} required />
-              </div>
+              {type !== 'split' && type !== 'consolidation' && (
+                <div className="form-group">
+                  <label>{type==='transfer'?`Amount (${sym})`:type==='dividend'?`Dividend (${sym})`:`Price (${sym})`}</label>
+                  <input value={price} onChange={e => setPrice(formatPriceInput(e.target.value))}
+                    type="text" inputMode="decimal" placeholder="0.00" style={{ width:110 }} required />
+                </div>
+              )}
 
-              {type !== 'transfer' && (
+              {type !== 'transfer' && type !== 'split' && type !== 'consolidation' && (
                 <div className="form-group">
                   <label>Fee ({sym})</label>
                   <input value={fee} onChange={e => setFee(formatPriceInput(e.target.value))}
