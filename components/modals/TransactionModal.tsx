@@ -1,7 +1,7 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
-import { X } from 'lucide-react';
-import { Account, Transaction, Currency, LotInfo, LotSelection, TaxLotMethod } from '@/lib/types';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { X, Upload, AlertCircle, CheckCircle } from 'lucide-react';
+import { Account, Transaction, Currency, CsvPreviewRow, LotInfo, LotSelection, TaxLotMethod } from '@/lib/types';
 import { formatPriceInput, parsePriceInput } from '@/lib/format';
 import DatePickerInput from '@/components/DatePickerInput';
 import TickerTypeahead from '@/components/TickerTypeahead';
@@ -12,6 +12,7 @@ interface Props {
   editingTx: Transaction | null;
   onSubmit: (data: any) => Promise<void>;
   onClose: () => void;
+  onImported?: () => void;
   prefillTicker?: string;
   prefillAccountId?: string | number;
   tickerSuggestions?: string[];
@@ -107,7 +108,6 @@ function TaxLotPanel({ ticker, accountId, sellQty, sellPrice, method, onMethodCh
         ))}
       </div>
 
-      {/* Summary */}
       <div style={{ display:'flex', gap:16, flexWrap:'wrap', marginBottom: method==='specific' ? 10 : 0 }}>
         <span style={{ fontSize:12, color:'var(--muted)' }}>Avg Cost All: <strong style={{ color:'var(--text)' }}>{fmtAmt(avgCostAll)}</strong></span>
         {activeCps > 0 && method !== 'specific' && (
@@ -126,7 +126,6 @@ function TaxLotPanel({ ticker, accountId, sellQty, sellPrice, method, onMethodCh
         )}
       </div>
 
-      {/* FIFO/LIFO preview */}
       {(method==='fifo'||method==='lifo') && autoSelected.length>0 && (
         <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
           {autoSelected.map((sel,i) => {
@@ -143,7 +142,6 @@ function TaxLotPanel({ ticker, accountId, sellQty, sellPrice, method, onMethodCh
         </div>
       )}
 
-      {/* Specific Lot table */}
       {method==='specific' && (
         <>
           <table style={{ width:'100%' }}>
@@ -190,12 +188,30 @@ function TaxLotPanel({ ticker, accountId, sellQty, sellPrice, method, onMethodCh
   );
 }
 
+// ─── CSV type helpers ─────────────────────────────────────────────
+const CSV_TYPE_LABEL: Record<string, string> = {
+  buy: 'Buy', sell: 'Sell', dividend: 'Dividend', cash: 'Cash',
+  transfer_deposit: 'Deposit', transfer_withdraw: 'Withdraw', skip: 'Skip',
+};
+const CSV_TYPE_COLOR: Record<string, string> = {
+  buy: 'var(--green)', sell: 'var(--red)', dividend: 'var(--color-dividend)',
+  cash: 'var(--color-cash)', transfer_deposit: 'var(--green)', transfer_withdraw: 'var(--red)',
+  skip: 'var(--muted)',
+};
+const CSV_FORMAT_LABEL: Record<string, string> = {
+  ib: 'Interactive Brokers', robinhood: 'Robinhood', webull: 'Webull', new: 'Generic',
+};
+
 // ─── Modal ────────────────────────────────────────────────────────
-export default function TransactionModal({ accounts, currency, editingTx, onSubmit, onClose, prefillTicker, prefillAccountId, tickerSuggestions = [] }: Props) {
+export default function TransactionModal({ accounts, currency, editingTx, onSubmit, onClose, onImported, prefillTicker, prefillAccountId, tickerSuggestions = [] }: Props) {
   const visible = accounts.filter(a => !a.hidden);
   const sym = SYM[currency];
   const isEditing = !!editingTx;
 
+  // ── mode ──────────────────────────────────────────────────────
+  const [mode, setMode] = useState<'manual' | 'csv'>('manual');
+
+  // ── manual form state ─────────────────────────────────────────
   const [type, setType] = useState('buy');
   const [accountId, setAccountId] = useState<string | number>(visible[0]?.id ?? '');
   const [ticker, setTicker] = useState('');
@@ -213,7 +229,18 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
   const [loading, setLoading] = useState(false);
   const [dateError, setDateError] = useState('');
 
-  // Load editing tx
+  // ── CSV import state ──────────────────────────────────────────
+  const csvFileRef = useRef<HTMLInputElement>(null);
+  const [csvPreview, setCsvPreview] = useState<CsvPreviewRow[] | null>(null);
+  const [csvTotal, setCsvTotal] = useState(0);
+  const [csvFormat, setCsvFormat] = useState('');
+  const [csvNeedsTicker, setCsvNeedsTicker] = useState(false);
+  const [csvTicker, setCsvTicker] = useState('');
+  const [csvError, setCsvError] = useState('');
+  const [csvImporting, setCsvImporting] = useState(false);
+  const [csvResult, setCsvResult] = useState<{ imported: number } | null>(null);
+
+  // ── Load editing tx ───────────────────────────────────────────
   useEffect(() => {
     if (editingTx) {
       if (editingTx.type === 'transfer_deposit' || editingTx.type === 'transfer_withdraw') {
@@ -229,39 +256,75 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
       setPrice(editingTx.price > 0 ? formatPriceInput(String(editingTx.price)) : '');
       setFee(editingTx.fee > 0 ? formatPriceInput(String(editingTx.fee)) : '');
       setNotes(editingTx.notes || '');
-      // Pre-populate reinvest if this dividend has a linked reinvest record
       if (editingTx.type === 'dividend' && editingTx.reinvest_id) {
         setReinvest(true);
         setReinvestQty(editingTx.reinvest_qty ? String(editingTx.reinvest_qty) : '');
         setReinvestPrice(editingTx.reinvest_price ? formatPriceInput(String(editingTx.reinvest_price)) : '');
       } else {
-        setReinvest(false);
-        setReinvestQty('');
-        setReinvestPrice('');
+        setReinvest(false); setReinvestQty(''); setReinvestPrice('');
       }
     } else {
       setType('buy'); setTicker(prefillTicker ?? ''); setDate(todayStr());
       setQty(''); setPrice(''); setFee(''); setNotes('');
       setReinvest(false); setReinvestQty(''); setReinvestPrice('');
       setLotMethod('average_cost'); setSpecificSelections({}); setTransferDir('DEPOSIT');
-      if (prefillAccountId) {
-        setAccountId(prefillAccountId);
-      } else if (visible.length > 0) {
-        setAccountId(visible[0].id);
-      }
+      if (prefillAccountId) setAccountId(prefillAccountId);
+      else if (visible.length > 0) setAccountId(visible[0].id);
     }
   }, [editingTx]);
 
-  // Reset specific selections on ticker/account/method change
   useEffect(() => { setSpecificSelections({}); }, [ticker, accountId, lotMethod]);
 
-  // ESC to close
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
+  // ── CSV helpers ───────────────────────────────────────────────
+  const buildCsvFd = (tickerVal: string, action?: string) => {
+    const fd = new FormData();
+    fd.append('file', csvFileRef.current!.files![0]);
+    fd.append('account_id', String(accountId));
+    if (tickerVal) fd.append('ticker', tickerVal);
+    if (action) fd.append('action', action);
+    return fd;
+  };
+
+  const fetchCsvPreview = async (tickerVal: string) => {
+    if (!csvFileRef.current?.files?.[0]) return;
+    setCsvError(''); setCsvPreview(null); setCsvResult(null);
+    try {
+      const res = await fetch('/api/csv-import', { method: 'POST', body: buildCsvFd(tickerVal) });
+      const data = await res.json();
+      if (data.error === 'ticker_required') { setCsvNeedsTicker(true); setCsvFormat('new'); return; }
+      if (data.error) { setCsvError(data.error); return; }
+      setCsvFormat(data.format || '');
+      setCsvNeedsTicker(false);
+      setCsvPreview(data.preview);
+      setCsvTotal(data.total);
+    } catch { setCsvError('Failed to parse file'); }
+  };
+
+  const handleCsvFileChange = async () => {
+    setCsvTicker(''); setCsvNeedsTicker(false); setCsvFormat('');
+    setCsvPreview(null); setCsvResult(null); setCsvError('');
+    await fetchCsvPreview('');
+  };
+
+  const handleCsvImport = async () => {
+    if (!csvFileRef.current?.files?.[0]) return;
+    setCsvImporting(true);
+    try {
+      const res = await fetch('/api/csv-import', { method: 'POST', body: buildCsvFd(csvTicker, 'import') });
+      const data = await res.json();
+      setCsvResult(data);
+      onImported?.();
+    } catch { setCsvError('Import failed'); }
+    finally { setCsvImporting(false); }
+  };
+
+  // ── Manual form submit ────────────────────────────────────────
   const doSave = async (): Promise<boolean> => {
     if (!isValidDate(date)) { setDateError('날짜 형식: MM/DD/YYYY'); return false; }
 
@@ -285,8 +348,7 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
         await onSubmit({
           account_id: accountId, date: ymd,
           type: transferDir === 'DEPOSIT' ? 'transfer_deposit' : 'transfer_withdraw',
-          price: parsePriceInput(price),
-          notes,
+          price: parsePriceInput(price), notes,
         });
       } else {
         const lot_assignments = type==='sell' && lotMethod==='specific'
@@ -327,8 +389,9 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
   };
 
   const sellQtyNum = parseFloat(qty||'0');
+  const csvImportable = csvPreview?.filter(r => !r.skip && !r.duplicate) ?? [];
 
-  // Dividend and DIVIDEND_REINVEST are not editable via this modal
+  // Dividend and DIVIDEND_REINVEST are not editable
   if (isEditing && (editingTx!.type === 'dividend' || editingTx!.subtype === 'DIVIDEND_REINVEST')) {
     return (
       <div className="modal-overlay" onClick={onClose}>
@@ -346,181 +409,316 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
-        <form onSubmit={handleSubmit}>
-          {/* Header */}
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
-            <h2 style={{ margin:0, fontSize:17, fontWeight:700 }}>
-              {isEditing
-                ? (editingTx!.type === 'transfer_deposit' || editingTx!.type === 'transfer_withdraw')
-                  ? 'Edit Transfer'
-                  : `Edit Trade #${editingTx!.id}`
-                : 'Add Trading History'}
-            </h2>
-            <button type="button" onClick={onClose} style={{ background:'none', color:'var(--muted)', padding:4 }}>
-              <X size={18} />
-            </button>
+      <div className="modal" style={{ maxWidth: mode === 'csv' ? 900 : 640 }} onClick={e => e.stopPropagation()}>
+
+        {/* ── Header ─────────────────────────────────────────────── */}
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 16 }}>
+          <h2 style={{ margin:0, fontSize:17, fontWeight:700 }}>
+            {isEditing
+              ? (editingTx!.type === 'transfer_deposit' || editingTx!.type === 'transfer_withdraw')
+                ? 'Edit Transfer'
+                : `Edit Trade #${editingTx!.id}`
+              : 'Add Trading History'}
+          </h2>
+          <button type="button" onClick={onClose} style={{ background:'none', color:'var(--muted)', padding:4 }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* ── Mode tabs (add-only) ────────────────────────────────── */}
+        {!isEditing && (
+          <div style={{ display:'flex', gap:6, marginBottom:20, borderBottom:'1px solid var(--border)', paddingBottom:12 }}>
+            {(['manual','csv'] as const).map(m => (
+              <button key={m} type="button"
+                onClick={() => setMode(m)}
+                style={{ padding:'5px 14px', fontSize:13, fontWeight:500, borderRadius:6,
+                  background: mode===m ? 'var(--accent)' : 'transparent',
+                  color: mode===m ? 'white' : 'var(--muted)',
+                  border: mode===m ? 'none' : '1px solid var(--border)' }}>
+                {m === 'manual' ? 'Manual' : 'Import CSV'}
+              </button>
+            ))}
           </div>
+        )}
 
-          {/* Body */}
-          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            {/* Type selector */}
-            <div className="form-group">
-              <label>Type</label>
-              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                {TX_TYPES.map(t => (
-                  <button key={t.value} type="button"
-                    onClick={() => { setType(t.value); setReinvest(false); setLotMethod('average_cost'); }}
-                    style={{ padding:'6px 14px', fontWeight:500, fontSize:13, borderRadius:6,
-                      background: type===t.value ? 'var(--accent)' : 'var(--border)',
-                      color: type===t.value ? 'white' : 'var(--muted)' }}>
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Row: Account + Ticker */}
-            <div className="form-row">
-              <div className="form-group" style={{ flex:1 }}>
+        {/* ══════════════════════════════════════════════════════════
+            CSV IMPORT MODE
+        ══════════════════════════════════════════════════════════ */}
+        {mode === 'csv' && (
+          <div>
+            {/* Account + file picker row */}
+            <div style={{ display:'flex', gap:12, marginBottom:16, alignItems:'flex-end', flexWrap:'wrap' }}>
+              <div className="form-group">
                 <label>Account</label>
-                <select value={accountId} onChange={e => setAccountId(e.target.value)} style={{ width:'100%' }}>
+                <select value={accountId} onChange={e => setAccountId(e.target.value)} style={{ minWidth:160 }}>
                   {visible.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                 </select>
               </div>
-              {type !== 'transfer' && (
+              <div className="form-group">
+                <label>&nbsp;</label>
+                <label style={{ cursor:'pointer', display:'inline-flex', alignItems:'center', gap:8,
+                  background:'var(--accent)', color:'white', padding:'7px 14px', borderRadius:6, fontWeight:500 }}>
+                  <Upload size={15} /> CSV 선택
+                  <input ref={csvFileRef} type="file" accept=".csv" style={{ display:'none' }} onChange={handleCsvFileChange} />
+                </label>
+              </div>
+              {csvNeedsTicker && (
+                <>
+                  <div className="form-group">
+                    <label>Symbol</label>
+                    <input type="text" value={csvTicker} onChange={e => setCsvTicker(e.target.value.toUpperCase())}
+                      placeholder="AAPL" style={{ width:90 }}
+                      onKeyDown={e => { if (e.key === 'Enter' && csvTicker) fetchCsvPreview(csvTicker); }} />
+                  </div>
+                  <div className="form-group">
+                    <label>&nbsp;</label>
+                    <button className="btn-primary" onClick={() => fetchCsvPreview(csvTicker)}
+                      disabled={!csvTicker} style={{ padding:'7px 14px' }}>Preview</button>
+                  </div>
+                </>
+              )}
+              {csvFormat && (
+                <div className="form-group">
+                  <label>&nbsp;</label>
+                  <span style={{ fontSize:11, background:'var(--border)', color:'var(--muted)', padding:'4px 10px', borderRadius:10, fontWeight:500, display:'inline-block' }}>
+                    {CSV_FORMAT_LABEL[csvFormat] ?? csvFormat}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {csvNeedsTicker && !csvTicker && (
+              <div style={{ color:'var(--color-gold-commodity)', marginBottom:12, fontSize:13, display:'flex', alignItems:'center', gap:6 }}>
+                <AlertCircle size={14} /> This format has no symbol info. Enter a symbol and click Preview.
+              </div>
+            )}
+
+            {csvError && (
+              <div style={{ color:'var(--red)', marginBottom:12, display:'flex', alignItems:'center', gap:6 }}>
+                <AlertCircle size={15} /> {csvError}
+              </div>
+            )}
+
+            {csvResult ? (
+              <div style={{ color:'var(--green)', marginBottom:20, display:'flex', alignItems:'center', gap:6 }}>
+                <CheckCircle size={15} /> {csvResult.imported} records imported
+              </div>
+            ) : csvPreview ? (
+              <>
+                <div style={{ marginBottom:8, color:'var(--muted)', fontSize:13 }}>
+                  Total: {csvTotal} · Import: {csvImportable.length} · Duplicate: {csvPreview.filter(r=>r.duplicate).length} · Skipped: {csvPreview.filter(r=>r.skip).length}
+                </div>
+                <div style={{ maxHeight:320, overflowY:'auto', marginBottom:16, border:'1px solid var(--border)', borderRadius:8 }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Date</th><th>Symbol</th><th>Type</th>
+                        <th style={{ textAlign:'right' }}>Qty</th>
+                        <th style={{ textAlign:'right' }}>Price</th>
+                        <th style={{ textAlign:'right' }}>Fee</th>
+                        <th>Notes</th><th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {csvPreview.map((r,i) => (
+                        <tr key={i} style={{ opacity: r.skip||r.duplicate ? 0.4 : 1 }}>
+                          <td>{r.date}</td>
+                          <td>{r.ticker}</td>
+                          <td><span style={{ color: CSV_TYPE_COLOR[r.type] ?? 'var(--muted)', fontWeight:500 }}>{CSV_TYPE_LABEL[r.type] ?? r.type}</span></td>
+                          <td style={{ textAlign:'right' }}>{r.quantity>0 ? r.quantity : '-'}</td>
+                          <td style={{ textAlign:'right' }}>{r.price>0 ? `$${r.price.toFixed(2)}` : '-'}</td>
+                          <td style={{ textAlign:'right' }}>{r.fee>0 ? `$${r.fee.toFixed(2)}` : '-'}</td>
+                          <td style={{ maxWidth:160, overflow:'hidden', textOverflow:'ellipsis', color:'var(--muted)', fontSize:12 }}>{r.notes}</td>
+                          <td>
+                            {r.duplicate && <span style={{ fontSize:11, color:'var(--color-gold-commodity)' }}>Duplicate</span>}
+                            {r.skip && <span style={{ fontSize:11, color:'var(--muted)' }}>Skipped</span>}
+                            {!r.duplicate && !r.skip && <span style={{ fontSize:11, color:'var(--green)' }}>✓</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : null}
+
+            {/* CSV footer */}
+            <div style={{ display:'flex', justifyContent:'flex-end', gap:10, paddingTop:16, borderTop:'1px solid var(--border)' }}>
+              <button className="btn-secondary" onClick={onClose}>Cancel</button>
+              {csvPreview && !csvResult && (
+                <button className="btn-primary" onClick={handleCsvImport}
+                  disabled={csvImporting || csvImportable.length === 0}>
+                  {csvImporting ? 'Importing...' : `Import ${csvImportable.length}`}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════
+            MANUAL ENTRY MODE
+        ══════════════════════════════════════════════════════════ */}
+        {mode === 'manual' && (
+          <form onSubmit={handleSubmit}>
+            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+              {/* Type selector */}
+              <div className="form-group">
+                <label>Type</label>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                  {TX_TYPES.map(t => (
+                    <button key={t.value} type="button"
+                      onClick={() => { setType(t.value); setReinvest(false); setLotMethod('average_cost'); }}
+                      style={{ padding:'6px 14px', fontWeight:500, fontSize:13, borderRadius:6,
+                        background: type===t.value ? 'var(--accent)' : 'var(--border)',
+                        color: type===t.value ? 'white' : 'var(--muted)' }}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Row: Account + Ticker */}
+              <div className="form-row">
                 <div className="form-group" style={{ flex:1 }}>
-                  <label>Symbol</label>
-                  {prefillTicker ? (
-                    <input value={ticker} readOnly style={{ width: '100%', opacity: 0.7 }} />
-                  ) : (
-                    <TickerTypeahead
-                      value={ticker}
-                      onChange={val => setTicker(val.toUpperCase())}
-                      suggestions={tickerSuggestions}
-                      placeholder="Type ticker to search"
-                      style={{ width: '100%' }}
-                    />
+                  <label>Account</label>
+                  <select value={accountId} onChange={e => setAccountId(e.target.value)} style={{ width:'100%' }}>
+                    {visible.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </select>
+                </div>
+                {type !== 'transfer' && (
+                  <div className="form-group" style={{ flex:1 }}>
+                    <label>Symbol</label>
+                    {prefillTicker ? (
+                      <input value={ticker} readOnly style={{ width:'100%', opacity:0.7 }} />
+                    ) : (
+                      <TickerTypeahead
+                        value={ticker}
+                        onChange={val => setTicker(val.toUpperCase())}
+                        suggestions={tickerSuggestions}
+                        placeholder="Type ticker to search"
+                        style={{ width:'100%' }}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Row: Date + fields */}
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Date</label>
+                  <DatePickerInput
+                    value={date}
+                    onChange={val => { setDate(val); setDateError(isValidDate(val) ? '' : 'Format: MM/DD/YYYY'); }}
+                    error={dateError}
+                  />
+                </div>
+
+                {type === 'transfer' && (
+                  <div className="form-group">
+                    <label>Direction</label>
+                    <select value={transferDir} onChange={e => setTransferDir(e.target.value as 'DEPOSIT' | 'WITHDRAW')}
+                      style={{ width:160 }}>
+                      <option value="DEPOSIT">Deposit</option>
+                      <option value="WITHDRAW">Withdraw</option>
+                    </select>
+                  </div>
+                )}
+
+                {(type === 'split' || type === 'consolidation') && (
+                  <div className="form-group">
+                    <label>Ratio</label>
+                    <input value={qty} onChange={e => setQty(e.target.value)}
+                      type="number" step="any" min="1.0001"
+                      placeholder={type === 'split' ? '2  (2:1 split)' : '10  (1:10 reverse)'}
+                      style={{ width:160 }} required />
+                  </div>
+                )}
+
+                {type !== 'transfer' && type !== 'dividend' && type !== 'split' && type !== 'consolidation' && (
+                  <div className="form-group">
+                    <label>Shares</label>
+                    <input value={qty} onChange={e => setQty(e.target.value)}
+                      type="number" step="any" min="0" placeholder="0" style={{ width:90 }} />
+                  </div>
+                )}
+
+                {type !== 'split' && type !== 'consolidation' && (
+                  <div className="form-group">
+                    <label>{type==='transfer'?`Amount (${sym})`:type==='dividend'?`Dividend (${sym})`:`Price (${sym})`}</label>
+                    <input value={price} onChange={e => setPrice(formatPriceInput(e.target.value))}
+                      type="text" inputMode="decimal" placeholder="0.00" style={{ width:110 }} required />
+                  </div>
+                )}
+
+                {type !== 'transfer' && type !== 'split' && type !== 'consolidation' && (
+                  <div className="form-group">
+                    <label>Fee ({sym})</label>
+                    <input value={fee} onChange={e => setFee(formatPriceInput(e.target.value))}
+                      type="text" inputMode="decimal" placeholder="0" style={{ width:90 }} />
+                  </div>
+                )}
+              </div>
+
+              {/* Note */}
+              <div className="form-group">
+                <label>Note</label>
+                <textarea value={notes} onChange={e => setNotes(e.target.value)}
+                  placeholder="Trade notes (optional)" rows={2}
+                  style={{ width:'100%', resize:'vertical', fontFamily:'inherit', fontSize:13 }} />
+              </div>
+
+              {/* Tax Lot (sell only) */}
+              {type==='sell' && !isEditing && ticker && (
+                <TaxLotPanel
+                  ticker={ticker} accountId={accountId}
+                  sellQty={sellQtyNum} sellPrice={parseFloat(price||'0')}
+                  method={lotMethod} onMethodChange={m => { setLotMethod(m); setSpecificSelections({}); }}
+                  specificSelections={specificSelections} onSpecificChange={(id,v) => setSpecificSelections(p => ({...p,[id]:v}))}
+                  currency={currency}
+                />
+              )}
+
+              {/* Dividend reinvestment */}
+              {type==='dividend' && (
+                <div style={{ padding:12, background:'rgba(99,102,241,0.08)', borderRadius:8, border:'1px solid rgba(99,102,241,0.2)' }}>
+                  <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer' }}>
+                    <input type="checkbox" checked={reinvest} onChange={e => setReinvest(e.target.checked)} />
+                    <span style={{ fontSize:13, fontWeight:500 }}>Reinvest Dividend</span>
+                  </label>
+                  {reinvest && (
+                    <div className="form-row" style={{ marginTop:10 }}>
+                      <div className="form-group">
+                        <label>Reinvest Shares</label>
+                        <input value={reinvestQty} onChange={e => setReinvestQty(e.target.value)}
+                          type="number" step="any" min="0" placeholder="0" style={{ width:90 }} required />
+                      </div>
+                      <div className="form-group">
+                        <label>Reinvest Price ({sym})</label>
+                        <input value={reinvestPrice} onChange={e => setReinvestPrice(formatPriceInput(e.target.value))}
+                          type="text" inputMode="decimal" placeholder="0.00" style={{ width:110 }} required />
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
             </div>
 
-            {/* Row: Date + Qty + Price + Fee */}
-            <div className="form-row">
-              <div className="form-group">
-                <label>Date</label>
-                <DatePickerInput
-                  value={date}
-                  onChange={val => { setDate(val); setDateError(isValidDate(val) ? '' : 'Format: MM/DD/YYYY'); }}
-                  error={dateError}
-                />
-              </div>
-
-              {type === 'transfer' && (
-                <div className="form-group">
-                  <label>Direction</label>
-                  <select value={transferDir} onChange={e => setTransferDir(e.target.value as 'DEPOSIT' | 'WITHDRAW')}
-                    style={{ width: 160 }}>
-                    <option value="DEPOSIT">Deposit</option>
-                    <option value="WITHDRAW">Withdraw</option>
-                  </select>
-                </div>
+            {/* Footer */}
+            <div style={{ display:'flex', justifyContent:'flex-end', gap:10, marginTop:24, paddingTop:16, borderTop:'1px solid var(--border)' }}>
+              <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+              {!isEditing && (
+                <button type="button" className="btn-secondary" disabled={loading} onClick={handleSaveAndAdd}>
+                  {loading ? 'Saving...' : 'Save & Add Another'}
+                </button>
               )}
-
-              {(type === 'split' || type === 'consolidation') && (
-                <div className="form-group">
-                  <label>Ratio</label>
-                  <input value={qty} onChange={e => setQty(e.target.value)}
-                    type="number" step="any" min="1.0001"
-                    placeholder={type === 'split' ? '2  (2:1 split)' : '10  (1:10 reverse)'}
-                    style={{ width: 160 }} required />
-                </div>
-              )}
-
-              {type !== 'transfer' && type !== 'dividend' && type !== 'split' && type !== 'consolidation' && (
-                <div className="form-group">
-                  <label>Shares</label>
-                  <input value={qty} onChange={e => setQty(e.target.value)}
-                    type="number" step="any" min="0" placeholder="0" style={{ width:90 }} />
-                </div>
-              )}
-
-              {type !== 'split' && type !== 'consolidation' && (
-                <div className="form-group">
-                  <label>{type==='transfer'?`Amount (${sym})`:type==='dividend'?`Dividend (${sym})`:`Price (${sym})`}</label>
-                  <input value={price} onChange={e => setPrice(formatPriceInput(e.target.value))}
-                    type="text" inputMode="decimal" placeholder="0.00" style={{ width:110 }} required />
-                </div>
-              )}
-
-              {type !== 'transfer' && type !== 'split' && type !== 'consolidation' && (
-                <div className="form-group">
-                  <label>Fee ({sym})</label>
-                  <input value={fee} onChange={e => setFee(formatPriceInput(e.target.value))}
-                    type="text" inputMode="decimal" placeholder="0" style={{ width:90 }} />
-                </div>
-              )}
-            </div>
-
-            {/* Note */}
-            <div className="form-group">
-              <label>Note</label>
-              <textarea value={notes} onChange={e => setNotes(e.target.value)}
-                placeholder="Trade notes (optional)"
-                rows={2}
-                style={{ width:'100%', resize:'vertical', fontFamily:'inherit', fontSize:13 }} />
-            </div>
-
-            {/* Tax Lot (sell only) */}
-            {type==='sell' && !isEditing && ticker && (
-              <TaxLotPanel
-                ticker={ticker} accountId={accountId}
-                sellQty={sellQtyNum} sellPrice={parseFloat(price||'0')}
-                method={lotMethod} onMethodChange={m => { setLotMethod(m); setSpecificSelections({}); }}
-                specificSelections={specificSelections} onSpecificChange={(id,v) => setSpecificSelections(p => ({...p,[id]:v}))}
-                currency={currency}
-              />
-            )}
-
-            {/* Dividend reinvestment */}
-            {type==='dividend' && (
-              <div style={{ padding:12, background:'rgba(99,102,241,0.08)', borderRadius:8, border:'1px solid rgba(99,102,241,0.2)' }}>
-                <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer' }}>
-                  <input type="checkbox" checked={reinvest} onChange={e => setReinvest(e.target.checked)} />
-                  <span style={{ fontSize:13, fontWeight:500 }}>Reinvest Dividend</span>
-                </label>
-                {reinvest && (
-                  <div className="form-row" style={{ marginTop:10 }}>
-                    <div className="form-group">
-                      <label>Reinvest Shares</label>
-                      <input value={reinvestQty} onChange={e => setReinvestQty(e.target.value)}
-                        type="number" step="any" min="0" placeholder="0" style={{ width:90 }} required />
-                    </div>
-                    <div className="form-group">
-                      <label>Reinvest Price ({sym})</label>
-                      <input value={reinvestPrice} onChange={e => setReinvestPrice(formatPriceInput(e.target.value))}
-                        type="text" inputMode="decimal" placeholder="0.00" style={{ width:110 }} required />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div style={{ display:'flex', justifyContent:'flex-end', gap:10, marginTop:24, paddingTop:16, borderTop:'1px solid var(--border)' }}>
-            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-            {!isEditing && (
-              <button type="button" className="btn-secondary" disabled={loading} onClick={handleSaveAndAdd}>
-                {loading ? 'Saving...' : 'Save & Add Another'}
+              <button type="submit" className="btn-primary" disabled={loading} style={{ minWidth:90 }}>
+                {loading ? 'Saving...' : isEditing ? 'Update' : 'Save'}
               </button>
-            )}
-            <button type="submit" className="btn-primary" disabled={loading} style={{ minWidth:90 }}>
-              {loading ? 'Saving...' : isEditing ? 'Update' : 'Save'}
-            </button>
-          </div>
-        </form>
+            </div>
+          </form>
+        )}
+
       </div>
     </div>
   );

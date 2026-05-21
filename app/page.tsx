@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Settings, FileUp, RefreshCw, LogOut, LogIn, HelpCircle } from 'lucide-react';
+import { Settings, RefreshCw, LogOut, LogIn, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
 import { Account, AccountBreakdown, AccountType, ExchangeRates, PortfolioPosition, SummaryData, Transaction, TradingHint, WatchlistQuote } from '@/lib/types';
@@ -11,7 +11,6 @@ import TransactionModal from '@/components/modals/TransactionModal';
 import AccountSettingsModal from '@/components/modals/AccountSettingsModal';
 import AccountHistoryModal from '@/components/modals/AccountHistoryModal';
 import TradeAnalysisModal from '@/components/modals/TradeAnalysisModal';
-import CsvImportModal from '@/components/modals/CsvImportModal';
 import TradingHintModal from '@/components/modals/TradingHintModal';
 import SummaryCards from '@/components/SummaryCards';
 import AccountBanner from '@/components/AccountBanner';
@@ -43,7 +42,6 @@ export default function Home() {
   const [txPrefill, setTxPrefill] = useState<{ ticker: string; accountId: string | number } | null>(null);
   const [historyDeepLink, setHistoryDeepLink] = useState<{ ticker: string; id: number } | null>(null);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
-  const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [tradingHintOpen, setTradingHintOpen] = useState(false);
   const [editingHint, setEditingHint] = useState<TradingHint | null>(null);
   const [hintPrefillTicker, setHintPrefillTicker] = useState<string | null>(null);
@@ -455,14 +453,7 @@ export default function Home() {
           <RefreshCw size={13} style={{ animation: ratesRefreshing ? 'spin 0.6s linear infinite' : 'none' }} />
         </button>
 
-        {!!userEmail && (
-          <button className="mobile-hide" onClick={() => setCsvImportOpen(true)}
-            style={{ background: 'var(--border)', color: 'var(--muted)', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
-            <FileUp size={14} /> CSV Import
-          </button>
-        )}
-
-        {userEmail && (
+{userEmail && (
           <span className="mobile-hide" style={{ fontSize: 11, color: 'var(--muted)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {userEmail}
           </span>
@@ -861,6 +852,7 @@ export default function Home() {
           editingTx={editingTx}
           onSubmit={handleTransactionSubmit}
           onClose={closeTransactionModal}
+          onImported={refreshAll}
           prefillTicker={txPrefill?.ticker}
           prefillAccountId={txPrefill?.accountId}
           tickerSuggestions={[...new Set([
@@ -906,9 +898,6 @@ export default function Home() {
           onEditHint={handleEditHint}
           onDeleteHint={handleDeleteHint}
         />
-      )}
-      {csvImportOpen && (
-        <CsvImportModal accounts={accounts} onClose={() => setCsvImportOpen(false)} onImported={() => { refreshAll(); setCsvImportOpen(false); }} />
       )}
       {tradingHintOpen && (
         <TradingHintModal
