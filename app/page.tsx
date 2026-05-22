@@ -57,6 +57,7 @@ export default function Home() {
   const [appNameInput, setAppNameInput] = useState('');
   const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([]);
   const [hintToasts, setHintToasts] = useState<HintToast[]>([]);
+  const shownHintToastIds = useRef<Set<string>>(new Set());
   const alertStateRef = useRef<Record<string, 'up' | 'down' | null>>({});
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [accountsLoaded, setAccountsLoaded] = useState(false);
@@ -88,19 +89,7 @@ export default function Home() {
       const res = await fetch('/api/check-prices', { method: 'POST' });
       if (res.ok) {
         const { triggered } = await res.json();
-        if (triggered?.length > 0) {
-          fetchHintNotifications();
-          setHintToasts(prev => [
-            ...prev,
-            ...triggered.map((t: any) => ({
-              id: `${t.ticker}-${t.hint_type}-${Date.now()}`,
-              ticker: t.ticker,
-              hint_type: t.hint_type,
-              hint_price: t.hint_price,
-              current_price: t.current_price,
-            })),
-          ]);
-        }
+        if (triggered?.length > 0) fetchHintNotifications();
       }
     } catch {}
   }, [fetchHintNotifications]);
@@ -257,6 +246,23 @@ export default function Home() {
     const id = setInterval(runCheckPrices, 60_000);
     return () => clearInterval(id);
   }, [runCheckPrices, userEmail]);
+
+  // Show toast for any unread hint notification not yet toasted (covers page-load + new triggers)
+  useEffect(() => {
+    const unseen = hintNotifications.filter(n => !n.read && !shownHintToastIds.current.has(n.id));
+    if (unseen.length === 0) return;
+    unseen.forEach(n => shownHintToastIds.current.add(n.id));
+    setHintToasts(prev => [
+      ...prev,
+      ...unseen.map(n => ({
+        id: n.id,
+        ticker: n.ticker,
+        hint_type: n.hint_type,
+        hint_price: n.hint_price,
+        current_price: n.current_price,
+      })),
+    ]);
+  }, [hintNotifications]);
 
   useEffect(() => {
     if (!userEmail) return;
