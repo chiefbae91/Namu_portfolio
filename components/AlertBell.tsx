@@ -47,7 +47,7 @@ export default function AlertBell({ alerts, notifications, onMarkAllRead, onDism
 
   const activeAlerts = alerts.filter(a => a.active);
   const unreadCount = notifications.filter(n => !n.read).length;
-  const badgeCount = unreadCount;
+  const bellColor = activeAlerts.length > 0 ? '#f5c518' : 'var(--muted)';
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -66,14 +66,14 @@ export default function AlertBell({ alerts, notifications, onMarkAllRead, onDism
         title="가격 알림"
         style={{
           background: 'none',
-          color: badgeCount > 0 ? 'var(--accent)' : activeAlerts.length > 0 ? 'var(--text)' : 'var(--muted)',
+          color: bellColor,
           padding: '6px 8px',
           display: 'flex',
           alignItems: 'center',
           position: 'relative',
         }}
       >
-        <Bell size={15} fill={unreadCount > 0 ? 'currentColor' : 'none'} />
+        <Bell size={15} fill={activeAlerts.length > 0 ? 'currentColor' : 'none'} />
         {unreadCount > 0 && (
           <span style={{
             position: 'absolute', top: 2, right: 2,
