@@ -12,6 +12,16 @@ const RANGE_CONFIG: Record<string, { yfRange: string; interval: string }> = {
   '5Y': { yfRange: '5y',  interval: '1wk' },
 };
 
+function applyTx(tx: any, holdings: Record<string, number>, cash: number): number {
+  if (tx.type === 'buy') { holdings[tx.ticker!] = (holdings[tx.ticker!] ?? 0) + tx.quantity; return cash - tx.quantity * tx.price - (tx.fee ?? 0); }
+  if (tx.type === 'sell') { holdings[tx.ticker!] = (holdings[tx.ticker!] ?? 0) - tx.quantity; return cash + tx.quantity * tx.price - (tx.fee ?? 0); }
+  if (tx.type === 'dividend') return cash + (tx.quantity > 0 ? tx.quantity * tx.price : tx.price);
+  if (tx.type === 'cash') return cash + tx.price;
+  if (tx.type === 'split' && tx.ticker) { holdings[tx.ticker] = (holdings[tx.ticker] ?? 0) * tx.quantity; }
+  if (tx.type === 'consolidation' && tx.ticker) { holdings[tx.ticker] = (holdings[tx.ticker] ?? 0) / tx.quantity; }
+  return cash;
+}
+
 export async function GET(req: NextRequest) {
   const user = await getAuthUser();
   if (!user) return unauthorized();
@@ -45,6 +55,8 @@ export async function GET(req: NextRequest) {
   const tickers = [...new Set(txs.filter(t => t.type === 'buy' || t.type === 'sell').map(t => t.ticker).filter((t): t is string => !!t))];
   const fetchList = tickers.length > 0 ? tickers : ['SPY'];
   const priceMap: Record<string, Record<string, number>> = {};
+  // Current market prices from meta.regularMarketPrice — same source as portfolio route
+  const currentPriceMap: Record<string, number> = {};
 
   await Promise.all(fetchList.map(async ticker => {
     try {
@@ -54,6 +66,8 @@ export async function GET(req: NextRequest) {
       const json = await res.json();
       const result = json?.chart?.result?.[0];
       if (!result) return;
+      const currentPrice = result.meta?.regularMarketPrice;
+      if (currentPrice != null) currentPriceMap[ticker] = currentPrice;
       const timestamps: number[] = result.timestamp ?? [];
       const closes: number[] = result.indicators?.quote?.[0]?.close ?? [];
       priceMap[ticker] = {};
@@ -74,11 +88,7 @@ export async function GET(req: NextRequest) {
 
   for (const date of allDates) {
     while (ti < txs.length && txs[ti].date <= date) {
-      const tx = txs[ti++];
-      if (tx.type === 'buy') { holdings[tx.ticker!] = (holdings[tx.ticker!] ?? 0) + tx.quantity; cash -= tx.quantity * tx.price + (tx.fee ?? 0); }
-      else if (tx.type === 'sell') { holdings[tx.ticker!] = (holdings[tx.ticker!] ?? 0) - tx.quantity; cash += tx.quantity * tx.price - (tx.fee ?? 0); }
-      else if (tx.type === 'dividend') { cash += tx.quantity > 0 ? tx.quantity * tx.price : tx.price; }
-      else if (tx.type === 'cash') { cash += tx.price; }
+      cash = applyTx(txs[ti++], holdings, cash);
     }
     while (fi < flows.length && flows[fi].date <= date) {
       const f = flows[fi++];
@@ -92,6 +102,25 @@ export async function GET(req: NextRequest) {
       if (qty > 0.00001) stockVal += qty * (lastKnownPrice[ticker] ?? 0);
     }
     data.push({ date, value: cash + stockVal });
+  }
+
+  // Process any remaining transactions/flows dated after the last chart date
+  while (ti < txs.length) { cash = applyTx(txs[ti++], holdings, cash); }
+  while (fi < flows.length) {
+    const f = flows[fi++];
+    cash += f.type === 'DEPOSIT' ? f.amount : -f.amount;
+  }
+
+  // Replace/append today's data point using current market prices (matches portfolio route)
+  const today = new Date().toISOString().slice(0, 10);
+  let finalStockVal = 0;
+  for (const [ticker, qty] of Object.entries(holdings)) {
+    if (qty > 0.00001) finalStockVal += qty * (currentPriceMap[ticker] ?? lastKnownPrice[ticker] ?? 0);
+  }
+  if (data.length > 0 && data[data.length - 1].date === today) {
+    data[data.length - 1] = { date: today, value: cash + finalStockVal };
+  } else if (data.length > 0) {
+    data.push({ date: today, value: cash + finalStockVal });
   }
 
   return NextResponse.json({ account_name: account.name, data });
