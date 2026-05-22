@@ -172,7 +172,7 @@ export default function AlertBell({ alerts, notifications, onMarkAllRead, onDism
                         </span>
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                        {fmtPrice(a.hint_prices)} 아래로 내려오면 알림
+                        {fmtPrice(a.hint_prices)} {['resistance','short_target','long_target'].includes(a.hint_type) ? '위로 올라오면' : '아래로 내려오면'} 알림
                       </div>
                     </div>
                     <button

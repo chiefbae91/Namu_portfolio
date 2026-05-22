@@ -51,6 +51,11 @@ export async function POST() {
   const priceEntries = await Promise.all(tickers.map(async t => [t, await fetchCurrentPrice(t)] as [string, number | null]));
   const priceMap: Record<string, number | null> = Object.fromEntries(priceEntries);
 
+  // 벽, 단기 목표, 장기 목표 → trigger when price reaches or exceeds hint price
+  const UPWARD_TYPES = new Set(['resistance', 'short_target', 'long_target']);
+
+  const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   const newNotifications: any[] = [];
   const alertsToSetTriggered: string[] = [];
   const alertsToResetTriggered: string[] = [];
@@ -62,28 +67,47 @@ export async function POST() {
     const prices = parsePrices(alert.hint_prices);
     if (prices.length === 0) continue;
 
-    const anyBelow = prices.some(p => currentPrice < p);
-    const allAbove = prices.every(p => currentPrice >= p);
+    const isUpward = UPWARD_TYPES.has(alert.hint_type);
+    const typeLabel = TYPE_LABELS[alert.hint_type] ?? alert.hint_type;
 
-    if (!alert.triggered && anyBelow) {
-      // Price crossed below a hint level — fire notifications for each crossed price
-      const crossedPrices = prices.filter(p => currentPrice < p);
-      for (const hintPrice of crossedPrices) {
-        const typeLabel = TYPE_LABELS[alert.hint_type] ?? alert.hint_type;
-        const message = `📉 ${alert.ticker} ${typeLabel} $${hintPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 아래 도달 (현재가 $${currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
-        newNotifications.push({
-          user_id: user.id,
-          ticker: alert.ticker,
-          hint_type: alert.hint_type,
-          hint_price: hintPrice,
-          current_price: currentPrice,
-          message,
-        });
+    if (isUpward) {
+      const crossedPrices = prices.filter(p => currentPrice >= p);
+      const allBelow = prices.every(p => currentPrice < p);
+
+      if (!alert.triggered && crossedPrices.length > 0) {
+        for (const hintPrice of crossedPrices) {
+          newNotifications.push({
+            user_id: user.id,
+            ticker: alert.ticker,
+            hint_type: alert.hint_type,
+            hint_price: hintPrice,
+            current_price: currentPrice,
+            message: `📈 ${alert.ticker} ${typeLabel} $${fmt(hintPrice)} 위 도달 (현재가 $${fmt(currentPrice)})`,
+          });
+        }
+        alertsToSetTriggered.push(alert.id);
+      } else if (alert.triggered && allBelow) {
+        alertsToResetTriggered.push(alert.id);
       }
-      alertsToSetTriggered.push(alert.id);
-    } else if (alert.triggered && allAbove) {
-      // Price recovered above all hint levels — reset so it can trigger again next time
-      alertsToResetTriggered.push(alert.id);
+    } else {
+      const crossedPrices = prices.filter(p => currentPrice <= p);
+      const allAbove = prices.every(p => currentPrice > p);
+
+      if (!alert.triggered && crossedPrices.length > 0) {
+        for (const hintPrice of crossedPrices) {
+          newNotifications.push({
+            user_id: user.id,
+            ticker: alert.ticker,
+            hint_type: alert.hint_type,
+            hint_price: hintPrice,
+            current_price: currentPrice,
+            message: `📉 ${alert.ticker} ${typeLabel} $${fmt(hintPrice)} 아래 도달 (현재가 $${fmt(currentPrice)})`,
+          });
+        }
+        alertsToSetTriggered.push(alert.id);
+      } else if (alert.triggered && allAbove) {
+        alertsToResetTriggered.push(alert.id);
+      }
     }
   }
 

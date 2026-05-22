@@ -23,6 +23,9 @@ export async function POST(req: NextRequest) {
   if (!hint_id || !ticker || !hint_type) {
     return NextResponse.json({ error: 'hint_id, ticker, hint_type required' }, { status: 400 });
   }
+  if (hint_type === 'note_only') {
+    return NextResponse.json({ error: '메모 항목은 알림을 설정할 수 없습니다.' }, { status: 400 });
+  }
 
   const { data: existing } = await supabase
     .from('price_alerts')
