@@ -261,11 +261,16 @@ export default function Home() {
     const pricesStr = Array.isArray(hintPricesRaw)
       ? hintPricesRaw.join(' ')
       : hintPricesRaw != null ? String(hintPricesRaw) : '';
-    await fetch('/api/alerts', {
+    const res = await fetch('/api/alerts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ hint_id: hint.id, ticker: hint.ticker, hint_type: hint.type, hint_prices: pricesStr }),
     });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error ?? '알림 설정에 실패했습니다.');
+      return;
+    }
     fetchHintAlerts();
   };
 

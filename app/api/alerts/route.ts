@@ -33,12 +33,31 @@ export async function POST(req: NextRequest) {
 
   if (existing) {
     const newActive = !existing.active;
+    if (newActive) {
+      const { count } = await supabase
+        .from('price_alerts')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('active', true);
+      if ((count ?? 0) >= 20) {
+        return NextResponse.json({ error: '알림은 최대 20개까지 설정할 수 있습니다.' }, { status: 400 });
+      }
+    }
     const { error } = await supabase
       .from('price_alerts')
       .update({ active: newActive, ...(newActive ? {} : { triggered: false }) })
       .eq('id', existing.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ active: newActive });
+  }
+
+  const { count: activeCount } = await supabase
+    .from('price_alerts')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .eq('active', true);
+  if ((activeCount ?? 0) >= 20) {
+    return NextResponse.json({ error: '알림은 최대 20개까지 설정할 수 있습니다.' }, { status: 400 });
   }
 
   const { error } = await supabase.from('price_alerts').insert({
