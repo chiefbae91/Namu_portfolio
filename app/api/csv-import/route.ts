@@ -244,6 +244,12 @@ function parseIBFlexQuery(rows: Record<string, string>[], existing: any[]): CsvP
 
 // ─── Fidelity parser ─────────────────────────────────────────────
 const FIDELITY_ACTION_MAP: Record<string, TransactionType | 'dividend_reinvest' | 'skip'> = {
+  // Short-form actions (newer Fidelity exports)
+  'BUY':                                     'buy',
+  'SELL':                                     'sell',
+  'DIVIDEND':                                'dividend',
+  'REINVEST':                                'dividend_reinvest',
+  // Verbose actions (older / full Fidelity exports)
   'YOU BOUGHT':                              'buy',
   'YOU BOUGHT (MARGIN)':                     'buy',
   'YOU SOLD':                                'sell',
@@ -352,7 +358,8 @@ function parseFidelityRows(rows: Record<string, string>[], existing: any[]): Csv
     const type = mappedType as TransactionType;
 
     if (type === 'dividend') {
-      const divAmount = amount || price;
+      // Use Amount column — Quantity may hold a $-prefixed dollar value in some Fidelity formats
+      const divAmount = amount;
       if (!symbol || divAmount === 0) continue;
       preview.push({
         date, ticker: symbol, type: 'dividend', quantity: 0, price: divAmount, amount: divAmount, fee: 0,
