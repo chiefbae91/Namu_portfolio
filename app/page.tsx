@@ -910,6 +910,8 @@ export default function Home() {
                   onSymbolClick={ticker => { setAnalysisInitialTab('hints'); setAnalysisTicker(ticker); }}
                   onAddHint={!!userEmail ? () => { setEditingHint(null); setTradingHintOpen(true); } : undefined}
                   isLoggedIn={!!userEmail}
+                  alertedHintIds={alertedHintIds}
+                  onToggleAlert={!!userEmail ? handleToggleAlert : undefined}
                 />
               )}
             </div>
