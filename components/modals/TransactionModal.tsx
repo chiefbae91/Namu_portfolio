@@ -199,7 +199,7 @@ const CSV_TYPE_COLOR: Record<string, string> = {
   skip: 'var(--muted)',
 };
 const CSV_FORMAT_LABEL: Record<string, string> = {
-  ib: 'Interactive Brokers', robinhood: 'Robinhood', webull: 'Webull', new: 'Generic',
+  ib: 'Interactive Brokers', robinhood: 'Robinhood', webull: 'Webull', new: 'Generic', fidelity: 'Fidelity',
 };
 
 // ─── Modal ────────────────────────────────────────────────────────

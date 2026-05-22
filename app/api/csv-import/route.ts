@@ -242,9 +242,144 @@ function parseIBFlexQuery(rows: Record<string, string>[], existing: any[]): CsvP
   return preview;
 }
 
-// ─── Format detection (for non-IB flat CSVs) ─────────────────────
-function detectFormat(headers: string[]): 'robinhood' | 'new' | 'webull' | 'ib' {
+// ─── Fidelity parser ─────────────────────────────────────────────
+const FIDELITY_ACTION_MAP: Record<string, TransactionType | 'dividend_reinvest' | 'skip'> = {
+  'YOU BOUGHT':                              'buy',
+  'YOU BOUGHT (MARGIN)':                     'buy',
+  'YOU SOLD':                                'sell',
+  'YOU SOLD (MARGIN)':                       'sell',
+  'DIVIDEND RECEIVED':                       'dividend',
+  'CASH DIVIDEND':                           'dividend',
+  'NON-QUALIFIED DIVIDEND':                  'dividend',
+  'QUALIFIED DIVIDEND':                      'dividend',
+  'REINVESTMENT':                            'dividend_reinvest',
+  'REINVESTED DIVIDEND':                     'dividend_reinvest',
+  'ELECTRONIC FUNDS TRANSFER RECEIVED':      'transfer_deposit',
+  'ELECTRONIC FUNDS TRANSFER PAID':          'transfer_withdraw',
+  'DIRECT DEBIT':                            'transfer_withdraw',
+  'DIRECT CREDIT':                           'transfer_deposit',
+  'TRANSFERRED FROM':                        'transfer_deposit',
+  'TRANSFERRED TO':                          'transfer_withdraw',
+  'JOURNALED SHARES':                        'skip',
+  'EXPIRED':                                 'skip',
+  'OPENING BALANCE':                         'skip',
+  'SHORT TERM CAP GAIN REINVEST':            'skip',
+  'LONG TERM CAP GAIN REINVEST':             'skip',
+  'INTEREST EARNED':                         'skip',
+  'MARGIN INTEREST':                         'skip',
+};
+
+// Fidelity files have a few header text lines before the actual CSV starts
+function extractFidelityCSV(text: string): string {
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const stripped = lines[i].replace(/"/g, '').trim();
+    if (stripped.startsWith('Run Date') || stripped.startsWith('Trade Date') || stripped.startsWith('Settlement Date')) {
+      return lines.slice(i).join('\n');
+    }
+  }
+  return text;
+}
+
+function isFidelityHeaders(headers: string[]): boolean {
   const lower = headers.map(h => h.toLowerCase().trim());
+  return (lower.includes('run date') || lower.includes('trade date')) &&
+         lower.includes('action') &&
+         lower.includes('symbol');
+}
+
+function parseFidelityRows(rows: Record<string, string>[], existing: any[]): CsvPreviewRow[] {
+  const preview: CsvPreviewRow[] = [];
+  for (const row of rows) {
+    const rawAction = (row['Action'] || row['action'] || '').trim().toUpperCase();
+    if (!rawAction) continue;
+
+    // Match against known actions (prefix match for variants like "YOU BOUGHT OPENING TRANSACTION")
+    let mappedType: TransactionType | 'dividend_reinvest' | 'skip' | undefined;
+    for (const key of Object.keys(FIDELITY_ACTION_MAP)) {
+      if (rawAction === key || rawAction.startsWith(key)) {
+        mappedType = FIDELITY_ACTION_MAP[key];
+        break;
+      }
+    }
+    if (!mappedType || mappedType === 'skip') continue;
+
+    const rawDate = (row['Run Date'] || row['Trade Date'] || row['Settlement Date'] || '').trim();
+    const date = parseDate(rawDate); // MM/DD/YYYY → YYYY-MM-DD
+    if (!date) continue;
+
+    const symbol = (row['Symbol'] || '').trim().toUpperCase();
+    const qty = Math.abs(parseAmount(row['Quantity'] || '0'));
+    const price = Math.abs(parseAmount(row['Price ($)'] || row['Price'] || '0'));
+    const commission = Math.abs(parseAmount(row['Commission ($)'] || row['Commission'] || '0'));
+    const fees = Math.abs(parseAmount(row['Fees ($)'] || row['Fees'] || '0'));
+    const fee = commission + fees;
+    const amount = Math.abs(parseAmount(row['Amount ($)'] || row['Amount'] || '0'));
+
+    if (mappedType === 'transfer_deposit' || mappedType === 'transfer_withdraw') {
+      const txAmount = amount || price;
+      if (txAmount === 0) continue;
+      const type: TransactionType = mappedType;
+      preview.push({
+        date, ticker: '', type, quantity: 0, price: txAmount, amount: txAmount, fee: 0,
+        notes: rawAction, skip: false, duplicate: false, raw_code: rawAction,
+      });
+      continue;
+    }
+
+    if (mappedType === 'dividend_reinvest') {
+      if (!symbol) continue;
+      const divAmount = amount || qty * price;
+      if (divAmount > 0) {
+        preview.push({
+          date, ticker: symbol, type: 'dividend', quantity: 0, price: divAmount, amount: divAmount, fee: 0,
+          notes: 'Dividend Reinvest (배당)', skip: false,
+          duplicate: dupCheckSync(existing, date, symbol, 'dividend', 0, divAmount),
+          raw_code: rawAction,
+        });
+      }
+      if (qty > 0 && price > 0) {
+        preview.push({
+          date, ticker: symbol, type: 'buy', quantity: qty, price, amount, fee,
+          notes: 'Dividend Reinvest (재투자 매수)', skip: false,
+          duplicate: dupCheckSync(existing, date, symbol, 'buy', qty, price),
+          raw_code: rawAction,
+        });
+      }
+      continue;
+    }
+
+    const type = mappedType as TransactionType;
+
+    if (type === 'dividend') {
+      const divAmount = amount || price;
+      if (!symbol || divAmount === 0) continue;
+      preview.push({
+        date, ticker: symbol, type: 'dividend', quantity: 0, price: divAmount, amount: divAmount, fee: 0,
+        notes: rawAction, skip: false,
+        duplicate: dupCheckSync(existing, date, symbol, 'dividend', 0, divAmount),
+        raw_code: rawAction,
+      });
+      continue;
+    }
+
+    // Buy / Sell
+    if (!symbol || qty === 0 || price === 0) continue;
+    preview.push({
+      date, ticker: symbol, type, quantity: qty, price, amount: amount || qty * price, fee,
+      notes: '', skip: false,
+      duplicate: dupCheckSync(existing, date, symbol, type, qty, price),
+      raw_code: rawAction,
+    });
+  }
+  return preview;
+}
+
+// ─── Format detection (for non-IB flat CSVs) ─────────────────────
+function detectFormat(headers: string[]): 'robinhood' | 'new' | 'webull' | 'ib' | 'fidelity' {
+  const lower = headers.map(h => h.toLowerCase().trim());
+
+  if (isFidelityHeaders(headers)) return 'fidelity';
 
   // IB Flex Query flat export
   if (lower.some(h => h === 'ibcommission' || h === 'ib commission') ||
@@ -378,7 +513,9 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Step 2: header:true parse for all other formats ──
-  const parsed = Papa.parse<Record<string, string>>(text, { header: true, skipEmptyLines: true, quoteChar: '"' });
+  // Fidelity files have preamble text before the CSV — strip it first
+  const csvText = extractFidelityCSV(text);
+  const parsed = Papa.parse<Record<string, string>>(csvText, { header: true, skipEmptyLines: true, quoteChar: '"' });
   const rows = parsed.data;
   if (!rows.length) return NextResponse.json({ error: '데이터 없음' }, { status: 400 });
 
@@ -388,7 +525,8 @@ export async function POST(req: NextRequest) {
   if (format === 'new' && !tickerInput) return NextResponse.json({ error: 'ticker_required', format }, { status: 400 });
 
   const preview =
-    format === 'ib'       ? parseIBFlexQuery(rows, existing)
+    format === 'fidelity' ? parseFidelityRows(rows, existing)
+    : format === 'ib'     ? parseIBFlexQuery(rows, existing)
     : format === 'webull' ? parseWebullRows(rows, accId, existing)
     : format === 'new'    ? parseNewRows(rows, tickerInput, accId, existing)
     :                       parseRobinhoodRows(rows, accId, existing);
