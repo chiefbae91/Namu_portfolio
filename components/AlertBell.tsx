@@ -73,8 +73,8 @@ export default function AlertBell({ alerts, notifications, onMarkAllRead, onDism
           position: 'relative',
         }}
       >
-        <Bell size={15} fill={badgeCount > 0 ? 'currentColor' : 'none'} />
-        {badgeCount > 0 && (
+        <Bell size={15} fill={unreadCount > 0 ? 'currentColor' : 'none'} />
+        {unreadCount > 0 && (
           <span style={{
             position: 'absolute', top: 2, right: 2,
             background: 'var(--red)', color: 'white',
@@ -83,19 +83,7 @@ export default function AlertBell({ alerts, notifications, onMarkAllRead, onDism
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             lineHeight: 1, padding: '0 2px',
           }}>
-            {badgeCount > 99 ? '99+' : badgeCount}
-          </span>
-        )}
-        {badgeCount === 0 && activeAlerts.length > 0 && (
-          <span style={{
-            position: 'absolute', top: 2, right: 2,
-            background: 'var(--accent)', color: 'white',
-            borderRadius: '50%', fontSize: 9, fontWeight: 700,
-            minWidth: 14, height: 14,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            lineHeight: 1, padding: '0 2px',
-          }}>
-            {activeAlerts.length}
+            {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
       </button>
