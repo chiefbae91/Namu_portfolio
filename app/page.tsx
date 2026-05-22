@@ -15,7 +15,7 @@ import TradingHintModal from '@/components/modals/TradingHintModal';
 import SummaryCards from '@/components/SummaryCards';
 import AccountBanner from '@/components/AccountBanner';
 import ThemeToggle from '@/components/ThemeToggle';
-import PriceAlertToasts, { PriceAlert } from '@/components/PriceAlertToasts';
+import PriceAlertToasts, { PriceAlert, HintToast } from '@/components/PriceAlertToasts';
 import AlertBell from '@/components/AlertBell';
 
 const TRANSFER_PREFIX = 'tf-';
@@ -56,6 +56,7 @@ export default function Home() {
   const [appNameEditing, setAppNameEditing] = useState(false);
   const [appNameInput, setAppNameInput] = useState('');
   const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([]);
+  const [hintToasts, setHintToasts] = useState<HintToast[]>([]);
   const alertStateRef = useRef<Record<string, 'up' | 'down' | null>>({});
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [accountsLoaded, setAccountsLoaded] = useState(false);
@@ -87,7 +88,19 @@ export default function Home() {
       const res = await fetch('/api/check-prices', { method: 'POST' });
       if (res.ok) {
         const { triggered } = await res.json();
-        if (triggered?.length > 0) fetchHintNotifications();
+        if (triggered?.length > 0) {
+          fetchHintNotifications();
+          setHintToasts(prev => [
+            ...prev,
+            ...triggered.map((t: any) => ({
+              id: `${t.ticker}-${t.hint_type}-${Date.now()}`,
+              ticker: t.ticker,
+              hint_type: t.hint_type,
+              hint_price: t.hint_price,
+              current_price: t.current_price,
+            })),
+          ]);
+        }
       }
     } catch {}
   }, [fetchHintNotifications]);
@@ -998,6 +1011,8 @@ export default function Home() {
       <PriceAlertToasts
         alerts={priceAlerts}
         onDismiss={id => setPriceAlerts(prev => prev.filter(a => a.id !== id))}
+        hintToasts={hintToasts}
+        onDismissHint={id => setHintToasts(prev => prev.filter(h => h.id !== id))}
       />
     </div>
   );
