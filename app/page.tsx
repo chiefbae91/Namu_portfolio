@@ -520,9 +520,14 @@ export default function Home() {
 
         {!!userEmail && (
           <AlertBell
+            alerts={hintAlerts}
             notifications={hintNotifications}
             onMarkAllRead={handleMarkAllNotificationsRead}
             onDismiss={handleDismissNotification}
+            onDeactivateAlert={async (alertId) => {
+              await fetch(`/api/alerts/${alertId}`, { method: 'DELETE' });
+              fetchHintAlerts();
+            }}
             onTickerClick={ticker => { setAnalysisInitialTab('hints'); setAnalysisTicker(ticker); }}
           />
         )}
