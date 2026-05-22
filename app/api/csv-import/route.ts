@@ -395,6 +395,8 @@ function detectFormat(headers: string[]): 'robinhood' | 'new' | 'webull' | 'ib' 
 
   if (lower.some(h => h === 'side') && lower.some(h => h === 'filled time' || h === 'placed time')) return 'webull';
   if (lower.some(h => h === 'side') && lower.some(h => h.includes('filled qty') || h === 'qty')) return 'webull';
+  // Webull new format: separate Date + Time columns, Quantity, Status
+  if (lower.some(h => h === 'side') && lower.some(h => h === 'status') && lower.some(h => h === 'quantity') && lower.some(h => h === 'date')) return 'webull';
   if (lower.some(h => h === 'costbasis' || h === 'cost basis')) return 'new';
   if (lower.some(h => h === 'trans code' || h === 'trans_code' || h === 'instrument')) return 'robinhood';
   if (lower.includes('type') && !lower.includes('trans code')) return 'new';
@@ -421,13 +423,13 @@ function parseWebullRows(rows: Record<string, string>[], accountId: string, exis
     const side = (row['Side'] || row['side'] || '').trim().toLowerCase();
     if (side !== 'buy' && side !== 'sell') continue;
     const type: TransactionType = side === 'buy' ? 'buy' : 'sell';
-    const rawDate = row['Filled Time'] || row['filled time'] || row['Trade Time'] || row['Order Time'] || row['trade time'] || row['order time'] || '';
+    const rawDate = row['Date'] || row['date'] || row['Filled Time'] || row['filled time'] || row['Trade Time'] || row['Order Time'] || row['trade time'] || row['order time'] || '';
     const date = parseWebullDate(rawDate);
     if (!date) continue;
     const ticker = (row['Symbol'] || row['symbol'] || row['Instrument'] || '').trim().toUpperCase();
     if (!ticker) continue;
-    const qty = Math.abs(parseAmount(row['Filled'] || row['filled'] || row['Filled Qty'] || row['filled qty'] || row['Qty'] || row['qty'] || '0'));
-    const price = Math.abs(parseAmount(row['Avg Price'] || row['avg price'] || (row['Price'] || '').replace('@', '') || '0'));
+    const qty = Math.abs(parseAmount(row['Quantity'] || row['quantity'] || row['Filled'] || row['filled'] || row['Filled Qty'] || row['filled qty'] || row['Qty'] || row['qty'] || '0'));
+    const price = Math.abs(parseAmount(row['Price'] || row['price'] || row['Avg Price'] || row['avg price'] || '0'));
     const fee = Math.abs(parseAmount(row['Commission'] || row['commission'] || row['Fee'] || row['fee'] || '0'));
     const name = (row['Name'] || row['name'] || '').trim();
     preview.push({ date, ticker, type, quantity: qty, price, amount: qty * price, fee, notes: name || 'Webull', skip: false, duplicate: dupCheckSync(existing, date, ticker, type, qty, price), raw_code: side });
