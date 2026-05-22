@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Settings, RefreshCw, LogOut, LogIn, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
-import { Account, AccountBreakdown, AccountType, ExchangeRates, PortfolioPosition, SummaryData, Transaction, TradingHint, WatchlistQuote } from '@/lib/types';
+import { Account, AccountBreakdown, AccountType, ExchangeRates, HintAlert, HintNotification, PortfolioPosition, SummaryData, Transaction, TradingHint, WatchlistQuote } from '@/lib/types';
 import StockPortfolio from '@/components/tabs/StockPortfolio';
 import TransactionHistory from '@/components/tabs/TransactionHistory';
 import TradingHints from '@/components/tabs/TradingHints';
@@ -16,6 +16,7 @@ import SummaryCards from '@/components/SummaryCards';
 import AccountBanner from '@/components/AccountBanner';
 import ThemeToggle from '@/components/ThemeToggle';
 import PriceAlertToasts, { PriceAlert } from '@/components/PriceAlertToasts';
+import AlertBell from '@/components/AlertBell';
 
 const TRANSFER_PREFIX = 'tf-';
 
@@ -58,12 +59,38 @@ export default function Home() {
   const alertStateRef = useRef<Record<string, 'up' | 'down' | null>>({});
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [accountsLoaded, setAccountsLoaded] = useState(false);
+  const [hintAlerts, setHintAlerts] = useState<HintAlert[]>([]);
+  const [hintNotifications, setHintNotifications] = useState<HintNotification[]>([]);
 
   const fetchTradingHints = useCallback(async () => {
     const res = await fetch('/api/trading-hints');
     setTradingHints(await res.json());
     setHintRefreshTrigger(t => t + 1);
   }, []);
+
+  const fetchHintAlerts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/alerts');
+      if (res.ok) setHintAlerts(await res.json());
+    } catch {}
+  }, []);
+
+  const fetchHintNotifications = useCallback(async () => {
+    try {
+      const res = await fetch('/api/alerts/notifications');
+      if (res.ok) setHintNotifications(await res.json());
+    } catch {}
+  }, []);
+
+  const runCheckPrices = useCallback(async () => {
+    try {
+      const res = await fetch('/api/check-prices', { method: 'POST' });
+      if (res.ok) {
+        const { triggered } = await res.json();
+        if (triggered?.length > 0) fetchHintNotifications();
+      }
+    } catch {}
+  }, [fetchHintNotifications]);
 
   const fetchWatchlistQuotes = useCallback(async (tickers: string[]) => {
     if (tickers.length === 0) { setWatchlistQuotes([]); return; }
@@ -171,6 +198,9 @@ export default function Home() {
         setUserEmail(user.email ?? null);
         fetchAccounts();
         fetchAccountTypes();
+        fetchHintAlerts();
+        fetchHintNotifications();
+        runCheckPrices();
         fetch('/api/settings?key=app_name')
           .then(r => r.json())
           .then(d => { if (d.value) { setAppName(d.value); document.title = d.value; } });
@@ -214,6 +244,33 @@ export default function Home() {
   }, [accountFilter, userEmail]);
 
   const refreshAll = () => { fetchPortfolio(); fetchTransactions(); };
+
+  const alertedHintIds = new Set(
+    hintAlerts.filter(a => a.active).map(a => a.hint_id)
+  );
+
+  const handleToggleAlert = async (hint: TradingHint) => {
+    const hintPricesRaw = hint.price;
+    const pricesStr = Array.isArray(hintPricesRaw)
+      ? hintPricesRaw.join(' ')
+      : hintPricesRaw != null ? String(hintPricesRaw) : '';
+    await fetch('/api/alerts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hint_id: hint.id, ticker: hint.ticker, hint_type: hint.type, hint_prices: pricesStr }),
+    });
+    fetchHintAlerts();
+  };
+
+  const handleDismissNotification = async (id: string) => {
+    setHintNotifications(prev => prev.filter(n => n.id !== id));
+    await fetch(`/api/alerts/notifications/${id}`, { method: 'DELETE' }).catch(() => {});
+  };
+
+  const handleMarkAllNotificationsRead = async () => {
+    setHintNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    await fetch('/api/alerts/notifications', { method: 'PATCH' }).catch(() => {});
+  };
 
   const handleAccountSelect = (id: string) => {
     setAccountFilter(id);
@@ -460,6 +517,15 @@ export default function Home() {
         )}
 
         <ThemeToggle />
+
+        {!!userEmail && (
+          <AlertBell
+            notifications={hintNotifications}
+            onMarkAllRead={handleMarkAllNotificationsRead}
+            onDismiss={handleDismissNotification}
+            onTickerClick={ticker => { setAnalysisInitialTab('hints'); setAnalysisTicker(ticker); }}
+          />
+        )}
 
         <Link
           href="/guide"
@@ -797,6 +863,8 @@ export default function Home() {
                 onSymbolClick={ticker => { setAnalysisInitialTab('hints'); setAnalysisTicker(ticker); }}
                 onAddHint={!!userEmail ? () => { setEditingHint(null); setTradingHintOpen(true); } : undefined}
                 isLoggedIn={!!userEmail}
+                alertedHintIds={alertedHintIds}
+                onToggleAlert={!!userEmail ? handleToggleAlert : undefined}
               />
             </div>
           </>

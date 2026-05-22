@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Pencil, PlusCircle, Trash2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
+import { Bell, Pencil, PlusCircle, Trash2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
 import { TradingHint } from '@/lib/types';
 import TickerTypeahead from '@/components/TickerTypeahead';
 import NoteTooltip from '@/components/NoteTooltip';
@@ -86,9 +86,11 @@ interface Props {
   onSymbolClick?: (ticker: string) => void;
   onAddHint?: () => void;
   isLoggedIn?: boolean;
+  alertedHintIds?: Set<string>;
+  onToggleAlert?: (hint: TradingHint) => void;
 }
 
-export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, onAddHint, isLoggedIn = false }: Props) {
+export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, onAddHint, isLoggedIn = false, alertedHintIds, onToggleAlert }: Props) {
   const [tickerFilter, setTickerFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [dateMode, setDateMode] = useState<DateRangeMode>('last_month');
@@ -267,6 +269,7 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, o
               <th style={{ textAlign: 'right' }}>Stock Price at Creation</th>
               <th style={{ width: '100%' }}>Note</th>
               <th></th>
+              {isLoggedIn && onToggleAlert && <th></th>}
             </tr>
           </thead>
           <tbody>
@@ -322,6 +325,28 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, o
                     </button>
                   </>)}
                 </td>
+                {isLoggedIn && onToggleAlert && (
+                  <td>
+                    {hint.type !== 'note_only' && hint.price != null && hint.price !== '' && (
+                      (() => {
+                        const isAlerted = alertedHintIds?.has(String(hint.id)) ?? false;
+                        return (
+                          <button
+                            onClick={() => onToggleAlert(hint)}
+                            title={isAlerted ? '알림 해제' : '가격 알림 설정'}
+                            style={{
+                              background: 'none',
+                              color: isAlerted ? 'var(--accent)' : 'var(--muted)',
+                              padding: 4,
+                            }}
+                          >
+                            <Bell size={13} fill={isAlerted ? 'currentColor' : 'none'} />
+                          </button>
+                        );
+                      })()
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -378,6 +403,18 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, o
             {/* Row 3: actions */}
             {isLoggedIn && (
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4, marginTop: 8 }}>
+                {onToggleAlert && hint.type !== 'note_only' && hint.price != null && hint.price !== '' && (() => {
+                  const isAlerted = alertedHintIds?.has(String(hint.id)) ?? false;
+                  return (
+                    <button
+                      onClick={() => onToggleAlert(hint)}
+                      style={{ background: 'none', color: isAlerted ? 'var(--accent)' : 'var(--muted)', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, minHeight: 36 }}
+                    >
+                      <Bell size={13} fill={isAlerted ? 'currentColor' : 'none'} />
+                      {isAlerted ? '알림 ON' : '알림'}
+                    </button>
+                  );
+                })()}
                 <button
                   style={{ background: 'none', color: 'var(--accent)', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, minHeight: 36 }}
                   onClick={() => onEdit(hint)}

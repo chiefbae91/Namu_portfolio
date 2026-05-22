@@ -152,6 +152,29 @@ export interface TradingHint {
   created_at: string;
 }
 
+export interface HintAlert {
+  id: string;
+  hint_id: string;
+  ticker: string;
+  hint_type: string;
+  hint_prices: string;
+  active: boolean;
+  triggered: boolean;
+  triggered_at: string | null;
+  created_at: string;
+}
+
+export interface HintNotification {
+  id: string;
+  ticker: string;
+  hint_type: string;
+  hint_price: number;
+  current_price: number;
+  message: string;
+  read: boolean;
+  created_at: string;
+}
+
 export interface CsvPreviewRow {
   date: string;
   ticker: string;
