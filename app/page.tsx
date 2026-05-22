@@ -238,6 +238,13 @@ export default function Home() {
     return () => clearInterval(id);
   }, [fetchPortfolio, userEmail]);
 
+  // Check alert prices every 60s
+  useEffect(() => {
+    if (!userEmail) return;
+    const id = setInterval(runCheckPrices, 60_000);
+    return () => clearInterval(id);
+  }, [runCheckPrices, userEmail]);
+
   useEffect(() => {
     if (!userEmail) return;
     fetchPortfolio(); fetchTransactions();
