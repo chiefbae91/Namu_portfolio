@@ -258,6 +258,7 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, o
         <table>
           <thead>
             <tr>
+              {isLoggedIn && onToggleAlert && <th></th>}
               <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={toggleSort}>
                 <span style={{ display: 'inline-flex', alignItems: 'center' }}>
                   Hint Date <SortIcon />
@@ -269,12 +270,29 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, o
               <th style={{ textAlign: 'right' }}>Stock Price at Creation</th>
               <th style={{ width: '100%' }}>Note</th>
               <th></th>
-              {isLoggedIn && onToggleAlert && <th></th>}
             </tr>
           </thead>
           <tbody>
             {paginated.map(hint => (
               <tr key={hint.id}>
+                {isLoggedIn && onToggleAlert && (
+                  <td>
+                    {hint.type !== 'note_only' && hint.price != null && hint.price !== '' && (
+                      (() => {
+                        const isAlerted = alertedHintIds?.has(String(hint.id)) ?? false;
+                        return (
+                          <button
+                            onClick={() => onToggleAlert(hint)}
+                            title={isAlerted ? '알림 해제' : '가격 알림 설정'}
+                            style={{ background: 'none', color: isAlerted ? 'var(--accent)' : 'var(--muted)', padding: 4 }}
+                          >
+                            <Bell size={13} fill={isAlerted ? 'currentColor' : 'none'} />
+                          </button>
+                        );
+                      })()
+                    )}
+                  </td>
+                )}
                 <td className="muted">{hint.hint_date}</td>
                 <td>
                   <button
@@ -325,28 +343,6 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, o
                     </button>
                   </>)}
                 </td>
-                {isLoggedIn && onToggleAlert && (
-                  <td>
-                    {hint.type !== 'note_only' && hint.price != null && hint.price !== '' && (
-                      (() => {
-                        const isAlerted = alertedHintIds?.has(String(hint.id)) ?? false;
-                        return (
-                          <button
-                            onClick={() => onToggleAlert(hint)}
-                            title={isAlerted ? '알림 해제' : '가격 알림 설정'}
-                            style={{
-                              background: 'none',
-                              color: isAlerted ? 'var(--accent)' : 'var(--muted)',
-                              padding: 4,
-                            }}
-                          >
-                            <Bell size={13} fill={isAlerted ? 'currentColor' : 'none'} />
-                          </button>
-                        );
-                      })()
-                    )}
-                  </td>
-                )}
               </tr>
             ))}
           </tbody>
