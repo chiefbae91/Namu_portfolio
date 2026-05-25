@@ -1,65 +1,35 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { X, PlusCircle, Pencil, Trash2 } from 'lucide-react';
 import { Currency, ExchangeRates, TradingHint } from '@/lib/types';
 import { formatCurrency, formatDate, DateFormat } from '@/lib/format';
+import { DetectedPattern } from '@/lib/patternDetector';
 import StockChart, { StockChartData, TxRow, Holding, ChartHint } from '@/components/StockChart';
 import { getLabelMap, resolveAccountName } from '@/lib/accountLabelMap';
 
-type Period = '5d' | '1mo' | '3mo' | '6mo' | '1y';
+type Period   = '5d' | '1mo' | '3mo' | '6mo' | '1y';
 type Interval = '1m' | '15m' | '1d' | '1wk';
+type ActiveTab = 'history' | 'hints' | 'patterns';
 
 const PERIODS: { value: Period; label: string }[] = [
-  { value: '5d', label: '5D' },
-  { value: '1mo', label: '1M' },
-  { value: '3mo', label: '3M' },
-  { value: '6mo', label: '6M' },
-  { value: '1y', label: '1Y' },
+  { value: '5d',  label: '5D'  },
+  { value: '1mo', label: '1M'  },
+  { value: '3mo', label: '3M'  },
+  { value: '6mo', label: '6M'  },
+  { value: '1y',  label: '1Y'  },
 ];
 
 const INTERVALS: { value: Interval; label: string }[] = [
-  { value: '1m', label: '1m' },
-  { value: '15m', label: '15m' },
-  { value: '1d', label: 'Daily' },
+  { value: '1m',  label: '1m'     },
+  { value: '15m', label: '15m'    },
+  { value: '1d',  label: 'Daily'  },
   { value: '1wk', label: 'Weekly' },
 ];
 
 const TX_TYPE_LABELS: Record<string, string> = { buy: 'Buy', sell: 'Sell', dividend: 'Dividend' };
-const TX_TYPE_COLORS: Record<string, string> = { buy: 'var(--color-price-up)', sell: 'var(--color-price-down)', dividend: 'var(--color-dividend)' };
-
-const BADGE_COLORS: [string, string][] = [
-  ['robinhood', '#00c853'], ['chase', '#1e88e5'], ['fidelity', '#f59e0b'],
-  ['schwab', '#8b5cf6'], ['etrade', '#06b6d4'], ['webull', '#ef4444'],
-  ['tdameritrade', '#fb923c'],
-];
-function badgeColor(name: string): string {
-  const l = name.toLowerCase();
-  for (const [key, color] of BADGE_COLORS) { if (l.includes(key)) return color; }
-  return '#666';
-}
-const BROKER_ABBR_MODAL: Record<string, string> = {
-  robinhood: 'RH', fidelity: 'FI', schwab: 'SC',
-  etrade: 'ET', webull: 'WB', tdameritrade: 'TD',
+const TX_TYPE_COLORS: Record<string, string> = {
+  buy: 'var(--color-price-up)', sell: 'var(--color-price-down)', dividend: 'var(--color-dividend)',
 };
-function badgeLabel(name: string): string {
-  const lower = name.toLowerCase();
-  for (const [key, abbr] of Object.entries(BROKER_ABBR_MODAL)) {
-    if (lower.includes(key)) return abbr;
-  }
-  const acct = name.match(/^Acct\s+(\d+)$/i);
-  if (acct) return `A${acct[1]}`;
-  const words = name.trim().split(/\s+/);
-  if (words.length > 1) return words.map(w => w[0]).join('').toUpperCase().slice(0, 3);
-  return name.slice(0, 2).toUpperCase();
-}
-function AccountBadge({ name }: { name?: string }) {
-  if (!name) return null;
-  return (
-    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 5px', borderRadius: 3, background: badgeColor(name), color: 'white', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
-      {badgeLabel(name)}
-    </span>
-  );
-}
 
 const HINT_TYPE_LABELS: Record<string, string> = {
   resistance:      '벽 (Resistance)',
@@ -105,6 +75,100 @@ function fmtNum(p: number | null): string {
   return `$${p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function AccountBadge({ name }: { name: string }) {
+  return (
+    <span style={{
+      fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 4,
+      background: 'var(--border)', color: 'var(--muted)',
+      whiteSpace: 'nowrap',
+    }}>{name}</span>
+  );
+}
+
+// ── Toggle Switch ──────────────────────────────────────────────────────────────
+
+function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}>
+      <div
+        onClick={() => onChange(!checked)}
+        style={{
+          width: 30, height: 17, borderRadius: 9, position: 'relative',
+          background: checked ? 'var(--accent)' : 'var(--border)',
+          transition: 'background 0.2s', flexShrink: 0,
+        }}
+      >
+        <div style={{
+          position: 'absolute', top: 2, left: checked ? 15 : 2,
+          width: 13, height: 13, borderRadius: '50%', background: 'white',
+          transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+        }} />
+      </div>
+      <span style={{ fontSize: 12, color: checked ? 'var(--text)' : 'var(--muted)', fontWeight: checked ? 600 : 400 }}>
+        {label}
+      </span>
+    </label>
+  );
+}
+
+// ── Pattern Card ───────────────────────────────────────────────────────────────
+
+function PatternCard({ pattern, currentPrice }: { pattern: DetectedPattern; currentPrice: number }) {
+  const signalColor = pattern.signal === 'Bullish'
+    ? 'var(--color-price-up)' : pattern.signal === 'Bearish'
+    ? 'var(--color-price-down)' : 'var(--muted)';
+  const signalIcon = pattern.signal === 'Bullish' ? '▲' : pattern.signal === 'Bearish' ? '▼' : '→';
+
+  const targetPct = pattern.targetPrice && currentPrice > 0
+    ? ((pattern.targetPrice - currentPrice) / currentPrice * 100)
+    : null;
+
+  return (
+    <div className="card" style={{ padding: '12px 16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+        <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{pattern.name}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <span style={{ color: signalColor, fontWeight: 600, fontSize: 12 }}>
+            {signalIcon} {pattern.signal}
+          </span>
+          <span style={{
+            fontSize: 12, fontWeight: 700, padding: '1px 8px', borderRadius: 10,
+            background: `color-mix(in srgb, ${signalColor} 15%, transparent)`,
+            color: signalColor, border: `1px solid color-mix(in srgb, ${signalColor} 30%, transparent)`,
+          }}>
+            {pattern.confidence}%
+          </span>
+        </div>
+      </div>
+
+      <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 4 }}>
+        {pattern.neckline != null && (
+          <span>Neckline: <strong style={{ color: 'var(--text)' }}>${pattern.neckline.toFixed(2)}</strong></span>
+        )}
+        {pattern.targetPrice != null && (
+          <span>
+            Target: <strong style={{ color: signalColor }}>${pattern.targetPrice.toFixed(2)}</strong>
+            {targetPct != null && (
+              <span style={{ color: signalColor, marginLeft: 4 }}>
+                ({targetPct >= 0 ? '+' : ''}{targetPct.toFixed(1)}%)
+              </span>
+            )}
+          </span>
+        )}
+        <span style={{ fontSize: 11, opacity: 0.7 }}>{pattern.startDate} → {pattern.endDate}</span>
+      </div>
+
+      {pattern.description && (
+        <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, lineHeight: 1.5 }}>
+          {pattern.description}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Props ──────────────────────────────────────────────────────────────────────
+
 interface Props {
   ticker: string;
   currency: Currency;
@@ -120,34 +184,51 @@ interface Props {
   dateFormat?: DateFormat;
 }
 
+// ── Component ──────────────────────────────────────────────────────────────────
+
 export default function TradeAnalysisModal({
   ticker, currency, rates, onClose, onAddTransaction, onShowHistory,
   initialTab = 'history', hintRefreshTrigger,
   onAddHint, onEditHint, onDeleteHint, dateFormat = 'MM/DD/YY',
 }: Props) {
-  const [period, setPeriod] = useState<Period>(() => {
-    if (typeof window === 'undefined') return '1mo';
-    return (localStorage.getItem('chart_period') as Period) ?? '1mo';
-  });
-  const [interval, setIntervalState] = useState<Interval>(() => {
-    if (typeof window === 'undefined') return '1d';
-    return (localStorage.getItem('chart_interval') as Interval) ?? '1d';
-  });
-  const [currentPrice, setCurrentPrice] = useState(0);
-  const [transactions, setTransactions] = useState<TxRow[]>([]);
-  const [holdings, setHoldings] = useState<Holding[]>([]);
+  // ── Chart controls ──
+  const [period, setPeriod] = useState<Period>(() =>
+    typeof window === 'undefined' ? '1mo' : (localStorage.getItem('chart_period') as Period) ?? '1mo'
+  );
+  const [interval, setIntervalState] = useState<Interval>(() =>
+    typeof window === 'undefined' ? '1d' : (localStorage.getItem('chart_interval') as Interval) ?? '1d'
+  );
+
+  // ── Chart data ──
+  const [currentPrice, setCurrentPrice]     = useState(0);
+  const [transactions, setTransactions]     = useState<TxRow[]>([]);
+  const [holdings, setHoldings]             = useState<Holding[]>([]);
   const [resolvedInterval, setResolvedInterval] = useState('1d');
 
-  const [activeTab, setActiveTab] = useState<'history' | 'hints'>(initialTab);
-  const [hintsData, setHintsData] = useState<TradingHint[]>([]);
-  const [hintsLoaded, setHintsLoaded] = useState(false);
-  const [hintsLoading, setHintsLoading] = useState(false);
-  const [labelMap, setLabelMap] = useState<Record<string, string>>(getLabelMap);
+  // ── Toggle states ──
+  const [showTrades,   setShowTrades]   = useState(true);
+  const [showHints,    setShowHints]    = useState(initialTab === 'hints');
+  const [showPatterns, setShowPatterns] = useState(false);
 
+  // ── Active bottom tab ──
+  const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab);
+
+  // ── Hints data ──
+  const [hintsData,    setHintsData]    = useState<TradingHint[]>([]);
+  const [hintsLoaded,  setHintsLoaded]  = useState(false);
+  const [hintsLoading, setHintsLoading] = useState(false);
+
+  // ── Patterns data + client-side cache ──
+  const [patternsData,    setPatternsData]    = useState<DetectedPattern[]>([]);
+  const [patternsLoading, setPatternsLoading] = useState(false);
+  const [patternsLoaded,  setPatternsLoaded]  = useState(false);
+  const patternCache = useRef<Map<string, DetectedPattern[]>>(new Map());
+
+  const [labelMap, setLabelMap] = useState<Record<string, string>>(getLabelMap);
   useEffect(() => {
-    const handler = () => setLabelMap(getLabelMap());
-    window.addEventListener('account_label_map_changed', handler);
-    return () => window.removeEventListener('account_label_map_changed', handler);
+    const h = () => setLabelMap(getLabelMap());
+    window.addEventListener('account_label_map_changed', h);
+    return () => window.removeEventListener('account_label_map_changed', h);
   }, []);
 
   const fmt = (v: number) => formatCurrency(v, currency, rates);
@@ -159,9 +240,49 @@ export default function TradeAnalysisModal({
     setResolvedInterval(data.resolvedInterval);
   }, []);
 
-  const handlePeriod = (p: Period) => { localStorage.setItem('chart_period', p); setPeriod(p); };
-  const handleInterval = (iv: Interval) => { localStorage.setItem('chart_interval', iv); setIntervalState(iv); };
+  const handlePeriod = (p: Period) => {
+    localStorage.setItem('chart_period', p);
+    setPeriod(p);
+  };
+  const handleInterval = (iv: Interval) => {
+    localStorage.setItem('chart_interval', iv);
+    setIntervalState(iv);
+  };
 
+  // ── Patterns cache key ──
+  const cacheKey = `${ticker}_${period}_${interval}`;
+
+  // ── Load patterns ──
+  const loadPatterns = useCallback(async (key: string, p: Period, iv: Interval) => {
+    const cached = patternCache.current.get(key);
+    if (cached) { setPatternsData(cached); setPatternsLoaded(true); return; }
+
+    setPatternsLoading(true);
+    setPatternsLoaded(false);
+    try {
+      const res = await fetch(`/api/patterns?ticker=${encodeURIComponent(ticker)}&period=${p}&interval=${iv}`);
+      const data = await res.json();
+      const patterns: DetectedPattern[] = data.patterns ?? [];
+      patternCache.current.set(key, patterns);
+      setPatternsData(patterns);
+      setPatternsLoaded(true);
+    } catch {
+      setPatternsData([]);
+      setPatternsLoaded(true);
+    } finally {
+      setPatternsLoading(false);
+    }
+  }, [ticker]);
+
+  // ── Re-load patterns when period/interval changes (if tab is active or toggle on) ──
+  useEffect(() => {
+    if (activeTab === 'patterns' || showPatterns) {
+      loadPatterns(cacheKey, period, interval);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cacheKey]);
+
+  // ── Hints ──
   const refreshHints = useCallback(async () => {
     setHintsLoading(true);
     try {
@@ -173,31 +294,46 @@ export default function TradeAnalysisModal({
     finally { setHintsLoading(false); }
   }, [ticker]);
 
-  // Load hints when switching to hints tab (lazy)
   useEffect(() => {
-    if (activeTab === 'hints' && !hintsLoaded && !hintsLoading) {
-      refreshHints();
+    if ((activeTab === 'hints' || showHints) && !hintsLoaded && !hintsLoading) refreshHints();
+  }, [activeTab, showHints, hintsLoaded, hintsLoading, refreshHints]);
+
+  useEffect(() => { setHintsLoaded(false); }, [hintRefreshTrigger]);
+
+  // ── Patterns toggle handler ──
+  const handlePatternsToggle = (on: boolean) => {
+    setShowPatterns(on);
+    if (on) {
+      setActiveTab('patterns');
+      loadPatterns(cacheKey, period, interval);
     }
-  }, [activeTab, hintsLoaded, hintsLoading, refreshHints]);
+  };
 
-  // Re-fetch when parent signals a change (add/edit/delete)
-  useEffect(() => {
-    setHintsLoaded(false);
-  }, [hintRefreshTrigger]);
+  // ── Patterns tab click ──
+  const handlePatternsTabClick = () => {
+    setActiveTab('patterns');
+    setShowPatterns(true);
+    loadPatterns(cacheKey, period, interval);
+  };
 
-  const switchToHints = () => setActiveTab('hints');
-  const switchToHistory = () => setActiveTab('history');
+  // ── Primary tab (history or hints, based on initialTab context) ──
+  const handlePrimaryTabClick = () => {
+    setActiveTab(initialTab);
+  };
 
-  const chartHints: ChartHint[] | undefined = activeTab === 'hints'
+  const chartHints: ChartHint[] | undefined = showHints
     ? hintsData.map(h => ({ date: h.hint_date, type: h.type, price: h.price ?? null, note: h.note }))
     : undefined;
 
   const preview = transactions.slice(0, PAGE_SIZE);
   const hasMore = transactions.length > PAGE_SIZE;
   const intervalCorrected = resolvedInterval !== interval;
-  const totalQty = holdings.reduce((s, h) => s + h.quantity, 0);
+  const totalQty   = holdings.reduce((s, h) => s + h.quantity, 0);
   const totalValue = holdings.reduce((s, h) => s + h.quantity * currentPrice, 0);
 
+  const primaryLabel = initialTab === 'history' ? 'Trading History' : 'Trading Hints';
+
+  // ── Styles ──
   const btnStyle = (active: boolean): React.CSSProperties => ({
     padding: '4px 10px', fontSize: 12, borderRadius: 4,
     background: active ? 'var(--accent)' : 'var(--border)',
@@ -224,14 +360,14 @@ export default function TradeAnalysisModal({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 900 }} onClick={e => e.stopPropagation()}>
-        {/* Header */}
+
+        {/* ── Header ── */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>{ticker}</h2>
             {currentPrice > 0 && (
               <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 2 }}>Price: {fmt(currentPrice)}</div>
             )}
-
             {holdings.length > 0 && currentPrice > 0 && (
               <div style={{ marginTop: 8, fontSize: 12, display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {holdings.map(h => (
@@ -275,8 +411,9 @@ export default function TradeAnalysisModal({
           </div>
         </div>
 
-        {/* Controls */}
+        {/* ── Controls ── */}
         <div style={{ display: 'flex', gap: 12, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Period */}
           <div style={{ display: 'flex', gap: 4 }}>
             {PERIODS.map(p => (
               <button key={p.value} onClick={() => handlePeriod(p.value)} style={btnStyle(period === p.value)}>
@@ -285,6 +422,7 @@ export default function TradeAnalysisModal({
             ))}
           </div>
           <div style={{ width: 1, height: 18, background: 'var(--border)' }} />
+          {/* Interval */}
           <div style={{ display: 'flex', gap: 4 }}>
             {INTERVALS.map(iv => (
               <button key={iv.value} onClick={() => handleInterval(iv.value)} style={ivBtnStyle(interval === iv.value)}>
@@ -296,42 +434,35 @@ export default function TradeAnalysisModal({
             <span style={{ fontSize: 11, color: 'var(--muted)' }}>→ {resolvedInterval} (auto)</span>
           )}
           <div style={{ width: 1, height: 18, background: 'var(--border)' }} />
-          <label style={{
-            display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer',
-            fontSize: 12, color: activeTab === 'hints' ? 'var(--text)' : 'var(--muted)', userSelect: 'none',
-          }}>
-            <input
-              type="checkbox"
-              checked={activeTab === 'hints'}
-              onChange={e => e.target.checked ? switchToHints() : switchToHistory()}
-              style={{ cursor: 'pointer', accentColor: 'var(--accent)' }}
-            />
-            Hints{hintsLoading ? ' …' : ''}
-          </label>
+          {/* Toggles */}
+          <Toggle checked={showTrades}   onChange={setShowTrades}         label="Trades"   />
+          <Toggle checked={showHints}    onChange={setShowHints}          label="Hints"    />
+          <Toggle checked={showPatterns} onChange={handlePatternsToggle}  label="Patterns" />
         </div>
 
-        {/* Chart */}
+        {/* ── Chart ── */}
         <StockChart
           ticker={ticker}
           period={period}
           interval={interval}
           svgOpacity={0.5}
           onLoaded={handleChartLoaded}
+          hideTransactions={!showTrades}
           chartHints={chartHints}
         />
 
-        {/* Tabs + Content */}
+        {/* ── Tabs + Content ── */}
         <div style={{ marginTop: 20 }}>
           <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)' }}>
-            <button style={tabBtnStyle(activeTab === 'history')} onClick={switchToHistory}>
-              History
+            <button style={tabBtnStyle(activeTab !== 'patterns')} onClick={handlePrimaryTabClick}>
+              {primaryLabel}{activeTab === 'hints' && hintsLoading ? ' …' : ''}
             </button>
-            <button style={tabBtnStyle(activeTab === 'hints')} onClick={switchToHints}>
-              Hints{hintsLoading ? ' …' : ''}
+            <button style={tabBtnStyle(activeTab === 'patterns')} onClick={handlePatternsTabClick}>
+              Patterns
             </button>
           </div>
 
-          {/* History tab */}
+          {/* ── Trading History tab ── */}
           {activeTab === 'history' && (
             <div style={{ paddingTop: 14 }}>
               {transactions.length > 0 ? (
@@ -386,7 +517,7 @@ export default function TradeAnalysisModal({
             </div>
           )}
 
-          {/* Hints tab */}
+          {/* ── Trading Hints tab ── */}
           {activeTab === 'hints' && (
             <div style={{ paddingTop: 14 }}>
               {hintsLoading ? (
@@ -407,7 +538,7 @@ export default function TradeAnalysisModal({
                     <tbody>
                       {hintsData.map(h => (
                         <tr key={h.id}>
-                          <td className="muted">{h.hint_date}</td>
+                          <td className="muted">{formatDate(h.hint_date, dateFormat)}</td>
                           <td>
                             <span style={{ color: HINT_TYPE_COLORS[h.type] ?? 'var(--muted)', fontWeight: 500, fontSize: 12 }}>
                               {HINT_TYPE_LABELS[h.type] ?? h.type}
@@ -449,6 +580,37 @@ export default function TradeAnalysisModal({
                   {hintsData.length === 0 && (
                     <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--muted)' }}>No hints for {ticker}</div>
                   )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Patterns tab ── */}
+          {activeTab === 'patterns' && (
+            <div style={{ paddingTop: 14 }}>
+              {patternsLoading ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '40px 0' }}>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: '50%',
+                    border: '3px solid var(--border)',
+                    borderTopColor: 'var(--accent)',
+                    animation: 'spin 0.7s linear infinite',
+                  }} />
+                  <span style={{ fontSize: 13, color: 'var(--muted)' }}>패턴을 읽고 있습니다…</span>
+                </div>
+              ) : !patternsLoaded ? (
+                <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--muted)', fontSize: 13 }}>
+                  Patterns 토글을 켜거나 탭을 클릭하면 분석을 시작합니다.
+                </div>
+              ) : patternsData.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)' }}>
+                  감지된 패턴이 없습니다
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 4 }}>
+                  {patternsData.map((p, i) => (
+                    <PatternCard key={i} pattern={p} currentPrice={currentPrice} />
+                  ))}
                 </div>
               )}
             </div>
