@@ -511,15 +511,12 @@ export default function TradeAnalysisModal({
         {/* ── Tabs + Content ── */}
         <div style={{ marginTop: 20 }}>
           <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)' }}>
-            {initialTab === 'history' ? (
-              <button style={tabBtnStyle(activeTab === 'history')} onClick={() => setActiveTab('history')}>
-                Trading History
-              </button>
-            ) : (
-              <button style={tabBtnStyle(activeTab === 'hints')} onClick={() => setActiveTab('hints')}>
-                Trading Hints{hintsLoading ? ' …' : ''}
-              </button>
-            )}
+            <button style={tabBtnStyle(activeTab === 'history')} onClick={() => setActiveTab('history')}>
+              Trading History
+            </button>
+            <button style={tabBtnStyle(activeTab === 'hints')} onClick={() => setActiveTab('hints')}>
+              Trading Hints{activeTab === 'hints' && hintsLoading ? ' …' : ''}
+            </button>
             <button style={tabBtnStyle(activeTab === 'patterns')} onClick={handlePatternsTabClick}>
               Patterns
             </button>
