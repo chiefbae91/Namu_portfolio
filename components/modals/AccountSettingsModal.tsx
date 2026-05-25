@@ -2,8 +2,9 @@
 import { useState } from 'react';
 import { X, Trash2, EyeOff, Eye, Edit2, Check, Sun, Moon } from 'lucide-react';
 import { Account, AccountType } from '@/lib/types';
+import { DateFormat } from '@/lib/format';
 
-export type DateFormat = 'MM/DD/YY' | 'YYYY/MM/DD';
+export type { DateFormat };
 
 const COLOR_PALETTE = [
   '#6366f1', '#3b82f6', '#10b981', '#14b8a6',

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Pencil, PlusCircle, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Transaction, Currency, ExchangeRates } from '@/lib/types';
-import { formatCurrency } from '@/lib/format';
+import { formatCurrency, formatDate, DateFormat } from '@/lib/format';
 import TickerTypeahead from '@/components/TickerTypeahead';
 import NoteTooltip from '@/components/NoteTooltip';
 import { getLabelMap, resolveAccountName } from '@/lib/accountLabelMap';
@@ -17,6 +17,7 @@ interface Props {
   deepLink?: { ticker: string; id: number } | null;
   onAddTradingHistory?: () => void;
   onTickerClick?: (ticker: string) => void;
+  dateFormat?: DateFormat;
 }
 
 const NAMED_BADGE_COLORS: [string, string][] = [
@@ -123,7 +124,7 @@ const TYPE_FILTER_OPTIONS = [
   { value: 'transfer_withdraw', label: 'Withdraw' },
 ];
 
-export default function TransactionHistory({ transactions, currency, rates, onEdit, onDelete, onDeleteMany, deepLink, onAddTradingHistory, onTickerClick }: Props) {
+export default function TransactionHistory({ transactions, currency, rates, onEdit, onDelete, onDeleteMany, deepLink, onAddTradingHistory, onTickerClick, dateFormat = 'MM/DD/YY' }: Props) {
   const [tickerFilter, setTickerFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [selected, setSelected] = useState<Set<string | number>>(new Set());
@@ -300,7 +301,7 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
                   <td>
                     <input type="checkbox" checked={isSelected} onChange={() => toggleOne(tx.id)} style={{ cursor: 'pointer' }} />
                   </td>
-                  <td className="muted">{tx.date}</td>
+                  <td className="muted">{formatDate(tx.date, dateFormat)}</td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       {tx.account_name && (() => {
@@ -395,7 +396,7 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
                     : <span style={{ fontWeight: 600, fontSize: 14 }}>{tx.ticker || '-'}</span>
                   }
                 </div>
-                <span style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>{tx.date}</span>
+                <span style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>{formatDate(tx.date, dateFormat)}</span>
               </div>
               {/* Row 2: type, qty@price, total */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>

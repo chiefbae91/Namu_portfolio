@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { X, PlusCircle, Pencil, Trash2 } from 'lucide-react';
 import { Currency, ExchangeRates, TradingHint } from '@/lib/types';
-import { formatCurrency } from '@/lib/format';
+import { formatCurrency, formatDate, DateFormat } from '@/lib/format';
 import StockChart, { StockChartData, TxRow, Holding, ChartHint } from '@/components/StockChart';
 import { getLabelMap, resolveAccountName } from '@/lib/accountLabelMap';
 
@@ -117,12 +117,13 @@ interface Props {
   onAddHint?: (ticker: string) => void;
   onEditHint?: (hint: TradingHint) => void;
   onDeleteHint?: (id: string | number) => void;
+  dateFormat?: DateFormat;
 }
 
 export default function TradeAnalysisModal({
   ticker, currency, rates, onClose, onAddTransaction, onShowHistory,
   initialTab = 'history', hintRefreshTrigger,
-  onAddHint, onEditHint, onDeleteHint,
+  onAddHint, onEditHint, onDeleteHint, dateFormat = 'MM/DD/YY',
 }: Props) {
   const [period, setPeriod] = useState<Period>(() => {
     if (typeof window === 'undefined') return '1mo';
@@ -351,7 +352,7 @@ export default function TradeAnalysisModal({
                           const total = tx.quantity > 0 ? tx.quantity * tx.price : tx.price;
                           return (
                             <tr key={tx.id ?? i}>
-                              <td className="muted">{tx.date}</td>
+                              <td className="muted">{formatDate(tx.date, dateFormat)}</td>
                               <td><AccountBadge name={resolveAccountName(tx.account_name, labelMap)} /></td>
                               <td style={{ fontWeight: 500 }}>{tx.ticker}</td>
                               <td>

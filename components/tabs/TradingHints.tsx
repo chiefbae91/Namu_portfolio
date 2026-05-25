@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Bell, Pencil, PlusCircle, Trash2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
 import { TradingHint } from '@/lib/types';
+import { formatDate, DateFormat } from '@/lib/format';
 import TickerTypeahead from '@/components/TickerTypeahead';
 import NoteTooltip from '@/components/NoteTooltip';
 
@@ -88,9 +89,10 @@ interface Props {
   isLoggedIn?: boolean;
   alertedHintIds?: Set<string>;
   onToggleAlert?: (hint: TradingHint) => void;
+  dateFormat?: DateFormat;
 }
 
-export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, onAddHint, isLoggedIn = false, alertedHintIds, onToggleAlert }: Props) {
+export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, onAddHint, isLoggedIn = false, alertedHintIds, onToggleAlert, dateFormat = 'MM/DD/YY' }: Props) {
   const [tickerFilter, setTickerFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [dateMode, setDateMode] = useState<DateRangeMode>('last_month');
@@ -293,7 +295,7 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, o
                     )}
                   </td>
                 )}
-                <td className="muted">{hint.hint_date}</td>
+                <td className="muted">{formatDate(hint.hint_date, dateFormat)}</td>
                 <td>
                   <button
                     onClick={() => onSymbolClick?.(hint.ticker)}
@@ -361,7 +363,7 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, o
           <div key={hint.id} className="mobile-card">
             {/* Row 1: date, ticker, type, note icon */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 11, color: 'var(--muted)' }}>{hint.hint_date}</span>
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>{formatDate(hint.hint_date, dateFormat)}</span>
               <button
                 onClick={() => onSymbolClick?.(hint.ticker)}
                 style={{ background: 'none', color: 'var(--accent)', fontWeight: 700, padding: 0, textDecoration: 'underline', cursor: 'pointer', fontSize: 14 }}

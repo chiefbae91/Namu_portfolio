@@ -1,5 +1,15 @@
 import { Currency, ExchangeRates } from './types';
 
+export type DateFormat = 'MM/DD/YY' | 'YYYY/MM/DD';
+
+export function formatDate(ymd: string, fmt: DateFormat): string {
+  if (!ymd) return '';
+  const [y, m, d] = ymd.slice(0, 10).split('-');
+  if (!y || !m || !d) return ymd;
+  if (fmt === 'MM/DD/YY') return `${m}/${d}/${y.slice(2)}`;
+  return `${y}/${m}/${d}`;
+}
+
 const SYMBOLS: Record<Currency, string> = { USD: '$', KRW: '₩', EUR: '€' };
 
 export function formatCurrency(usd: number, currency: Currency, rates: ExchangeRates): string {

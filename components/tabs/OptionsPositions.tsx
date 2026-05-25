@@ -1,15 +1,17 @@
 'use client';
 import { OptionPosition, Currency, ExchangeRates } from '@/lib/types';
+import { formatDate, DateFormat } from '@/lib/format';
 
 interface Props {
   options: OptionPosition[];
   currency: Currency;
   rates: ExchangeRates;
+  dateFormat?: DateFormat;
 }
 
 const SYMBOLS: Record<Currency, string> = { USD: '$', KRW: '₩', EUR: '€' };
 
-export default function OptionsPositions({ options, currency, rates }: Props) {
+export default function OptionsPositions({ options, currency, rates, dateFormat = 'MM/DD/YY' }: Props) {
   const fmt = (usd: number) => {
     const v = usd * rates[currency];
     const sym = SYMBOLS[currency];
@@ -43,7 +45,7 @@ export default function OptionsPositions({ options, currency, rates }: Props) {
           <tbody>
             {rows.map(o => (
               <tr key={o.id}>
-                <td className="muted">{o.date}</td>
+                <td className="muted">{formatDate(o.date, dateFormat)}</td>
                 <td>{o.account_name}</td>
                 <td style={{ fontWeight: 600 }}>{o.ticker}</td>
                 <td>

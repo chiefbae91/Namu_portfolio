@@ -913,6 +913,7 @@ export default function Home() {
                 isLoggedIn={!!userEmail}
                 alertedHintIds={alertedHintIds}
                 onToggleAlert={!!userEmail ? handleToggleAlert : undefined}
+                dateFormat={dateFormat}
               />
             </div>
           </>
@@ -943,6 +944,7 @@ export default function Home() {
                   deepLink={historyDeepLink}
                   onAddTradingHistory={() => { setEditingTx(null); setTxModalOpen(true); }}
                   onTickerClick={ticker => { setAnalysisInitialTab('history'); setAnalysisTicker(ticker); }}
+                  dateFormat={dateFormat}
                 />
               )}
               {activeTab === 'hints' && (
@@ -955,6 +957,7 @@ export default function Home() {
                   isLoggedIn={!!userEmail}
                   alertedHintIds={alertedHintIds}
                   onToggleAlert={!!userEmail ? handleToggleAlert : undefined}
+                  dateFormat={dateFormat}
                 />
               )}
             </div>
@@ -1023,6 +1026,7 @@ export default function Home() {
           onAddHint={handleAddHintFromAnalysis}
           onEditHint={handleEditHint}
           onDeleteHint={handleDeleteHint}
+          dateFormat={dateFormat}
         />
       )}
       {tradingHintOpen && (
