@@ -547,14 +547,6 @@ export default function Home() {
           {showEur && <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-eur)' }}>EUR</span>}
         </div>
 
-        <button
-          onClick={fetchRates}
-          title="Refresh Rates"
-          style={{ background: 'none', color: 'var(--muted)', padding: 2, display: 'flex', alignItems: 'center' }}
-        >
-          <RefreshCw size={13} style={{ animation: ratesRefreshing ? 'spin 0.6s linear infinite' : 'none' }} />
-        </button>
-
         {userEmail && (
           <span className="mobile-hide" style={{ fontSize: 11, color: 'var(--muted)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {userEmail}
@@ -791,11 +783,20 @@ export default function Home() {
                 <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}>/USD</span>
               </div>
             )}
-            {ratesUpdatedAt && (
-              <span className="mobile-hide" style={{ fontSize: 10, color: 'var(--muted)', opacity: 0.6, marginLeft: 'auto' }}>
-                {ratesUpdatedAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'America/New_York', timeZoneName: 'short' })}
-              </span>
-            )}
+            <div className="mobile-hide" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+              {ratesUpdatedAt && (
+                <span style={{ fontSize: 10, color: 'var(--muted)', opacity: 0.6 }}>
+                  {ratesUpdatedAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'America/New_York', timeZoneName: 'short' })}
+                </span>
+              )}
+              <button
+                onClick={fetchRates}
+                title="Refresh Rates"
+                style={{ background: 'none', color: 'var(--muted)', padding: 2, display: 'flex', alignItems: 'center' }}
+              >
+                <RefreshCw size={12} style={{ animation: ratesRefreshing ? 'spin 0.6s linear infinite' : 'none' }} />
+              </button>
+            </div>
           </div>
 
           {/* Row 2: US Treasury Yields */}
