@@ -26,6 +26,13 @@ export interface ChartHint {
   note: string | null;
 }
 
+export interface PatternHighlight {
+  startDate: string;
+  endDate: string;
+  neckline: number | null;
+  signal: 'Bullish' | 'Bearish' | 'Neutral';
+}
+
 function parsePrices(p: string | number | number[] | null): number[] {
   if (p == null || p === '') return [];
   if (Array.isArray(p)) return p.filter(n => !isNaN(n) && n > 0);
@@ -46,6 +53,7 @@ interface Props {
   candles: OHLCPoint[];
   transactions?: ChartTx[];
   chartHints?: ChartHint[];
+  patternHighlight?: PatternHighlight | null;
   resolvedInterval?: string;
   svgOpacity?: number;
 }
@@ -114,7 +122,7 @@ function formatXLabel(date: string): string {
   return date.slice(5, 10);
 }
 
-export default function CandlestickChart({ candles, transactions = [], chartHints, resolvedInterval = '1d', svgOpacity = 1 }: Props) {
+export default function CandlestickChart({ candles, transactions = [], chartHints, patternHighlight, resolvedInterval = '1d', svgOpacity = 1 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(600);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
@@ -161,6 +169,22 @@ export default function CandlestickChart({ candles, transactions = [], chartHint
   }
 
   const isIntraday = resolvedInterval === '1m' || resolvedInterval === '15m';
+
+  let hlStartIdx = -1, hlEndIdx = -1;
+  if (patternHighlight && candles.length > 0) {
+    const kLen = isIntraday ? 16 : 10;
+    const sk = patternHighlight.startDate.slice(0, kLen);
+    const ek = patternHighlight.endDate.slice(0, kLen);
+    for (let i = 0; i < candles.length; i++) {
+      const ck = candles[i].date.slice(0, kLen);
+      if (ck >= sk && hlStartIdx < 0) hlStartIdx = i;
+      if (ck <= ek) hlEndIdx = i;
+    }
+  }
+  const hlActive = hlStartIdx >= 0 && hlEndIdx >= hlStartIdx;
+  const hlColor = patternHighlight?.signal === 'Bullish' ? '#10b981'
+                : patternHighlight?.signal === 'Bearish' ? '#ef4444' : '#94a3b8';
+
   const candleTxs = candles.map((c, i) => {
     const dateKey = c.date.slice(0, 10);
     if (!isIntraday) return txByDate[dateKey] ?? [];
@@ -219,6 +243,15 @@ export default function CandlestickChart({ candles, transactions = [], chartHint
               {label}
             </text>
           ))}
+
+          {/* Pattern highlight background */}
+          {hlActive && (
+            <rect
+              x={PAD.left + hlStartIdx * slot} y={PAD.top}
+              width={(hlEndIdx - hlStartIdx + 1) * slot} height={ch}
+              fill={hlColor} opacity={0.08} pointerEvents="none"
+            />
+          )}
 
           {/* Candles + transaction markers */}
           {candles.map((c, i) => {
@@ -316,6 +349,27 @@ export default function CandlestickChart({ candles, transactions = [], chartHint
               />
             );
           })}
+
+          {/* Pattern fade overlay + boundary lines + neckline */}
+          {hlActive && patternHighlight && (
+            <g pointerEvents="none">
+              {hlStartIdx > 0 && (
+                <rect x={PAD.left} y={PAD.top} width={hlStartIdx * slot} height={ch} fill="rgba(0,0,0,0.5)" />
+              )}
+              {hlEndIdx < candles.length - 1 && (
+                <rect x={PAD.left + (hlEndIdx + 1) * slot} y={PAD.top} width={(candles.length - hlEndIdx - 1) * slot} height={ch} fill="rgba(0,0,0,0.5)" />
+              )}
+              <line x1={PAD.left + hlStartIdx * slot} y1={PAD.top} x2={PAD.left + hlStartIdx * slot} y2={PAD.top + ch} stroke={hlColor} strokeWidth={1.5} strokeDasharray="4,2" opacity={0.8} />
+              <line x1={PAD.left + (hlEndIdx + 1) * slot} y1={PAD.top} x2={PAD.left + (hlEndIdx + 1) * slot} y2={PAD.top + ch} stroke={hlColor} strokeWidth={1.5} strokeDasharray="4,2" opacity={0.8} />
+              {patternHighlight.neckline != null && (
+                <line
+                  x1={PAD.left + hlStartIdx * slot} y1={PAD.top + toY(patternHighlight.neckline)}
+                  x2={PAD.left + (hlEndIdx + 1) * slot} y2={PAD.top + toY(patternHighlight.neckline)}
+                  stroke={hlColor} strokeWidth={1.5} strokeDasharray="6,3"
+                />
+              )}
+            </g>
+          )}
 
           {/* Crosshair — hidden while a marker tooltip is active */}
           {tooltip && !markerTooltip && !hintMarkerTooltip && (

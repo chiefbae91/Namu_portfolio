@@ -4,7 +4,7 @@ import { X, PlusCircle, Pencil, Trash2 } from 'lucide-react';
 import { Currency, ExchangeRates, TradingHint } from '@/lib/types';
 import { formatCurrency, formatDate, DateFormat } from '@/lib/format';
 import { DetectedPattern } from '@/lib/patternDetector';
-import StockChart, { StockChartData, TxRow, Holding, ChartHint } from '@/components/StockChart';
+import StockChart, { StockChartData, TxRow, Holding, ChartHint, PatternHighlight } from '@/components/StockChart';
 import { getLabelMap, resolveAccountName } from '@/lib/accountLabelMap';
 
 type Period   = '5d' | '1mo' | '3mo' | '6mo' | '1y';
@@ -75,6 +75,26 @@ function fmtNum(p: number | null): string {
   return `$${p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function isoWeek(dateStr: string): string {
+  const d = new Date(dateStr.slice(0, 10) + 'T00:00:00');
+  const thu = new Date(d); thu.setDate(d.getDate() + (4 - (d.getDay() || 7)));
+  const year = thu.getFullYear();
+  const jan1 = new Date(year, 0, 1);
+  const week = Math.ceil(((thu.getTime() - jan1.getTime()) / 86400000 + 1) / 7);
+  return `${year}-W${String(week).padStart(2, '0')}`;
+}
+
+function formatPatternDateRange(start: string, end: string, ri: string): string {
+  const intraday = ri === '1m' || ri === '15m';
+  if (intraday) {
+    const sDay = start.slice(5, 10), eDay = end.slice(5, 10);
+    const sTime = start.slice(11, 16), eTime = end.slice(11, 16);
+    return sDay === eDay ? `${sTime} ~ ${eTime}` : `${sDay} ${sTime} ~ ${eDay} ${eTime}`;
+  }
+  if (ri === '1wk') return `${isoWeek(start)} ~ ${isoWeek(end)}`;
+  return `${start.slice(0, 10)} ~ ${end.slice(0, 10)}`;
+}
+
 function AccountBadge({ name }: { name: string }) {
   return (
     <span style={{
@@ -113,7 +133,12 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
 
 // ── Pattern Card ───────────────────────────────────────────────────────────────
 
-function PatternCard({ pattern, currentPrice }: { pattern: DetectedPattern; currentPrice: number }) {
+function PatternCard({
+  pattern, currentPrice, resolvedInterval, selected, onSelect,
+}: {
+  pattern: DetectedPattern; currentPrice: number; resolvedInterval: string;
+  selected: boolean; onSelect: () => void;
+}) {
   const signalColor = pattern.signal === 'Bullish'
     ? 'var(--color-price-up)' : pattern.signal === 'Bearish'
     ? 'var(--color-price-down)' : 'var(--muted)';
@@ -123,10 +148,28 @@ function PatternCard({ pattern, currentPrice }: { pattern: DetectedPattern; curr
     ? ((pattern.targetPrice - currentPrice) / currentPrice * 100)
     : null;
 
+  const dateRange = formatPatternDateRange(pattern.startDate, pattern.endDate, resolvedInterval);
+
   return (
-    <div className="card" style={{ padding: '12px 16px' }}>
+    <div
+      className="card"
+      onClick={onSelect}
+      style={{
+        padding: '12px 16px', cursor: 'pointer', transition: 'outline 0.12s',
+        outline: selected ? `1.5px solid ${signalColor}` : undefined,
+        background: selected ? `color-mix(in srgb, ${signalColor} 6%, var(--surface))` : undefined,
+      }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-        <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{pattern.name}</span>
+        <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          {pattern.name}
+          {selected && (
+            <span style={{
+              display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
+              background: signalColor, flexShrink: 0,
+            }} />
+          )}
+        </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <span style={{ color: signalColor, fontWeight: 600, fontSize: 12 }}>
             {signalIcon} {pattern.signal}
@@ -155,7 +198,7 @@ function PatternCard({ pattern, currentPrice }: { pattern: DetectedPattern; curr
             )}
           </span>
         )}
-        <span style={{ fontSize: 11, opacity: 0.7 }}>{pattern.startDate} → {pattern.endDate}</span>
+        <span style={{ fontSize: 11, opacity: 0.7 }}>{dateRange}</span>
       </div>
 
       {pattern.description && (
@@ -222,6 +265,7 @@ export default function TradeAnalysisModal({
   const [patternsData,    setPatternsData]    = useState<DetectedPattern[]>([]);
   const [patternsLoading, setPatternsLoading] = useState(false);
   const [patternsLoaded,  setPatternsLoaded]  = useState(false);
+  const [selectedPattern, setSelectedPattern] = useState<DetectedPattern | null>(null);
   const patternCache = useRef<Map<string, DetectedPattern[]>>(new Map());
 
   const [labelMap, setLabelMap] = useState<Record<string, string>>(getLabelMap);
@@ -276,6 +320,7 @@ export default function TradeAnalysisModal({
 
   // ── Re-load patterns when period/interval changes (if tab is active or toggle on) ──
   useEffect(() => {
+    setSelectedPattern(null);
     if (activeTab === 'patterns' || showPatterns) {
       loadPatterns(cacheKey, period, interval);
     }
@@ -306,6 +351,9 @@ export default function TradeAnalysisModal({
     if (on) {
       setActiveTab('patterns');
       loadPatterns(cacheKey, period, interval);
+    } else {
+      setActiveTab(initialTab);
+      setSelectedPattern(null);
     }
   };
 
@@ -324,6 +372,13 @@ export default function TradeAnalysisModal({
   const chartHints: ChartHint[] | undefined = showHints
     ? hintsData.map(h => ({ date: h.hint_date, type: h.type, price: h.price ?? null, note: h.note }))
     : undefined;
+
+  const patternHighlight: PatternHighlight | null = selectedPattern ? {
+    startDate: selectedPattern.startDate,
+    endDate: selectedPattern.endDate,
+    neckline: selectedPattern.neckline,
+    signal: selectedPattern.signal,
+  } : null;
 
   const preview = transactions.slice(0, PAGE_SIZE);
   const hasMore = transactions.length > PAGE_SIZE;
@@ -449,6 +504,7 @@ export default function TradeAnalysisModal({
           onLoaded={handleChartLoaded}
           hideTransactions={!showTrades}
           chartHints={chartHints}
+          patternHighlight={patternHighlight}
         />
 
         {/* ── Tabs + Content ── */}
@@ -609,7 +665,14 @@ export default function TradeAnalysisModal({
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 4 }}>
                   {patternsData.map((p, i) => (
-                    <PatternCard key={i} pattern={p} currentPrice={currentPrice} />
+                    <PatternCard
+                      key={i}
+                      pattern={p}
+                      currentPrice={currentPrice}
+                      resolvedInterval={resolvedInterval}
+                      selected={selectedPattern === p}
+                      onSelect={() => setSelectedPattern(prev => prev === p ? null : p)}
+                    />
                   ))}
                 </div>
               )}
