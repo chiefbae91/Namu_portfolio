@@ -491,9 +491,9 @@ export default function TradeAnalysisModal({
           )}
           <div style={{ width: 1, height: 18, background: 'var(--border)' }} />
           {/* Toggles */}
-          <Toggle checked={showTrades}   onChange={setShowTrades}         label="Trades"   />
-          <Toggle checked={showHints}    onChange={setShowHints}          label="Hints"    />
-          <Toggle checked={showPatterns} onChange={handlePatternsToggle}  label="Patterns" />
+          <Toggle checked={showTrades}   onChange={setShowTrades}                                                                                    label="Trades"   />
+          <Toggle checked={showHints}    onChange={on => { setShowHints(on); if (on) { setActiveTab('hints'); if (!hintsLoaded && !hintsLoading) refreshHints(); } }} label="Hints"    />
+          <Toggle checked={showPatterns} onChange={handlePatternsToggle}                                                                                            label="Patterns" />
         </div>
 
         {/* ── Chart ── */}
@@ -511,10 +511,10 @@ export default function TradeAnalysisModal({
         {/* ── Tabs + Content ── */}
         <div style={{ marginTop: 20 }}>
           <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)' }}>
-            <button style={tabBtnStyle(activeTab === 'history')} onClick={() => setActiveTab('history')}>
+            <button style={tabBtnStyle(activeTab === 'history')} onClick={() => { setActiveTab('history'); setShowHints(false); }}>
               Trading History
             </button>
-            <button style={tabBtnStyle(activeTab === 'hints')} onClick={() => setActiveTab('hints')}>
+            <button style={tabBtnStyle(activeTab === 'hints')} onClick={() => { setActiveTab('hints'); setShowHints(true); if (!hintsLoaded && !hintsLoading) refreshHints(); }}>
               Trading Hints{activeTab === 'hints' && hintsLoading ? ' …' : ''}
             </button>
             <button style={tabBtnStyle(activeTab === 'patterns')} onClick={handlePatternsTabClick}>
