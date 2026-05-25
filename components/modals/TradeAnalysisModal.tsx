@@ -398,7 +398,7 @@ export default function TradeAnalysisModal({
                         <th>Date</th>
                         <th>Type</th>
                         <th style={{ textAlign: 'right' }}>Hint Price</th>
-                        <th style={{ textAlign: 'right' }}>Stock Price at Creation</th>
+                        <th style={{ textAlign: 'right' }}>Price at Creation</th>
                         <th>Note</th>
                         {(onEditHint || onDeleteHint) && <th></th>}
                       </tr>

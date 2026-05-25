@@ -267,7 +267,7 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, o
               <th>Ticker</th>
               <th>Type</th>
               <th style={{ textAlign: 'right' }}>Hint Price</th>
-              <th style={{ textAlign: 'right' }}>Stock Price at Creation</th>
+              <th style={{ textAlign: 'right' }}>Price at Creation</th>
               <th style={{ width: '100%' }}>Note</th>
               <th></th>
             </tr>

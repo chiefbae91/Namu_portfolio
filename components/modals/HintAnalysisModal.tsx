@@ -210,7 +210,7 @@ export default function HintAnalysisModal({ ticker, hints, onClose, onAddHint, o
                 <th>Date</th>
                 <th>Type</th>
                 <th style={{ textAlign: 'right' }}>Price</th>
-                <th style={{ textAlign: 'right' }}>Stock Price at Creation</th>
+                <th style={{ textAlign: 'right' }}>Price at Creation</th>
                 <th>Note</th>
                 <th></th>
               </tr>

@@ -157,7 +157,7 @@ export default function TradingHintModal({ editingHint, prefillTicker, tickerSug
     }
   };
 
-  const cpLabel = 'Stock Price at Creation';
+  const cpLabel = 'Price at Creation';
 
   const disabledStyle: React.CSSProperties = {
     width: '100%', background: 'var(--border)', color: 'var(--muted)', cursor: 'not-allowed',
