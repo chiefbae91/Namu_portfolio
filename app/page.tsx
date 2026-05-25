@@ -8,13 +8,12 @@ import StockPortfolio from '@/components/tabs/StockPortfolio';
 import TransactionHistory from '@/components/tabs/TransactionHistory';
 import TradingHints from '@/components/tabs/TradingHints';
 import TransactionModal from '@/components/modals/TransactionModal';
-import AccountSettingsModal from '@/components/modals/AccountSettingsModal';
+import AccountSettingsModal, { DateFormat } from '@/components/modals/AccountSettingsModal';
 import AccountHistoryModal from '@/components/modals/AccountHistoryModal';
 import TradeAnalysisModal from '@/components/modals/TradeAnalysisModal';
 import TradingHintModal from '@/components/modals/TradingHintModal';
 import SummaryCards from '@/components/SummaryCards';
 import AccountBanner from '@/components/AccountBanner';
-import ThemeToggle from '@/components/ThemeToggle';
 import PriceAlertToasts, { PriceAlert, HintToast } from '@/components/PriceAlertToasts';
 import AlertBell from '@/components/AlertBell';
 
@@ -31,6 +30,8 @@ export default function Home() {
   const [rates, setRates] = useState<ExchangeRates>({ USD: 1, KRW: 1380, KRW_PREV: 1380, EUR: 0.92, DXY: 104, DXY_PREV: 104, WTI: 78, WTI_PREV: 78, GOLD: 2300, GOLD_PREV: 2300, ES: 5800, ES_PREV: 5800, ES_MARKET_STATE: 'REGULAR', ES_EXT_PRICE: null, ES_EXT_CHG_PCT: null, T5Y: 4.25, T5Y_PREV: 4.25, T10Y: 4.50, T10Y_PREV: 4.50, T30Y: 4.75, T30Y_PREV: 4.75 });
   const [showKrw, setShowKrw] = useState(true);
   const [showEur, setShowEur] = useState(false);
+  const [dateFormat, setDateFormatState] = useState<DateFormat>('MM/DD/YY');
+  const [theme, setThemeState] = useState<'dark' | 'light'>('dark');
   const [activeTab, setActiveTab] = useState<'portfolio' | 'history' | 'hints'>('portfolio');
   const [positions, setPositions] = useState<PortfolioPosition[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -211,6 +212,15 @@ export default function Home() {
       }
     });
     fetchRates(); fetchTradingHints();
+    try {
+      const savedFormat = localStorage.getItem('namu_date_format') as DateFormat | null;
+      if (savedFormat) setDateFormatState(savedFormat);
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme === 'light') {
+        setThemeState('light');
+        document.documentElement.classList.add('light');
+      }
+    } catch {}
     try {
       const stored = localStorage.getItem('namu_watchlist');
       if (stored) {
@@ -477,6 +487,22 @@ export default function Home() {
 
   const visibleAccounts = accounts.filter(a => !a.hidden);
 
+  const setDateFormat = (v: DateFormat) => {
+    setDateFormatState(v);
+    localStorage.setItem('namu_date_format', v);
+  };
+
+  const setTheme = (v: 'dark' | 'light') => {
+    setThemeState(v);
+    if (v === 'light') {
+      document.documentElement.classList.add('light');
+      localStorage.setItem('theme', 'light');
+    } else {
+      document.documentElement.classList.remove('light');
+      localStorage.setItem('theme', 'dark');
+    }
+  };
+
   return (
     <div style={{ minHeight: '100vh', padding: '0 0 40px' }}>
       {/* Header */}
@@ -515,22 +541,10 @@ export default function Home() {
 
         <div className="mobile-hide" style={{ flex: 1 }} />
 
-        <div className="mobile-hide" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div className="mobile-hide" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>USD</span>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', userSelect: 'none' }}>
-            <input type="checkbox" checked={showKrw} onChange={e => setShowKrw(e.target.checked)}
-              style={{ cursor: 'pointer', accentColor: 'var(--color-krw)' }} />
-            <span style={{ fontSize: 12, color: showKrw ? 'var(--color-krw)' : 'var(--muted)', fontWeight: showKrw ? 600 : 400 }}>
-              KRW
-            </span>
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', userSelect: 'none' }}>
-            <input type="checkbox" checked={showEur} onChange={e => setShowEur(e.target.checked)}
-              style={{ cursor: 'pointer', accentColor: 'var(--color-eur)' }} />
-            <span style={{ fontSize: 12, color: showEur ? 'var(--color-eur)' : 'var(--muted)', fontWeight: showEur ? 600 : 400 }}>
-              EUR
-            </span>
-          </label>
+          {showKrw && <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-krw)' }}>KRW</span>}
+          {showEur && <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-eur)' }}>EUR</span>}
         </div>
 
         <button
@@ -541,13 +555,11 @@ export default function Home() {
           <RefreshCw size={13} style={{ animation: ratesRefreshing ? 'spin 0.6s linear infinite' : 'none' }} />
         </button>
 
-{userEmail && (
+        {userEmail && (
           <span className="mobile-hide" style={{ fontSize: 11, color: 'var(--muted)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {userEmail}
           </span>
         )}
-
-        <ThemeToggle />
 
         {!!userEmail && (
           <AlertBell
@@ -981,6 +993,14 @@ export default function Home() {
           onRenameType={handleRenameType}
           onDeleteType={handleDeleteType}
           onAssignType={handleAssignType}
+          showKrw={showKrw}
+          setShowKrw={setShowKrw}
+          showEur={showEur}
+          setShowEur={setShowEur}
+          dateFormat={dateFormat}
+          setDateFormat={setDateFormat}
+          theme={theme}
+          setTheme={setTheme}
         />
       )}
       {historyAccount && (

@@ -1,7 +1,9 @@
 'use client';
 import { useState } from 'react';
-import { X, Trash2, EyeOff, Eye, Edit2, Check } from 'lucide-react';
+import { X, Trash2, EyeOff, Eye, Edit2, Check, Sun, Moon } from 'lucide-react';
 import { Account, AccountType } from '@/lib/types';
+
+export type DateFormat = 'MM/DD/YY' | 'YYYY/MM/DD';
 
 const COLOR_PALETTE = [
   '#6366f1', '#3b82f6', '#10b981', '#14b8a6',
@@ -20,20 +22,28 @@ interface Props {
   onRenameType: (id: string | number, name: string, color: string) => Promise<void>;
   onDeleteType: (id: string | number) => Promise<void>;
   onAssignType: (accountId: string | number, typeId: string | number | null) => Promise<void>;
+  showKrw: boolean;
+  setShowKrw: (v: boolean) => void;
+  showEur: boolean;
+  setShowEur: (v: boolean) => void;
+  dateFormat: DateFormat;
+  setDateFormat: (v: DateFormat) => void;
+  theme: 'dark' | 'light';
+  setTheme: (v: 'dark' | 'light') => void;
 }
 
 export default function AccountSettingsModal({
   accounts, accountTypes, onClose,
   onAddAccount, onRename, onToggleHidden, onDelete,
   onAddType, onRenameType, onDeleteType, onAssignType,
+  showKrw, setShowKrw, showEur, setShowEur,
+  dateFormat, setDateFormat, theme, setTheme,
 }: Props) {
-  // Account state
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState<string | number | null>(null);
   const [editName, setEditName] = useState('');
   const [error, setError] = useState('');
 
-  // Type state
   const [newTypeName, setNewTypeName] = useState('');
   const [newTypeColor, setNewTypeColor] = useState(COLOR_PALETTE[0]);
   const [editingTypeId, setEditingTypeId] = useState<string | number | null>(null);
@@ -41,8 +51,6 @@ export default function AccountSettingsModal({
   const [editTypeColor, setEditTypeColor] = useState(COLOR_PALETTE[0]);
   const [typeError, setTypeError] = useState('');
 
-
-  // Account handlers
   const handleAdd = async () => {
     if (!newName.trim()) return;
     try { await onAddAccount(newName.trim()); setNewName(''); setError(''); }
@@ -61,7 +69,6 @@ export default function AccountSettingsModal({
     catch { setError('Cannot delete an account with transactions. Set it to Hidden instead.'); }
   };
 
-  // Type handlers
   const handleAddType = async () => {
     if (!newTypeName.trim()) return;
     try { await onAddType(newTypeName.trim(), newTypeColor); setNewTypeName(''); setNewTypeColor(COLOR_PALETTE[0]); setTypeError(''); }
@@ -79,17 +86,90 @@ export default function AccountSettingsModal({
     await onDeleteType(id);
   };
 
+  const sectionLabel: React.CSSProperties = {
+    fontSize: 11, fontWeight: 700, color: 'var(--muted)',
+    letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 14,
+  };
+
+  const settingRow: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14,
+  };
+
+  const settingLabel: React.CSSProperties = {
+    fontSize: 13, color: 'var(--text)', minWidth: 110, flexShrink: 0,
+  };
+
+  const segmentBtn = (active: boolean): React.CSSProperties => ({
+    display: 'flex', alignItems: 'center', gap: 5,
+    padding: '5px 14px', fontSize: 12, fontWeight: 600, borderRadius: 6,
+    background: active ? 'var(--accent)' : 'var(--border)',
+    color: active ? 'white' : 'var(--muted)',
+    border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+  });
+
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 500 }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>⚙️ Account Management</h2>
+      <div className="modal" style={{ maxWidth: 680, width: '100%' }} onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Settings</h2>
           <button onClick={onClose} style={{ background: 'none', color: 'var(--muted)' }}><X size={18} /></button>
         </div>
 
-        {/* ── Account Types ── */}
+        {/* ── Local Settings ── */}
+        <div style={sectionLabel as React.CSSProperties}>Local Settings</div>
+
+        {/* Date Format */}
+        <div style={settingRow}>
+          <span style={settingLabel}>Date Format</span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {(['MM/DD/YY', 'YYYY/MM/DD'] as DateFormat[]).map(fmt => (
+              <button key={fmt} onClick={() => setDateFormat(fmt)} style={segmentBtn(dateFormat === fmt)}>
+                {fmt}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Currency */}
+        <div style={settingRow}>
+          <span style={settingLabel}>Currency</span>
+          <div style={{ display: 'flex', gap: 20 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', userSelect: 'none' }}>
+              <input type="checkbox" checked={showKrw} onChange={e => setShowKrw(e.target.checked)}
+                style={{ cursor: 'pointer', accentColor: 'var(--color-krw)', width: 15, height: 15 }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: showKrw ? 'var(--color-krw)' : 'var(--muted)' }}>KRW</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', userSelect: 'none' }}>
+              <input type="checkbox" checked={showEur} onChange={e => setShowEur(e.target.checked)}
+                style={{ cursor: 'pointer', accentColor: 'var(--color-eur)', width: 15, height: 15 }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: showEur ? 'var(--color-eur)' : 'var(--muted)' }}>EUR</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Theme */}
+        <div style={{ ...settingRow, marginBottom: 24 }}>
+          <span style={settingLabel}>Theme</span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setTheme('light')} style={segmentBtn(theme === 'light')}>
+              <Sun size={13} /> Day
+            </button>
+            <button onClick={() => setTheme('dark')} style={segmentBtn(theme === 'dark')}>
+              <Moon size={13} /> Night
+            </button>
+          </div>
+        </div>
+
+        <div style={{ borderTop: '1px solid var(--border)', marginBottom: 24 }} />
+
+        {/* ── Account Settings ── */}
+        <div style={sectionLabel as React.CSSProperties}>Account Settings</div>
+
+        {/* Account Types */}
         <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>Account Types</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 10 }}>Account Types</div>
           {typeError && <div style={{ color: 'var(--red)', marginBottom: 8, fontSize: 13 }}>{typeError}</div>}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
@@ -132,8 +212,8 @@ export default function AccountSettingsModal({
 
         <div style={{ borderTop: '1px solid var(--border)', marginBottom: 20 }} />
 
-        {/* ── Accounts ── */}
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>Accounts</div>
+        {/* Accounts */}
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 10 }}>Accounts</div>
         {error && <div style={{ color: 'var(--red)', marginBottom: 8, fontSize: 13 }}>{error}</div>}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
