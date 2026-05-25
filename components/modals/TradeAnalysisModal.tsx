@@ -364,11 +364,6 @@ export default function TradeAnalysisModal({
     loadPatterns(cacheKey, period, interval);
   };
 
-  // ── Primary tab (history or hints, based on initialTab context) ──
-  const handlePrimaryTabClick = () => {
-    setActiveTab(initialTab);
-  };
-
   const chartHints: ChartHint[] | undefined = showHints
     ? hintsData.map(h => ({ date: h.hint_date, type: h.type, price: h.price ?? null, note: h.note }))
     : undefined;
@@ -386,7 +381,13 @@ export default function TradeAnalysisModal({
   const totalQty   = holdings.reduce((s, h) => s + h.quantity, 0);
   const totalValue = holdings.reduce((s, h) => s + h.quantity * currentPrice, 0);
 
-  const primaryLabel = initialTab === 'history' ? 'Trading History' : 'Trading Hints';
+  // Sync activeTab when ticker/context changes (safety net for same-component prop updates)
+  useEffect(() => {
+    setActiveTab(initialTab);
+    setShowHints(initialTab === 'hints');
+    setShowPatterns(false);
+    setSelectedPattern(null);
+  }, [ticker, initialTab]);
 
   // ── Styles ──
   const btnStyle = (active: boolean): React.CSSProperties => ({
@@ -510,9 +511,15 @@ export default function TradeAnalysisModal({
         {/* ── Tabs + Content ── */}
         <div style={{ marginTop: 20 }}>
           <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)' }}>
-            <button style={tabBtnStyle(activeTab !== 'patterns')} onClick={handlePrimaryTabClick}>
-              {primaryLabel}{activeTab === 'hints' && hintsLoading ? ' …' : ''}
-            </button>
+            {initialTab === 'history' ? (
+              <button style={tabBtnStyle(activeTab === 'history')} onClick={() => setActiveTab('history')}>
+                Trading History
+              </button>
+            ) : (
+              <button style={tabBtnStyle(activeTab === 'hints')} onClick={() => setActiveTab('hints')}>
+                Trading Hints{hintsLoading ? ' …' : ''}
+              </button>
+            )}
             <button style={tabBtnStyle(activeTab === 'patterns')} onClick={handlePatternsTabClick}>
               Patterns
             </button>

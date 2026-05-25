@@ -1046,6 +1046,7 @@ export default function Home() {
       )}
       {analysisTicker && (
         <TradeAnalysisModal
+          key={`${analysisTicker}_${analysisInitialTab}`}
           ticker={analysisTicker}
           currency="USD"
           rates={rates}
