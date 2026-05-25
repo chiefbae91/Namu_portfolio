@@ -26,6 +26,16 @@ const INTERVALS: { value: Interval; label: string }[] = [
   { value: '1wk', label: 'Weekly' },
 ];
 
+const RANGE_DAYS: Record<Period, number> = { '5d': 5, '1mo': 30, '3mo': 90, '6mo': 180, '1y': 365 };
+
+function isIntervalDisabled(iv: Interval, p: Period): boolean {
+  const days = RANGE_DAYS[p];
+  if (iv === '1m'  && days > 7)  return true;
+  if (iv === '15m' && days > 5)  return true;
+  if (iv === '1wk' && days < 14) return true;
+  return false;
+}
+
 const TX_TYPE_LABELS: Record<string, string> = { buy: 'Buy', sell: 'Sell', dividend: 'Dividend' };
 const TX_TYPE_COLORS: Record<string, string> = {
   buy: 'var(--color-price-up)', sell: 'var(--color-price-down)', dividend: 'var(--color-dividend)',
@@ -287,6 +297,11 @@ export default function TradeAnalysisModal({
   const handlePeriod = (p: Period) => {
     localStorage.setItem('chart_period', p);
     setPeriod(p);
+    if (isIntervalDisabled(interval, p)) {
+      const fallback: Interval = '1d';
+      localStorage.setItem('chart_interval', fallback);
+      setIntervalState(fallback);
+    }
   };
   const handleInterval = (iv: Interval) => {
     localStorage.setItem('chart_interval', iv);
@@ -397,12 +412,14 @@ export default function TradeAnalysisModal({
     fontWeight: active ? 600 : 400,
   });
 
-  const ivBtnStyle = (active: boolean): React.CSSProperties => ({
+  const ivBtnStyle = (active: boolean, disabled = false): React.CSSProperties => ({
     padding: '4px 10px', fontSize: 12, borderRadius: 4,
     background: active ? 'var(--border)' : 'transparent',
-    color: active ? 'var(--text)' : 'var(--muted)',
+    color: disabled ? '#334155' : active ? 'var(--text)' : 'var(--muted)',
     fontWeight: active ? 600 : 400,
     border: active ? '1px solid #475569' : '1px solid transparent',
+    opacity: disabled ? 0.4 : 1,
+    cursor: disabled ? 'not-allowed' : 'pointer',
   });
 
   const tabBtnStyle = (active: boolean): React.CSSProperties => ({
@@ -480,11 +497,15 @@ export default function TradeAnalysisModal({
           <div style={{ width: 1, height: 18, background: 'var(--border)' }} />
           {/* Interval */}
           <div style={{ display: 'flex', gap: 4 }}>
-            {INTERVALS.map(iv => (
-              <button key={iv.value} onClick={() => handleInterval(iv.value)} style={ivBtnStyle(interval === iv.value)}>
-                {iv.label}
-              </button>
-            ))}
+            {INTERVALS.map(iv => {
+              const dis = isIntervalDisabled(iv.value, period);
+              return (
+                <button key={iv.value} onClick={() => !dis && handleInterval(iv.value)}
+                  disabled={dis} style={ivBtnStyle(interval === iv.value, dis)}>
+                  {iv.label}
+                </button>
+              );
+            })}
           </div>
           {intervalCorrected && (
             <span style={{ fontSize: 11, color: 'var(--muted)' }}>→ {resolvedInterval} (auto)</span>
