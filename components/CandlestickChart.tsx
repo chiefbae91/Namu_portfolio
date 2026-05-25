@@ -118,9 +118,8 @@ function getTxLabel(tx: ChartTx): string {
   return TX_LABELS[tx.type] ?? tx.type;
 }
 
-function formatXLabel(date: string): string {
-  return date.slice(5, 10);
-}
+function fmtXDay(date: string)  { return date.slice(5, 10); }   // MM-DD
+function fmtXTime(date: string) { return date.slice(11, 16); }  // HH:MM
 
 export default function CandlestickChart({ candles, transactions = [], chartHints, patternHighlight, resolvedInterval = '1d', svgOpacity = 1 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -157,18 +156,43 @@ export default function CandlestickChart({ candles, transactions = [], chartHint
   const bodyW = Math.max(1, Math.min(14, slot * 0.65));
 
   const yTicks = Array.from({ length: 5 }, (_, i) => yMin + (ySpan * i) / 4);
-  const xStep = Math.max(1, Math.ceil(candles.length / 6));
-  const xTicks = candles
-    .map((c, i) => ({ i, label: formatXLabel(c.date) }))
-    .filter((_, i) => i % xStep === 0);
+
+  const isIntraday = resolvedInterval === '1m' || resolvedInterval === '15m';
+
+  // X-axis ticks
+  const xTicks: { i: number; label: string }[] = (() => {
+    if (!isIntraday) {
+      const step = Math.max(1, Math.ceil(candles.length / 6));
+      return candles.map((c, i) => ({ i, label: fmtXDay(c.date) })).filter((_, i) => i % step === 0);
+    }
+    // Intraday: show "MM-DD" at first candle of each day + "HH:MM" midday labels
+    const result: { i: number; label: string }[] = [];
+    const tradingDays: string[] = [];
+    const dayFirstIdx: Record<string, number> = {};
+    candles.forEach((c, i) => {
+      const day = c.date.slice(0, 10);
+      if (!(day in dayFirstIdx)) { dayFirstIdx[day] = i; tradingDays.push(day); }
+    });
+    // Day boundary markers
+    tradingDays.forEach(day => result.push({ i: dayFirstIdx[day], label: fmtXDay(day) }));
+    // Add time ticks: 2–3 per day (midday-ish), skip if already a day marker
+    const daySet = new Set(tradingDays.map(d => dayFirstIdx[d]));
+    const candlesPerDay = Math.round(candles.length / Math.max(tradingDays.length, 1));
+    const timeStep = Math.max(1, Math.round(candlesPerDay / 3));
+    for (let i = 0; i < candles.length; i++) {
+      const offsetInDay = i - dayFirstIdx[candles[i].date.slice(0, 10)];
+      if (offsetInDay > 0 && offsetInDay % timeStep === 0 && !daySet.has(i)) {
+        result.push({ i, label: fmtXTime(candles[i].date) });
+      }
+    }
+    return result.sort((a, b) => a.i - b.i);
+  })();
 
   const txByDate: Record<string, ChartTx[]> = {};
   for (const tx of transactions) {
     const k = tx.date.slice(0, 10);
     (txByDate[k] ??= []).push(tx);
   }
-
-  const isIntraday = resolvedInterval === '1m' || resolvedInterval === '15m';
 
   let hlStartIdx = -1, hlEndIdx = -1;
   if (patternHighlight && candles.length > 0) {

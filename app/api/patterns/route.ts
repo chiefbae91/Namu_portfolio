@@ -9,8 +9,8 @@ const RANGE_DAYS: Record<string, number> = { '5d': 5, '1mo': 30, '3mo': 90, '6mo
 
 function coerceInterval(interval: Interval, range: Range): Interval {
   const days = RANGE_DAYS[range] ?? 30;
-  if (interval === '1m'  && days > 7)  return days <= 60 ? '15m' : '1d';
-  if (interval === '15m' && days > 60) return '1d';
+  if (interval === '1m'  && days > 7) return '15m'; // 1m only valid for 5d
+  if (interval === '15m' && days > 5) return '1d';  // 15m only valid for 5d; beyond that → daily
   return interval;
 }
 
