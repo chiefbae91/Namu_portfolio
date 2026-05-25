@@ -25,6 +25,8 @@ export interface Holding {
 
 export interface StockChartData {
   price: number;
+  change: number | null;
+  changePct: number | null;
   transactions: TxRow[];
   resolvedInterval: string;
   holdings: Holding[];
@@ -63,13 +65,13 @@ const StockChart = memo(function StockChart({ ticker, period, interval, hideTran
         setCandles(newCandles);
         setChartTxs(newTxs.map(tx => ({ date: tx.date, type: tx.type.toLowerCase(), subtype: tx.subtype, price: tx.price, quantity: tx.quantity, notes: tx.notes })));
         setResolvedInterval(ri);
-        onLoadedRef.current?.({ price: data.price ?? 0, transactions: newTxs, resolvedInterval: ri, holdings: data.holdings ?? [] });
+        onLoadedRef.current?.({ price: data.price ?? 0, change: data.change ?? null, changePct: data.changePct ?? null, transactions: newTxs, resolvedInterval: ri, holdings: data.holdings ?? [] });
       })
       .catch(() => {
         if (cancelled) return;
         setCandles([]);
         setChartTxs([]);
-        onLoadedRef.current?.({ price: 0, transactions: [], resolvedInterval: interval, holdings: [] });
+        onLoadedRef.current?.({ price: 0, change: null, changePct: null, transactions: [], resolvedInterval: interval, holdings: [] });
       })
       .finally(() => { if (!cancelled) setLoading(false); });
 

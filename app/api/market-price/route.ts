@@ -39,7 +39,9 @@ export async function GET(req: NextRequest) {
     const result = data?.chart?.result?.[0];
     if (!result) return NextResponse.json({ price: 0, candles: [], resolvedInterval, transactions: [], holdings: [] });
 
-    const price = result.meta?.regularMarketPrice ?? 0;
+    const price     = result.meta?.regularMarketPrice      ?? 0;
+    const change    = result.meta?.regularMarketChange      ?? null;
+    const changePct = result.meta?.regularMarketChangePercent ?? null;
     const timestamps: number[] = result.timestamp ?? [];
     const quote = result.indicators?.quote?.[0] ?? {};
     const opens: number[] = quote.open ?? [];
@@ -143,7 +145,7 @@ export async function GET(req: NextRequest) {
       .map(h => ({ account_id: h.account_id, account_name: h.account_name, quantity: h.qty, avg_cost: h.qty > 0 ? h.cost / h.qty : 0 }))
       .filter(h => h.quantity > 0.00001);
 
-    return NextResponse.json({ price, candles, resolvedInterval, transactions, holdings });
+    return NextResponse.json({ price, change, changePct, candles, resolvedInterval, transactions, holdings });
   } catch {
     return NextResponse.json({ price: 0, candles: [], resolvedInterval, transactions: [], holdings: [] });
   }

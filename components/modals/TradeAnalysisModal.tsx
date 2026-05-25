@@ -254,6 +254,8 @@ export default function TradeAnalysisModal({
 
   // ── Chart data ──
   const [currentPrice, setCurrentPrice]     = useState(0);
+  const [priceChange, setPriceChange]       = useState<number | null>(null);
+  const [priceChangePct, setPriceChangePct] = useState<number | null>(null);
   const [transactions, setTransactions]     = useState<TxRow[]>([]);
   const [holdings, setHoldings]             = useState<Holding[]>([]);
   const [resolvedInterval, setResolvedInterval] = useState('1d');
@@ -289,6 +291,8 @@ export default function TradeAnalysisModal({
 
   const handleChartLoaded = useCallback((data: StockChartData) => {
     setCurrentPrice(data.price);
+    setPriceChange(data.change);
+    setPriceChangePct(data.changePct);
     setTransactions(data.transactions);
     setHoldings(data.holdings);
     setResolvedInterval(data.resolvedInterval);
@@ -439,7 +443,17 @@ export default function TradeAnalysisModal({
           <div>
             <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>{ticker}</h2>
             {currentPrice > 0 && (
-              <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 2 }}>Price: {fmt(currentPrice)}</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
+                <span style={{ color: 'var(--muted)', fontSize: 13 }}>Price: {fmt(currentPrice)}</span>
+                {priceChange !== null && priceChangePct !== null && (
+                  <span style={{
+                    fontSize: 12, fontWeight: 500,
+                    color: priceChange >= 0 ? 'var(--color-price-up)' : 'var(--color-price-down)',
+                  }}>
+                    {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)} ({priceChange >= 0 ? '+' : ''}{priceChangePct.toFixed(2)}%)
+                  </span>
+                )}
+              </div>
             )}
             {holdings.length > 0 && currentPrice > 0 && (
               <div style={{ marginTop: 8, fontSize: 12, display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -699,6 +713,10 @@ export default function TradeAnalysisModal({
                       onSelect={() => setSelectedPattern(prev => prev === p ? null : p)}
                     />
                   ))}
+                  <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--muted)', lineHeight: 1.5, opacity: 0.7 }}>
+                    패턴 감지는 자체 구현된 규칙 기반 알고리즘을 사용하며 TA-Lib 또는 기타 외부 라이브러리를 사용하지 않습니다.
+                    감지된 패턴은 참고용이며 투자 조언이 아닙니다. 과거 패턴이 미래 수익을 보장하지 않습니다.
+                  </p>
                 </div>
               )}
             </div>
