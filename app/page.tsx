@@ -23,6 +23,8 @@ export default function Home() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountTypes, setAccountTypes] = useState<AccountType[]>([]);
   const [accountFilter, setAccountFilter] = useState<string>(''); // '' = all, '1,2,3' = subset
+  const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [watchlist, setWatchlist] = useState<string[]>([]);
   const [watchlistQuotes, setWatchlistQuotes] = useState<WatchlistQuote[]>([]);
   const [watchlistAdding, setWatchlistAdding] = useState(false);
@@ -318,6 +320,39 @@ export default function Home() {
     localStorage.setItem('namu_account_filter', id);
   };
 
+  const handleTypeSelect = (typeId: string | null) => {
+    setSelectedTypeId(typeId);
+    setSelectedAccountId(null);
+    if (!typeId) {
+      handleAccountSelect('');
+    } else {
+      const ids = visibleAccounts
+        .filter(a => String(a.type_id) === typeId)
+        .map(a => String(a.id))
+        .sort()
+        .join(',');
+      handleAccountSelect(ids);
+    }
+  };
+
+  const handleAccountDropdownSelect = (accountId: string | null, currentTypeId: string | null) => {
+    setSelectedAccountId(accountId);
+    if (!accountId) {
+      if (!currentTypeId) {
+        handleAccountSelect('');
+      } else {
+        const ids = visibleAccounts
+          .filter(a => String(a.type_id) === currentTypeId)
+          .map(a => String(a.id))
+          .sort()
+          .join(',');
+        handleAccountSelect(ids);
+      }
+    } else {
+      handleAccountSelect(accountId);
+    }
+  };
+
   // Restore saved account filter after accounts load
   useEffect(() => {
     if (!accountsLoaded) return;
@@ -595,70 +630,65 @@ export default function Home() {
         )}
       </div>
 
-      {/* Account Tab Bar */}
+      {/* Account Filter Bar */}
       {accountsLoaded && visibleAccounts.length > 0 && (() => {
-        const filterSorted = accountFilter.split(',').filter(Boolean).sort().join(',');
-        const typeTabsToShow = accountTypes.filter(t =>
+        const typesWithAccounts = accountTypes.filter(t =>
           visibleAccounts.some(a => String(a.type_id) === String(t.id))
         );
-        const tabStyle = (isActive: boolean, accentColor?: string): React.CSSProperties => ({
-          padding: '10px 14px',
-          fontSize: 13,
-          fontWeight: isActive ? 700 : 400,
-          color: isActive ? (accentColor ?? 'var(--accent)') : 'var(--muted)',
-          background: 'none',
-          border: 'none',
-          borderBottom: isActive ? `2px solid ${accentColor ?? 'var(--accent)'}` : '2px solid transparent',
-          cursor: 'pointer',
-          whiteSpace: 'nowrap',
-          flexShrink: 0,
-          transition: 'color 0.15s',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 5,
-        });
-        const sep = <div style={{ width: 1, height: 18, background: 'var(--border)', alignSelf: 'center', margin: '0 2px', flexShrink: 0 }} />;
+        const accountsForDropdown = selectedTypeId
+          ? visibleAccounts.filter(a => String(a.type_id) === selectedTypeId)
+          : visibleAccounts;
+        const selectedType = typesWithAccounts.find(t => String(t.id) === selectedTypeId);
+        const dropdownStyle: React.CSSProperties = {
+          fontSize: 13, padding: '5px 10px', borderRadius: 6,
+          border: '1px solid var(--border)', background: 'var(--surface)',
+          color: 'var(--text)', cursor: 'pointer', outline: 'none',
+        };
         return (
           <div style={{
             background: 'var(--header-bg)',
             borderBottom: '1px solid var(--border)',
-            padding: '0 12px',
+            padding: '8px 16px',
             display: 'flex',
-            alignItems: 'stretch',
-            overflowX: 'auto',
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none',
-          } as React.CSSProperties}>
-            {/* All */}
-            <button onClick={() => handleAccountSelect('')} style={tabStyle(accountFilter === '')}>
-              All Accounts
-            </button>
-
-            {/* Type tabs */}
-            {typeTabsToShow.length > 0 && sep}
-            {typeTabsToShow.map(t => {
-              const ids = visibleAccounts
-                .filter(a => String(a.type_id) === String(t.id))
-                .map(a => String(a.id)).sort().join(',');
-              const isActive = filterSorted === ids;
-              return (
-                <button key={`type-${t.id}`} onClick={() => handleAccountSelect(ids)} style={tabStyle(isActive, t.color)}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: t.color, flexShrink: 0 }} />
-                  {t.name}
-                </button>
-              );
-            })}
-
-            {/* Individual account tabs */}
-            {sep}
-            {visibleAccounts.map(acct => {
-              const isActive = accountFilter === String(acct.id);
-              return (
-                <button key={String(acct.id)} onClick={() => handleAccountSelect(String(acct.id))} style={tabStyle(isActive)}>
-                  {acct.name}
-                </button>
-              );
-            })}
+            alignItems: 'center',
+            gap: 10,
+          }}>
+            {typesWithAccounts.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)' }}>Type</span>
+                <select
+                  value={selectedTypeId ?? ''}
+                  onChange={e => handleTypeSelect(e.target.value || null)}
+                  style={{
+                    ...dropdownStyle,
+                    color: selectedType ? selectedType.color : 'var(--text)',
+                    borderColor: selectedType ? selectedType.color : 'var(--border)',
+                    fontWeight: selectedTypeId ? 600 : 400,
+                  }}
+                >
+                  <option value="">All Types</option>
+                  {typesWithAccounts.map(t => (
+                    <option key={t.id} value={String(t.id)}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)' }}>Account</span>
+              <select
+                value={selectedAccountId ?? ''}
+                onChange={e => handleAccountDropdownSelect(e.target.value || null, selectedTypeId)}
+                style={{
+                  ...dropdownStyle,
+                  fontWeight: selectedAccountId ? 600 : 400,
+                }}
+              >
+                <option value="">All Accounts</option>
+                {accountsForDropdown.map(acc => (
+                  <option key={acc.id} value={String(acc.id)}>{acc.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
         );
       })()}
@@ -932,7 +962,7 @@ export default function Home() {
             {/* Tab Content */}
             <div className="card" style={{ marginBottom: 20, overflowX: 'auto' }}>
               {activeTab === 'portfolio' && (
-                <StockPortfolio positions={positions} currency="USD" rates={rates} onTickerClick={ticker => { setAnalysisInitialTab('history'); setAnalysisTicker(ticker); }} />
+                <StockPortfolio positions={positions} currency="USD" rates={rates} onTickerClick={ticker => { setAnalysisInitialTab('history'); setAnalysisTicker(ticker); }} loading={portfolioLoading} />
               )}
               {activeTab === 'history' && (
                 <TransactionHistory

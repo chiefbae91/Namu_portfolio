@@ -8,6 +8,7 @@ interface Props {
   currency: Currency;
   rates: ExchangeRates;
   onTickerClick: (ticker: string) => void;
+  loading?: boolean;
 }
 
 type SortKey = 'ticker' | 'value' | 'cost' | 'weight' | 'return_amount' | 'return_pct';
@@ -85,11 +86,25 @@ function PriceChange({ current, prev }: { current: number; prev: number }) {
   );
 }
 
-export default function StockPortfolio({ positions, currency, rates, onTickerClick }: Props) {
+export default function StockPortfolio({ positions, currency, rates, onTickerClick, loading = false }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>('value');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
   const fmt = (usd: number) => formatCurrency(usd, currency, rates);
+
+  if (loading) {
+    return (
+      <div style={{ padding: '40px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: '50%',
+          border: '3px solid var(--border)',
+          borderTopColor: 'var(--accent)',
+          animation: 'spin 0.7s linear infinite',
+        }} />
+        <span style={{ fontSize: 12, color: 'var(--muted)' }}>Loading...</span>
+      </div>
+    );
+  }
 
   if (positions.length === 0) {
     return <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)' }}>No positions</div>;
