@@ -54,10 +54,8 @@ function Badge({ label, color, ml = 5 }: { label: string; color: string; ml?: nu
 function MoveBadge({ current, prev }: { current: number; prev: number }) {
   if (!current || !prev) return null;
   const pct = (current - prev) / prev * 100;
-  if (pct >= 10) return <span style={{ fontSize: 16, filter: 'sepia(1) saturate(4) hue-rotate(330deg)' }}>🔥</span>;
-  if (pct >= 5)  return <span style={{ fontSize: 16, filter: 'sepia(1) saturate(3) hue-rotate(15deg)' }}>🔥</span>;
-  if (pct <= -10) return <span style={{ fontSize: 16, filter: 'sepia(1) saturate(5) hue-rotate(315deg)' }}>⚠️</span>;
-  if (pct <= -5)  return <span style={{ fontSize: 16 }}>⚠️</span>;
+  if (pct >= 5) return <span style={{ fontSize: 16 }}>🔥</span>;
+  if (pct <= -5) return <span style={{ fontSize: 16 }}>⚠️</span>;
   return null;
 }
 
