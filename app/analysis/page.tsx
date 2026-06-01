@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
 import { Account } from '@/lib/types';
 import { BarChart2, ArrowLeft, RefreshCw } from 'lucide-react';
+import FOMOAnalysis, { FomoScoreData } from '@/components/FOMOAnalysis';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -17,11 +18,7 @@ interface AnalysisResult {
     totalPnl: number;
     totalPnlPct: number;
   };
-  fomoScore: {
-    score: number;
-    detail: string;
-    recommendation: string | null;
-  };
+  fomoScore: FomoScoreData;
   stopLossScore: {
     score: number;
     avgLossPct: number;
@@ -68,16 +65,8 @@ interface AnalysisResult {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function fmtPct(n: number, decimals = 1) {
+function fmtPct(n: number, decimals = 2) {
   return `${n >= 0 ? '+' : ''}${n.toFixed(decimals)}%`;
-}
-
-function fmtMoney(n: number) {
-  const abs = Math.abs(n);
-  const str = abs >= 1000
-    ? `$${(abs / 1000).toFixed(1)}K`
-    : `$${abs.toFixed(0)}`;
-  return n < 0 ? `-${str}` : `+${str}`;
 }
 
 function scoreColor(score: number, invert = false) {
@@ -96,26 +85,16 @@ function ScoreGauge({ score, invert = false, size = 90 }: { score: number; inver
   const circumference = Math.PI * r;
   const offset = circumference * (1 - pct);
   const color = scoreColor(score, invert);
-
   return (
     <svg width={size} height={size / 2 + 16} viewBox={`0 0 ${size} ${size / 2 + 16}`}>
-      <path
-        d={`M 5,${size / 2} A ${r},${r} 0 0 1 ${size - 5},${size / 2}`}
-        fill="none" stroke="var(--border)" strokeWidth={8} strokeLinecap="round"
-      />
-      <path
-        d={`M 5,${size / 2} A ${r},${r} 0 0 1 ${size - 5},${size / 2}`}
+      <path d={`M 5,${size / 2} A ${r},${r} 0 0 1 ${size - 5},${size / 2}`}
+        fill="none" stroke="var(--border)" strokeWidth={8} strokeLinecap="round" />
+      <path d={`M 5,${size / 2} A ${r},${r} 0 0 1 ${size - 5},${size / 2}`}
         fill="none" stroke={color} strokeWidth={8} strokeLinecap="round"
-        strokeDasharray={circumference}
-        strokeDashoffset={offset}
-        style={{ transform: 'none', transition: 'stroke-dashoffset 0.8s ease' }}
-      />
-      <text x={cx} y={size / 2 + 2} textAnchor="middle" fontSize={20} fontWeight={700} fill={color}>
-        {score}
-      </text>
-      <text x={cx} y={size / 2 + 16} textAnchor="middle" fontSize={10} fill="var(--muted)">
-        /100
-      </text>
+        strokeDasharray={circumference} strokeDashoffset={offset}
+        style={{ transform: 'none', transition: 'stroke-dashoffset 0.8s ease' }} />
+      <text x={cx} y={size / 2 + 2} textAnchor="middle" fontSize={20} fontWeight={700} fill={color}>{score}</text>
+      <text x={cx} y={size / 2 + 16} textAnchor="middle" fontSize={10} fill="var(--muted)">/100</text>
     </svg>
   );
 }
@@ -159,8 +138,8 @@ function SummaryCard({ label, value, sub, color }: { label: string; value: strin
 
 // ── StyleBar ──────────────────────────────────────────────────────────────────
 
-function StyleBar({ label, value, max = 100 }: { label: string; value: number; max?: number }) {
-  const pct = Math.min(100, (value / max) * 100);
+function StyleBar({ label, value }: { label: string; value: number }) {
+  const pct = Math.min(100, value);
   const color = pct >= 60 ? '#6366f1' : pct >= 30 ? '#8b5cf6' : 'var(--border)';
   return (
     <div style={{ marginBottom: 8 }}>
@@ -199,7 +178,6 @@ export default function AnalysisPage() {
         const accts: Account[] = await res.json();
         const visible = accts.filter(a => !a.hidden);
         setAccounts(visible);
-        // Restore saved selection
         const saved = localStorage.getItem('analysis_selected_accounts');
         if (saved) {
           try {
@@ -284,7 +262,8 @@ export default function AnalysisPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>계좌 선택</h2>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, color: 'var(--muted)' }}>
-              <input type="checkbox" checked={allSelected} onChange={toggleAll} style={{ accentColor: 'var(--accent)', width: 14, height: 14 }} />
+              <input type="checkbox" checked={allSelected} onChange={toggleAll}
+                style={{ accentColor: 'var(--accent)', width: 14, height: 14 }} />
               전체 선택
             </label>
           </div>
@@ -300,8 +279,7 @@ export default function AnalysisPage() {
                   color: on ? 'white' : 'var(--muted)',
                   transition: 'background 0.15s',
                 }}>
-                  <input type="checkbox" checked={on} onChange={() => toggleAccount(id)}
-                    style={{ display: 'none' }} />
+                  <input type="checkbox" checked={on} onChange={() => toggleAccount(id)} style={{ display: 'none' }} />
                   {a.name}
                 </label>
               );
@@ -319,7 +297,9 @@ export default function AnalysisPage() {
                 cursor: loading || selected.size === 0 ? 'not-allowed' : 'pointer',
               }}
             >
-              {loading ? <><RefreshCw size={14} style={{ animation: 'spin 0.7s linear infinite' }} /> 분석 중…</> : '분석 시작'}
+              {loading
+                ? <><RefreshCw size={14} style={{ animation: 'spin 0.7s linear infinite' }} /> 분석 중…</>
+                : '분석 시작'}
             </button>
             {selected.size > 0 && !loading && (
               <span style={{ fontSize: 12, color: 'var(--muted)' }}>{selected.size}개 계좌 선택됨</span>
@@ -340,28 +320,30 @@ export default function AnalysisPage() {
           </div>
         )}
 
-        {/* No data yet */}
         {!loading && !result && hasRun && !error && (
           <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--muted)', fontSize: 14 }}>
             분석 결과가 없습니다. 계좌를 선택하고 분석을 시작하세요.
           </div>
         )}
 
-        {/* Results */}
+        {/* ── Results ── */}
         {result && !loading && (
           <>
             {/* Summary Cards */}
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
-              <SummaryCard label="총 거래 횟수" value={`${result.summary.totalTrades}건`} sub={`총 거래내역 ${result.summary.totalTxCount}건`} />
+              <SummaryCard label="총 거래 횟수" value={`${result.summary.totalTrades}건`}
+                sub={`총 거래내역 ${result.summary.totalTxCount}건`} />
               <SummaryCard
                 label="승률"
-                value={`${result.summary.winRate.toFixed(0)}%`}
+                value={`${result.summary.winRate.toFixed(2)}%`}
                 sub={`수익 ${result.summary.winningTrades}건 / 손실 ${result.summary.losingTrades}건`}
                 color={result.summary.winRate >= 50 ? 'var(--color-price-up)' : 'var(--color-price-down)'}
               />
               <SummaryCard
                 label="실현 손익"
-                value={result.summary.totalPnl >= 0 ? `+$${result.summary.totalPnl.toFixed(0)}` : `-$${Math.abs(result.summary.totalPnl).toFixed(0)}`}
+                value={result.summary.totalPnl >= 0
+                  ? `+$${result.summary.totalPnl.toFixed(2)}`
+                  : `-$${Math.abs(result.summary.totalPnl).toFixed(2)}`}
                 sub={`${fmtPct(result.summary.totalPnlPct)} 투자 대비`}
                 color={result.summary.totalPnl >= 0 ? 'var(--color-price-up)' : 'var(--color-price-down)'}
               />
@@ -372,30 +354,28 @@ export default function AnalysisPage() {
               />
             </div>
 
-            {/* Score Cards */}
+            {/* A. FOMO — full expandable card */}
+            <div style={{ marginBottom: 12 }}>
+              <FOMOAnalysis data={result.fomoScore} winRate={result.summary.winRate} />
+            </div>
+
+            {/* B / C / E score cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
-              <ScoreCard
-                title="A. FOMO (추격매수) 점수"
-                score={result.fomoScore.score}
-                invert
-                invertGauge
-                detail={result.fomoScore.score >= 70 ? '높음 — 추격매수 경향' : result.fomoScore.score >= 40 ? '중간' : '낮음 — 좋은 타이밍'}
-              />
               <ScoreCard
                 title="B. 손절 능력 점수"
                 score={result.stopLossScore.score}
                 detail={result.stopLossScore.score >= 75 ? '우수' : result.stopLossScore.score >= 50 ? '보통' : '개선 필요'}
                 extra={
                   <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>
-                    평균 손실 {result.stopLossScore.avgLossPct.toFixed(1)}% · {Math.round(result.stopLossScore.avgLossDays)}일
+                    평균 손실 {result.stopLossScore.avgLossPct.toFixed(2)}%
+                    · {Math.round(result.stopLossScore.avgLossDays)}일
                   </div>
                 }
               />
               <ScoreCard
                 title="C. 집중투자 성향"
                 score={result.concentration.score}
-                invert
-                invertGauge
+                invert invertGauge
                 detail={result.concentration.score >= 60 ? '고집중 (위험)' : result.concentration.score >= 30 ? '적절' : '분산 (우수)'}
                 extra={
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, justifyContent: 'center' }}>
@@ -404,7 +384,7 @@ export default function AnalysisPage() {
                         fontSize: 10, padding: '2px 6px', borderRadius: 4,
                         background: 'var(--border)', color: 'var(--text)', fontWeight: 600,
                       }}>
-                        {h.ticker} {h.pct.toFixed(0)}%
+                        {h.ticker} {h.pct.toFixed(1)}%
                       </span>
                     ))}
                   </div>
@@ -416,23 +396,20 @@ export default function AnalysisPage() {
                 detail={result.taxEfficiency.score >= 70 ? '좋음 (장기 위주)' : result.taxEfficiency.score >= 40 ? '보통' : '개선 필요'}
                 extra={
                   <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>
-                    장기 {result.taxEfficiency.longTermCount}건 · 단기 {result.taxEfficiency.shortTermCount}건
+                    장기 {result.taxEfficiency.longTermCount}건
+                    · 단기 {result.taxEfficiency.shortTermCount}건
                   </div>
                 }
               />
             </div>
 
-            {/* Style + Return Prediction */}
+            {/* D + F: Style + Return Prediction */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginBottom: 20 }}>
-              {/* Trading Style */}
-              <div style={{
-                background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10,
-                padding: '16px',
-              }}>
+
+              {/* D. Trading Style */}
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>D. 거래 스타일 분류</div>
-                <div style={{
-                  fontSize: 15, fontWeight: 700, color: 'var(--accent)', marginBottom: 4,
-                }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent)', marginBottom: 4 }}>
                   {result.tradingStyle.type}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14, lineHeight: 1.5 }}>
@@ -444,38 +421,37 @@ export default function AnalysisPage() {
                 <div style={{ marginTop: 10, display: 'flex', gap: 16, fontSize: 11, color: 'var(--muted)' }}>
                   <span>평균 보유 {Math.round(result.tradingStyle.avgHoldDays)}일</span>
                   <span>월 {result.tradingStyle.tradesPerMonth.toFixed(1)}회</span>
-                  <span>승률 {result.tradingStyle.winRate.toFixed(0)}%</span>
+                  <span>승률 {result.tradingStyle.winRate.toFixed(2)}%</span>
                 </div>
               </div>
 
-              {/* Return Prediction */}
-              <div style={{
-                background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10,
-                padding: '16px',
-              }}>
+              {/* F. Return Prediction */}
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>F. 장기 수익률 예측</div>
                 {result.returnPrediction.confidence > 0 ? (
                   <>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
                       {[
-                        { label: '실현 수익률', value: fmtPct(result.returnPrediction.currentPnlPct) },
-                        { label: '월 예상', value: fmtPct(result.returnPrediction.monthlyExpected) },
-                        { label: '1년 예상', value: fmtPct(result.returnPrediction.yearlyExpected) },
-                        { label: '5년 예상 (복리)', value: fmtPct(result.returnPrediction.fiveYearExpected, 0) },
+                        { label: '실현 수익률',     value: fmtPct(result.returnPrediction.currentPnlPct) },
+                        { label: '월 예상',         value: fmtPct(result.returnPrediction.monthlyExpected) },
+                        { label: '1년 예상',         value: fmtPct(result.returnPrediction.yearlyExpected) },
+                        { label: '5년 예상 (복리)', value: fmtPct(result.returnPrediction.fiveYearExpected) },
                       ].map(item => (
                         <div key={item.label} style={{ background: 'var(--bg)', borderRadius: 6, padding: '8px 10px' }}>
                           <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 2 }}>{item.label}</div>
                           <div style={{
                             fontSize: 15, fontWeight: 700,
-                            color: item.value.startsWith('+') ? 'var(--color-price-up)' : item.value.startsWith('-') ? 'var(--color-price-down)' : 'var(--text)',
+                            color: item.value.startsWith('+') ? 'var(--color-price-up)'
+                              : item.value.startsWith('-') ? 'var(--color-price-down)' : 'var(--text)',
                           }}>{item.value}</div>
                         </div>
                       ))}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
-                      신뢰도 {result.returnPrediction.confidence}% · 승률 {result.returnPrediction.winRate.toFixed(0)}%
-                      · 평균 수익 +{result.returnPrediction.avgGainPct.toFixed(1)}%
-                      · 평균 손실 -{result.returnPrediction.avgLossPct.toFixed(1)}%
+                      신뢰도 {result.returnPrediction.confidence}%
+                      · 승률 {result.returnPrediction.winRate.toFixed(2)}%
+                      · 평균 수익 +{result.returnPrediction.avgGainPct.toFixed(2)}%
+                      · 평균 손실 -{result.returnPrediction.avgLossPct.toFixed(2)}%
                     </div>
                     <div style={{
                       fontSize: 10, color: 'var(--muted)', lineHeight: 1.5, opacity: 0.7,
@@ -492,7 +468,7 @@ export default function AnalysisPage() {
               </div>
             </div>
 
-            {/* Top Holdings Table */}
+            {/* C. Top Holdings Table */}
             {result.concentration.topHoldings.length > 0 && (
               <div className="card" style={{ marginBottom: 20 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>C. 종목별 투자 비중 (매수금액 기준 Top 5)</div>
@@ -510,7 +486,7 @@ export default function AnalysisPage() {
                       <tr key={h.ticker}>
                         <td style={{ color: 'var(--muted)', width: 40 }}>{i + 1}</td>
                         <td style={{ fontWeight: 600 }}>{h.ticker}</td>
-                        <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{h.pct.toFixed(1)}%</td>
+                        <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{h.pct.toFixed(2)}%</td>
                         <td style={{ textAlign: 'right', width: 100 }}>
                           <div style={{ height: 6, borderRadius: 3, background: 'var(--border)' }}>
                             <div style={{
@@ -526,6 +502,31 @@ export default function AnalysisPage() {
               </div>
             )}
 
+            {/* B. Stop-loss + E. Tax details */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginBottom: 20 }}>
+              <div className="card">
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>B. 손절 능력 상세</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.8 }}>
+                  <div>점수: <strong style={{ color: scoreColor(result.stopLossScore.score) }}>{result.stopLossScore.score}/100</strong></div>
+                  <div>평균 손실률: {result.stopLossScore.avgLossPct.toFixed(2)}%</div>
+                  <div>평균 손절 기간: {Math.round(result.stopLossScore.avgLossDays)}일</div>
+                  {result.stopLossScore.recommendation && (
+                    <div style={{ marginTop: 6, color: 'var(--text)' }}>{result.stopLossScore.recommendation}</div>
+                  )}
+                </div>
+              </div>
+              <div className="card">
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>E. 세금 효율성 상세</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.8 }}>
+                  <div>장기(1년+): {result.taxEfficiency.longTermCount}건 ({result.taxEfficiency.longTermPct.toFixed(2)}%)</div>
+                  <div>단기: {result.taxEfficiency.shortTermCount}건 ({result.taxEfficiency.shortTermPct.toFixed(2)}%)</div>
+                  {result.taxEfficiency.recommendation && (
+                    <div style={{ marginTop: 6, color: 'var(--text)' }}>{result.taxEfficiency.recommendation}</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Recommendations */}
             {result.recommendations.length > 0 && (
               <div className="card" style={{ marginBottom: 20 }}>
@@ -538,7 +539,8 @@ export default function AnalysisPage() {
                       background: 'var(--bg)', border: '1px solid var(--border)',
                     }}>
                       <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>
-                        {rec.includes('우수') || rec.includes('유지') ? '✅' : rec.includes('필요') || rec.includes('높습니다') ? '⚠️' : 'ℹ️'}
+                        {rec.includes('우수') || rec.includes('유지') ? '✅'
+                          : rec.includes('필요') || rec.includes('높습니다') || rec.includes('권장') ? '⚠️' : 'ℹ️'}
                       </span>
                       <span style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5 }}>{rec}</span>
                     </div>
@@ -547,35 +549,8 @@ export default function AnalysisPage() {
               </div>
             )}
 
-            {/* Detail cards for FOMO & stop-loss */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginBottom: 20 }}>
-              <div className="card">
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>A. FOMO 점수 상세</div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.7 }}>
-                  <div>점수: <strong style={{ color: scoreColor(result.fomoScore.score, true) }}>{result.fomoScore.score}/100</strong></div>
-                  <div>{result.fomoScore.detail}</div>
-                </div>
-              </div>
-              <div className="card">
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>B. 손절 능력 상세</div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.7 }}>
-                  <div>점수: <strong style={{ color: scoreColor(result.stopLossScore.score) }}>{result.stopLossScore.score}/100</strong></div>
-                  <div>{result.stopLossScore.detail}</div>
-                </div>
-              </div>
-              <div className="card">
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>E. 세금 효율성 상세</div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.7 }}>
-                  <div>장기(1년+): {result.taxEfficiency.longTermCount}건 ({result.taxEfficiency.longTermPct.toFixed(0)}%)</div>
-                  <div>단기: {result.taxEfficiency.shortTermCount}건 ({result.taxEfficiency.shortTermPct.toFixed(0)}%)</div>
-                  <div style={{ marginTop: 4 }}>{result.taxEfficiency.detail}</div>
-                </div>
-              </div>
-            </div>
-
             <div style={{
-              textAlign: 'center', fontSize: 11, color: 'var(--muted)', opacity: 0.6,
-              marginTop: 10, lineHeight: 1.7,
+              textAlign: 'center', fontSize: 11, color: 'var(--muted)', opacity: 0.6, lineHeight: 1.7,
             }}>
               모든 분석은 실현된 거래 데이터를 기반으로 하며 투자 조언이 아닙니다.<br />
               과거 거래 성과가 미래 수익을 보장하지 않습니다.

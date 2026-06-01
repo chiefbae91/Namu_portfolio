@@ -73,9 +73,27 @@ function matchTrades(txs: TxRow[]): ClosedTrade[] {
   return trades;
 }
 
-function calcFomoScore(txs: TxRow[]): { score: number; detail: string; recommendation: string | null } {
+interface FomoTicker {
+  ticker: string;
+  buyCount: number;
+  avgFomoRatio: number;
+  observedHigh: number;
+  avgBuyPrice: number;
+  avgPnlPct: number | null;
+}
+
+function calcFomoScore(txs: TxRow[], trades: ClosedTrade[]): {
+  score: number;
+  detail: string;
+  recommendation: string | null;
+  level: string;
+  levelNum: number;
+  totalBuys: number;
+  fomoTickers: FomoTicker[];
+  expectedImprovement: { targetScore: number; winRateGain: number; avgGainBoost: number };
+} {
   const byTicker = new Map<string, number[]>();
-  const buysByTicker = new Map<string, Array<{ price: number; qty: number }>>() ;
+  const buysByTicker = new Map<string, Array<{ price: number; qty: number }>>();
 
   for (const tx of txs) {
     if (tx.type !== 'buy' && tx.type !== 'sell') continue;
@@ -87,7 +105,15 @@ function calcFomoScore(txs: TxRow[]): { score: number; detail: string; recommend
     }
   }
 
+  // Build realized P&L map per ticker
+  const pnlByTicker = new Map<string, number[]>();
+  for (const t of trades) {
+    if (!pnlByTicker.has(t.ticker)) pnlByTicker.set(t.ticker, []);
+    pnlByTicker.get(t.ticker)!.push(t.realizedPnlPct);
+  }
+
   let totalWeighted = 0, totalWeight = 0;
+  const fomoTickers: FomoTicker[] = [];
 
   for (const [ticker, buys] of buysByTicker) {
     const prices = byTicker.get(ticker) || [];
@@ -95,27 +121,78 @@ function calcFomoScore(txs: TxRow[]): { score: number; detail: string; recommend
     const minP = Math.min(...prices);
     const maxP = Math.max(...prices);
     if (maxP === minP) continue;
+
+    let tickerWeighted = 0, tickerWeight = 0;
+    let totalBuyPrice = 0;
     for (const buy of buys) {
       const ratio = (buy.price - minP) / (maxP - minP);
       const w = buy.qty * buy.price;
+      tickerWeighted += ratio * w;
+      tickerWeight += w;
       totalWeighted += ratio * w;
       totalWeight += w;
+      totalBuyPrice += buy.price;
     }
+
+    const pnls = pnlByTicker.get(ticker);
+    const avgPnlPct = pnls && pnls.length > 0
+      ? pnls.reduce((a, b) => a + b, 0) / pnls.length
+      : null;
+
+    fomoTickers.push({
+      ticker,
+      buyCount: buys.length,
+      avgFomoRatio: tickerWeight > 0 ? Math.round((tickerWeighted / tickerWeight) * 100) : 50,
+      observedHigh: maxP,
+      avgBuyPrice: totalBuyPrice / buys.length,
+      avgPnlPct,
+    });
   }
 
-  if (totalWeight === 0) return { score: 50, detail: '거래 데이터가 부족합니다.', recommendation: null };
+  const totalBuys = txs.filter(t => t.type === 'buy').length;
+
+  if (totalWeight === 0) {
+    return {
+      score: 50, detail: '거래 데이터가 부족합니다.', recommendation: null,
+      level: '중간', levelNum: 2, totalBuys,
+      fomoTickers: [],
+      expectedImprovement: { targetScore: 35, winRateGain: 0, avgGainBoost: 0 },
+    };
+  }
 
   const score = Math.round((totalWeighted / totalWeight) * 100);
-  const level = score >= 70 ? '높음' : score >= 40 ? '중간' : '낮음';
+
+  let levelNum: number, level: string, recommendation: string | null;
+  if (score >= 76) {
+    levelNum = 4; level = '매우 높음 (위험!)';
+    recommendation = '거의 모든 거래가 고점 근처 매수입니다. 매수 전 반드시 저점 확인이 필요합니다.';
+  } else if (score >= 51) {
+    levelNum = 3; level = '높은 수준 (주의)';
+    recommendation = '저점 근처에서 매수하는 훈련이 필요합니다. 고점 이후 조정을 기다리세요.';
+  } else if (score >= 21) {
+    levelNum = 2; level = '적절한 수준';
+    recommendation = null;
+  } else {
+    levelNum = 1; level = '신중한 투자자';
+    recommendation = '저점 근처에서 매수하는 훌륭한 습관이 있습니다. 계속 유지하세요.';
+  }
+
+  // Expected improvement: if user reduces FOMO score by 30 points
+  const targetScore = Math.max(20, score - 30);
+  const winRateGain = Math.round((score - targetScore) * 0.12 * 10) / 10; // ~0.12% per point
+  const avgGainBoost = Math.round((score - targetScore) * 0.05 * 10) / 10; // ~0.05% per point
+
+  fomoTickers.sort((a, b) => b.avgFomoRatio - a.avgFomoRatio);
 
   return {
     score,
     detail: `FOMO 점수: ${score}/100 (${level})`,
-    recommendation: score >= 65
-      ? '저점 근처에서 매수하는 훈련이 필요합니다. 가격이 급등한 후 매수하는 경향이 있습니다.'
-      : score <= 35
-      ? '저점 근처에서 매수하는 훌륭한 습관이 있습니다. 계속 유지하세요.'
-      : null,
+    recommendation,
+    level,
+    levelNum,
+    totalBuys,
+    fomoTickers: fomoTickers.slice(0, 10),
+    expectedImprovement: { targetScore, winRateGain, avgGainBoost },
   };
 }
 
@@ -375,7 +452,7 @@ export async function POST(req: NextRequest) {
 
   const trades = matchTrades(txs);
 
-  const fomo        = calcFomoScore(txs);
+  const fomo        = calcFomoScore(txs, trades);
   const stopLoss    = calcStopLossScore(trades);
   const conc        = calcConcentration(txs);
   const style       = calcTradingStyle(trades, txs);
