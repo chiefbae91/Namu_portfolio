@@ -196,42 +196,115 @@ function calcFomoScore(txs: TxRow[], trades: ClosedTrade[]): {
   };
 }
 
+interface StopLossTradeDetail {
+  ticker: string;
+  buyPrice: number;
+  sellPrice: number;
+  lossPct: number;
+  holdDays: number;
+}
+
 function calcStopLossScore(trades: ClosedTrade[]): {
-  score: number; avgLossPct: number; avgLossDays: number; detail: string; recommendation: string | null;
+  score: number;
+  avgLossPct: number;
+  avgLossDays: number;
+  maxLossPct: number;
+  maxLossTicker: string;
+  totalLossCount: number;
+  totalTradeCount: number;
+  cutoff: { within1d: number; within3d: number; within7d: number; over7d: number };
+  worstTrades: StopLossTradeDetail[];
+  levelNum: number;
+  level: string;
+  detail: string;
+  recommendation: string | null;
+  expectedImprovement: { targetScore: number; lossReduction: number };
 } {
+  const empty = (score: number) => ({
+    score, avgLossPct: 0, avgLossDays: 0, maxLossPct: 0, maxLossTicker: '',
+    totalLossCount: 0, totalTradeCount: trades.length,
+    cutoff: { within1d: 0, within3d: 0, within7d: 0, over7d: 0 },
+    worstTrades: [], levelNum: 4, level: '우수',
+    detail: '손절 능력: 90/100 (우수) — 손실 거래 없음',
+    recommendation: null,
+    expectedImprovement: { targetScore: score, lossReduction: 0 },
+  });
+
   const losing = trades.filter(t => t.realizedPnlPct < 0);
-  if (losing.length === 0) {
-    return { score: 90, avgLossPct: 0, avgLossDays: 0, detail: '손절 능력: 90/100 (우수)', recommendation: null };
-  }
+  if (losing.length === 0) return empty(90);
 
   const avgLossPct = losing.reduce((s, t) => s + Math.abs(t.realizedPnlPct), 0) / losing.length;
   const avgLossDays = losing.reduce((s, t) => s + t.holdDays, 0) / losing.length;
+
+  const worst = [...losing].sort((a, b) => a.realizedPnlPct - b.realizedPnlPct);
+  const maxLoss = worst[0];
 
   const lossPenalty = Math.min(avgLossPct / 25 * 50, 50);
   const daysPenalty = Math.min(avgLossDays / 150 * 50, 50);
   const score = Math.max(0, Math.min(100, Math.round(100 - lossPenalty - daysPenalty)));
 
-  const level = score >= 75 ? '우수' : score >= 50 ? '보통' : '개선 필요';
+  let levelNum: number, level: string;
+  if (score >= 76) { levelNum = 4; level = '우수 수준 (모범!)'; }
+  else if (score >= 51) { levelNum = 3; level = '좋은 수준'; }
+  else if (score >= 21) { levelNum = 2; level = '보통 수준'; }
+  else { levelNum = 1; level = '손절 능력 부족'; }
+
   const recommendation = score < 50
-    ? `평균 손실률이 ${avgLossPct.toFixed(1)}%이고 평균 ${Math.round(avgLossDays)}일 후 손절합니다. 더 빠른 손절이 필요합니다.`
-    : score >= 75
+    ? `평균 손실률 ${avgLossPct.toFixed(2)}%, 평균 ${Math.round(avgLossDays)}일 후 손절합니다. 더 빠른 손절이 필요합니다.`
+    : score >= 76
     ? '손절 능력이 우수합니다. 현재 방식을 유지하세요.'
     : null;
+
+  const cutoff = {
+    within1d: losing.filter(t => t.holdDays <= 1).length,
+    within3d: losing.filter(t => t.holdDays <= 3).length,
+    within7d: losing.filter(t => t.holdDays <= 7).length,
+    over7d:   losing.filter(t => t.holdDays > 7).length,
+  };
+
+  const worstTrades: StopLossTradeDetail[] = worst.slice(0, 10).map(t => ({
+    ticker: t.ticker,
+    buyPrice: t.buyPrice,
+    sellPrice: t.sellPrice,
+    lossPct: t.realizedPnlPct,
+    holdDays: t.holdDays,
+  }));
+
+  const targetScore = Math.min(100, score + 7);
+  const lossReduction = Math.round((avgLossPct - avgLossPct * (score / targetScore)) * 100) / 100;
 
   return {
     score,
     avgLossPct,
     avgLossDays,
-    detail: `손절 능력: ${score}/100 (${level}) — 평균 손실률: ${avgLossPct.toFixed(1)}%, 평균 손절 기간: ${Math.round(avgLossDays)}일`,
+    maxLossPct: Math.abs(maxLoss.realizedPnlPct),
+    maxLossTicker: maxLoss.ticker,
+    totalLossCount: losing.length,
+    totalTradeCount: trades.length,
+    cutoff,
+    worstTrades,
+    levelNum,
+    level,
+    detail: `손절 능력: ${score}/100 (${level}) — 평균 손실 ${avgLossPct.toFixed(2)}%, ${Math.round(avgLossDays)}일`,
     recommendation,
+    expectedImprovement: { targetScore, lossReduction },
   };
 }
 
 function calcConcentration(txs: TxRow[]): {
   score: number;
   topHoldings: { ticker: string; pct: number }[];
+  top3pct: number;
+  top5pct: number;
+  top10pct: number;
+  totalTickers: number;
+  hhi: number;
+  levelNum: number;
+  level: string;
+  scenario: { top1impact: number; top3impact: number };
   detail: string;
   recommendation: string | null;
+  expectedImprovement: { targetPct: number };
 } {
   const volByTicker = new Map<string, number>();
   for (const tx of txs) {
@@ -240,7 +313,15 @@ function calcConcentration(txs: TxRow[]): {
   }
 
   const total = [...volByTicker.values()].reduce((a, b) => a + b, 0);
-  if (total === 0) return { score: 0, topHoldings: [], detail: '데이터 부족', recommendation: null };
+  if (total === 0) {
+    return {
+      score: 0, topHoldings: [], top3pct: 0, top5pct: 0, top10pct: 0,
+      totalTickers: 0, hhi: 0, levelNum: 2, level: '데이터 부족',
+      scenario: { top1impact: 0, top3impact: 0 },
+      detail: '데이터 부족', recommendation: null,
+      expectedImprovement: { targetPct: 30 },
+    };
+  }
 
   const sorted = [...volByTicker.entries()]
     .map(([ticker, vol]) => ({ ticker, pct: (vol / total) * 100 }))
@@ -249,18 +330,46 @@ function calcConcentration(txs: TxRow[]): {
   const hhi = sorted.reduce((s, h) => s + (h.pct / 100) ** 2, 0);
   const score = Math.round(hhi * 100);
 
-  const top3pct = sorted.slice(0, 3).reduce((s, h) => s + h.pct, 0);
-  const level = score >= 60 ? '위험' : score >= 30 ? '적절' : '우수 (분산)';
+  const top3pct  = sorted.slice(0, 3).reduce((s, h)  => s + h.pct, 0);
+  const top5pct  = sorted.slice(0, 5).reduce((s, h)  => s + h.pct, 0);
+  const top10pct = sorted.slice(0, 10).reduce((s, h) => s + h.pct, 0);
+  const totalTickers = sorted.length;
 
-  const recommendation = score >= 50 && sorted.length > 0
+  // Level based on top3pct
+  let levelNum: number, level: string;
+  if (top3pct >= 81)      { levelNum = 5; level = '극도 집중 (위험!)'; }
+  else if (top3pct >= 61) { levelNum = 4; level = '고집중도 (주의!)'; }
+  else if (top3pct >= 41) { levelNum = 3; level = '중집중도 (중간)'; }
+  else if (top3pct >= 21) { levelNum = 2; level = '저집중도 (적절) ✅'; }
+  else                    { levelNum = 1; level = '과분산 (관리 어려움)'; }
+
+  // Scenario: what happens if top holdings drop -20%
+  const top1impact = sorted.length > 0 ? -(sorted[0].pct / 100 * 20) : 0;
+  const top3impact = -(top3pct / 100 * 20);
+
+  const recommendation = top3pct >= 60
     ? `${sorted.slice(0, 2).map(h => h.ticker).join(', ')}에 집중되어 있습니다. 분산 투자를 권장합니다.`
+    : top3pct <= 20 && totalTickers > 30
+    ? '종목이 너무 많습니다. 우량주 10~15개로 관리하면 효율성이 높아집니다.'
     : null;
 
   return {
     score,
-    topHoldings: sorted.slice(0, 5),
-    detail: `집중도: ${top3pct.toFixed(0)}% (Top 3 기준) — ${level}`,
+    topHoldings: sorted.slice(0, 10),
+    top3pct,
+    top5pct,
+    top10pct,
+    totalTickers,
+    hhi,
+    levelNum,
+    level,
+    scenario: {
+      top1impact: Math.round(top1impact * 100) / 100,
+      top3impact: Math.round(top3impact * 100) / 100,
+    },
+    detail: `집중도: Top 3 = ${top3pct.toFixed(2)}% — ${level}`,
     recommendation,
+    expectedImprovement: { targetPct: Math.max(20, top3pct - 10) },
   };
 }
 

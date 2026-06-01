@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase';
 import { Account } from '@/lib/types';
 import { BarChart2, ArrowLeft, RefreshCw } from 'lucide-react';
 import FOMOAnalysis, { FomoScoreData } from '@/components/FOMOAnalysis';
+import StopLossAnalysis, { StopLossData } from '@/components/StopLossAnalysis';
+import ConcentrationAnalysis, { ConcentrationData } from '@/components/ConcentrationAnalysis';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -19,19 +21,8 @@ interface AnalysisResult {
     totalPnlPct: number;
   };
   fomoScore: FomoScoreData;
-  stopLossScore: {
-    score: number;
-    avgLossPct: number;
-    avgLossDays: number;
-    detail: string;
-    recommendation: string | null;
-  };
-  concentration: {
-    score: number;
-    topHoldings: { ticker: string; pct: number }[];
-    detail: string;
-    recommendation: string | null;
-  };
+  stopLossScore: StopLossData;
+  concentration: ConcentrationData;
   tradingStyle: {
     type: string;
     similarity: Record<string, number>;
@@ -359,45 +350,31 @@ export default function AnalysisPage() {
               <FOMOAnalysis data={result.fomoScore} winRate={result.summary.winRate} />
             </div>
 
-            {/* B / C / E score cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
-              <ScoreCard
-                title="B. 손절 능력 점수"
-                score={result.stopLossScore.score}
-                detail={result.stopLossScore.score >= 75 ? '우수' : result.stopLossScore.score >= 50 ? '보통' : '개선 필요'}
-                extra={
-                  <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>
-                    평균 손실 {result.stopLossScore.avgLossPct.toFixed(2)}%
-                    · {Math.round(result.stopLossScore.avgLossDays)}일
-                  </div>
-                }
-              />
-              <ScoreCard
-                title="C. 집중투자 성향"
-                score={result.concentration.score}
-                invert invertGauge
-                detail={result.concentration.score >= 60 ? '고집중 (위험)' : result.concentration.score >= 30 ? '적절' : '분산 (우수)'}
-                extra={
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, justifyContent: 'center' }}>
-                    {result.concentration.topHoldings.map(h => (
-                      <span key={h.ticker} style={{
-                        fontSize: 10, padding: '2px 6px', borderRadius: 4,
-                        background: 'var(--border)', color: 'var(--text)', fontWeight: 600,
-                      }}>
-                        {h.ticker} {h.pct.toFixed(1)}%
-                      </span>
-                    ))}
-                  </div>
-                }
-              />
+            {/* B. Stop-loss — full expandable card */}
+            <div style={{ marginBottom: 12 }}>
+              <StopLossAnalysis data={result.stopLossScore} />
+            </div>
+
+            {/* C. Concentration — full expandable card */}
+            <div style={{ marginBottom: 20 }}>
+              <ConcentrationAnalysis data={result.concentration} />
+            </div>
+
+            {/* E. Tax Efficiency score card (compact) */}
+            <div style={{ marginBottom: 20 }}>
               <ScoreCard
                 title="E. 세금 효율성"
                 score={result.taxEfficiency.score}
                 detail={result.taxEfficiency.score >= 70 ? '좋음 (장기 위주)' : result.taxEfficiency.score >= 40 ? '보통' : '개선 필요'}
                 extra={
                   <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>
-                    장기 {result.taxEfficiency.longTermCount}건
+                    장기 {result.taxEfficiency.longTermCount}건 ({result.taxEfficiency.longTermPct.toFixed(1)}%)
                     · 단기 {result.taxEfficiency.shortTermCount}건
+                    {result.taxEfficiency.recommendation && (
+                      <div style={{ marginTop: 4, color: 'var(--text)', textAlign: 'left', lineHeight: 1.4 }}>
+                        {result.taxEfficiency.recommendation}
+                      </div>
+                    )}
                   </div>
                 }
               />
@@ -468,64 +445,6 @@ export default function AnalysisPage() {
               </div>
             </div>
 
-            {/* C. Top Holdings Table */}
-            {result.concentration.topHoldings.length > 0 && (
-              <div className="card" style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>C. 종목별 투자 비중 (매수금액 기준 Top 5)</div>
-                <table>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: 'left' }}>순위</th>
-                      <th style={{ textAlign: 'left' }}>종목</th>
-                      <th style={{ textAlign: 'right' }}>비중</th>
-                      <th style={{ textAlign: 'right' }}>바</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {result.concentration.topHoldings.map((h, i) => (
-                      <tr key={h.ticker}>
-                        <td style={{ color: 'var(--muted)', width: 40 }}>{i + 1}</td>
-                        <td style={{ fontWeight: 600 }}>{h.ticker}</td>
-                        <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{h.pct.toFixed(2)}%</td>
-                        <td style={{ textAlign: 'right', width: 100 }}>
-                          <div style={{ height: 6, borderRadius: 3, background: 'var(--border)' }}>
-                            <div style={{
-                              height: 6, borderRadius: 3, background: 'var(--accent)',
-                              width: `${Math.min(100, h.pct)}%`,
-                            }} />
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* B. Stop-loss + E. Tax details */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginBottom: 20 }}>
-              <div className="card">
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>B. 손절 능력 상세</div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.8 }}>
-                  <div>점수: <strong style={{ color: scoreColor(result.stopLossScore.score) }}>{result.stopLossScore.score}/100</strong></div>
-                  <div>평균 손실률: {result.stopLossScore.avgLossPct.toFixed(2)}%</div>
-                  <div>평균 손절 기간: {Math.round(result.stopLossScore.avgLossDays)}일</div>
-                  {result.stopLossScore.recommendation && (
-                    <div style={{ marginTop: 6, color: 'var(--text)' }}>{result.stopLossScore.recommendation}</div>
-                  )}
-                </div>
-              </div>
-              <div className="card">
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>E. 세금 효율성 상세</div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.8 }}>
-                  <div>장기(1년+): {result.taxEfficiency.longTermCount}건 ({result.taxEfficiency.longTermPct.toFixed(2)}%)</div>
-                  <div>단기: {result.taxEfficiency.shortTermCount}건 ({result.taxEfficiency.shortTermPct.toFixed(2)}%)</div>
-                  {result.taxEfficiency.recommendation && (
-                    <div style={{ marginTop: 6, color: 'var(--text)' }}>{result.taxEfficiency.recommendation}</div>
-                  )}
-                </div>
-              </div>
-            </div>
 
             {/* Recommendations */}
             {result.recommendations.length > 0 && (
