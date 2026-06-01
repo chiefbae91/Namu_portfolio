@@ -8,6 +8,7 @@ import FOMOAnalysis, { FomoScoreData } from '@/components/FOMOAnalysis';
 import StopLossAnalysis, { StopLossData } from '@/components/StopLossAnalysis';
 import ConcentrationAnalysis, { ConcentrationData } from '@/components/ConcentrationAnalysis';
 import ReturnPrediction, { ReturnPredictionData } from '@/components/ReturnPrediction';
+import TaxEfficiencyAnalysis, { TaxEfficiencyData } from '@/components/TaxEfficiencyAnalysis';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -32,15 +33,7 @@ interface AnalysisResult {
     tradesPerMonth: number;
     winRate: number;
   };
-  taxEfficiency: {
-    score: number;
-    longTermPct: number;
-    shortTermPct: number;
-    longTermCount: number;
-    shortTermCount: number;
-    detail: string;
-    recommendation: string | null;
-  };
+  taxEfficiency: TaxEfficiencyData;
   returnPrediction: ReturnPredictionData;
   recommendations: string[];
 }
@@ -357,24 +350,9 @@ export default function AnalysisPage() {
               <ConcentrationAnalysis data={result.concentration} />
             </div>
 
-            {/* E. Tax Efficiency score card (compact) */}
+            {/* E. Tax Efficiency — full expandable card */}
             <div style={{ marginBottom: 20 }}>
-              <ScoreCard
-                title="E. 세금 효율성"
-                score={result.taxEfficiency.score}
-                detail={result.taxEfficiency.score >= 70 ? '좋음 (장기 위주)' : result.taxEfficiency.score >= 40 ? '보통' : '개선 필요'}
-                extra={
-                  <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>
-                    장기 {result.taxEfficiency.longTermCount}건 ({result.taxEfficiency.longTermPct.toFixed(1)}%)
-                    · 단기 {result.taxEfficiency.shortTermCount}건
-                    {result.taxEfficiency.recommendation && (
-                      <div style={{ marginTop: 4, color: 'var(--text)', textAlign: 'left', lineHeight: 1.4 }}>
-                        {result.taxEfficiency.recommendation}
-                      </div>
-                    )}
-                  </div>
-                }
-              />
+              <TaxEfficiencyAnalysis data={result.taxEfficiency} />
             </div>
 
             {/* D + F: Style + Return Prediction */}

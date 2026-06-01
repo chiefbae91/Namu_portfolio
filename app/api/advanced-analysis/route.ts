@@ -481,36 +481,124 @@ function calcTradingStyle(trades: ClosedTrade[], txs: TxRow[]): {
   return { type: topType, similarity, description: descriptions[topType], avgHoldDays, tradesPerMonth, winRate };
 }
 
-function calcTaxEfficiency(trades: ClosedTrade[]): {
+interface WashSaleEntry {
+  ticker: string;
+  sellDate: string;
+  loss: number;
+  buysInWindow: { date: string; quantity: number; price: number; daysFromSell: number }[];
+}
+
+function detectWashSales(trades: ClosedTrade[], txs: TxRow[]): WashSaleEntry[] {
+  const result: WashSaleEntry[] = [];
+  const losingSells = trades.filter(t => t.realizedPnl < 0);
+  const WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
+  for (const sell of losingSells) {
+    const sellMs = sell.sellDate.getTime();
+    const buysInWindow = txs.filter(tx => {
+      if (tx.type !== 'buy' || tx.ticker !== sell.ticker) return false;
+      const delta = Math.abs(new Date(tx.date).getTime() - sellMs);
+      return delta <= WINDOW_MS;
+    });
+
+    if (buysInWindow.length > 0) {
+      result.push({
+        ticker: sell.ticker,
+        sellDate: sell.sellDate.toISOString().slice(0, 10),
+        loss: Math.abs(sell.realizedPnl),
+        buysInWindow: buysInWindow.map(buy => ({
+          date: buy.date.slice(0, 10),
+          quantity: buy.quantity,
+          price: buy.price,
+          daysFromSell: Math.round((new Date(buy.date).getTime() - sellMs) / 86400000),
+        })),
+      });
+    }
+  }
+
+  return result;
+}
+
+function calcTaxEfficiency(trades: ClosedTrade[], txs: TxRow[]): {
   score: number;
   longTermPct: number;
   shortTermPct: number;
   longTermCount: number;
   shortTermCount: number;
+  longTermGains: number;
+  longTermLosses: number;
+  shortTermGains: number;
+  shortTermLosses: number;
+  estimatedTax: number;
+  potentialSavings: number;
+  deductibleLoss: number;
+  washSales: WashSaleEntry[];
   detail: string;
   recommendation: string | null;
 } {
-  if (trades.length === 0) {
-    return { score: 50, longTermPct: 0, shortTermPct: 0, longTermCount: 0, shortTermCount: 0, detail: '데이터 부족', recommendation: null };
-  }
+  const empty = {
+    score: 50, longTermPct: 0, shortTermPct: 0, longTermCount: 0, shortTermCount: 0,
+    longTermGains: 0, longTermLosses: 0, shortTermGains: 0, shortTermLosses: 0,
+    estimatedTax: 0, potentialSavings: 0, deductibleLoss: 0,
+    washSales: [], detail: '데이터 부족', recommendation: null,
+  };
+  if (trades.length === 0) return empty;
 
-  const longTermCount = trades.filter(t => t.isLongTerm).length;
-  const shortTermCount = trades.length - longTermCount;
-  const longTermPct = (longTermCount / trades.length) * 100;
-  const score = Math.round(longTermPct);
+  const lt = trades.filter(t => t.isLongTerm);
+  const st = trades.filter(t => !t.isLongTerm);
+
+  const ltGains  = lt.filter(t => t.realizedPnl > 0).reduce((s, t) => s + t.realizedPnl, 0);
+  const ltLosses = lt.filter(t => t.realizedPnl < 0).reduce((s, t) => s + Math.abs(t.realizedPnl), 0);
+  const stGains  = st.filter(t => t.realizedPnl > 0).reduce((s, t) => s + t.realizedPnl, 0);
+  const stLosses = st.filter(t => t.realizedPnl < 0).reduce((s, t) => s + Math.abs(t.realizedPnl), 0);
+
+  const totalGains = ltGains + stGains;
+  const longTermPct = totalGains > 0
+    ? (ltGains / totalGains) * 100
+    : lt.length > 0 ? 100 : 0;
+
+  // Tax estimate: LT 15%, ST 32%
+  const ltTax = ltGains * 0.15;
+  const stTax = stGains * 0.32;
+
+  // Net loss deduction: capped $3,000/year
+  const netLoss = (ltLosses + stLosses) - (ltGains + stGains);
+  const deductibleLoss = netLoss > 0 ? Math.min(netLoss, 3000) : 0;
+
+  const estimatedTax = Math.max(0, ltTax + stTax - deductibleLoss * 0.32);
+  const taxIfAllLT = totalGains * 0.15;
+  const potentialSavings = Math.max(0, estimatedTax - taxIfAllLT);
+
+  // Wash sale detection
+  const washSales = detectWashSales(trades, txs);
+
+  // Score: % of gains that are long-term, minus wash sale penalty
+  const baseScore = Math.round(longTermPct);
+  const washPenalty = Math.min(washSales.length * 5, 15);
+  const score = Math.max(0, Math.min(100, baseScore - washPenalty));
 
   const level = score >= 70 ? '좋음' : score >= 40 ? '보통' : '개선 필요';
-  const recommendation = score < 40
-    ? `단기 거래 비중이 ${(100 - score).toFixed(0)}%입니다. 장기 보유를 늘리면 세금을 절감할 수 있습니다.`
+  const recommendation = washSales.length > 0
+    ? `Wash Sale ${washSales.length}건이 감지되었습니다. 손실 공제가 제한될 수 있습니다.`
+    : score < 40
+    ? `단기 거래 비중이 ${(100 - longTermPct).toFixed(0)}%입니다. 장기 보유를 늘리면 세금을 절감할 수 있습니다.`
     : null;
 
   return {
     score,
     longTermPct,
     shortTermPct: 100 - longTermPct,
-    longTermCount,
-    shortTermCount,
-    detail: `세금 효율성: ${score}/100 (${level}) — 장기: ${longTermCount}건, 단기: ${shortTermCount}건`,
+    longTermCount: lt.length,
+    shortTermCount: st.length,
+    longTermGains: Math.round(ltGains * 100) / 100,
+    longTermLosses: Math.round(ltLosses * 100) / 100,
+    shortTermGains: Math.round(stGains * 100) / 100,
+    shortTermLosses: Math.round(stLosses * 100) / 100,
+    estimatedTax: Math.round(estimatedTax * 100) / 100,
+    potentialSavings: Math.round(potentialSavings * 100) / 100,
+    deductibleLoss: Math.round(deductibleLoss * 100) / 100,
+    washSales,
+    detail: `세금 효율성: ${score}/100 (${level})`,
     recommendation,
   };
 }
@@ -731,7 +819,7 @@ export async function POST(req: NextRequest) {
     Promise.resolve(calcReturnPrediction(trades, txs)),
   ]);
   const style       = calcTradingStyle(trades, txs);
-  const tax         = calcTaxEfficiency(trades);
+  const tax         = calcTaxEfficiency(trades, txs);
 
   const totalTrades = trades.length;
   const winningTrades = trades.filter(t => t.realizedPnlPct > 0).length;
