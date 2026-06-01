@@ -51,6 +51,14 @@ function fmtPct(n: number, decimals = 2) {
   return `${n >= 0 ? '+' : ''}${n.toFixed(decimals)}%`;
 }
 
+function fmtUSD(n: number, showSign = true): string {
+  const abs = Math.abs(n);
+  const str = abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formatted = `$${str}`;
+  if (!showSign) return formatted;
+  return n >= 0 ? `+${formatted}` : `-${formatted}`;
+}
+
 function scoreColor(score: number, invert = false) {
   const s = invert ? 100 - score : score;
   if (s >= 70) return '#10b981';
@@ -323,9 +331,7 @@ export default function AnalysisPage() {
               />
               <SummaryCard
                 label="실현 손익"
-                value={result.summary.totalPnl >= 0
-                  ? `+$${result.summary.totalPnl.toFixed(2)}`
-                  : `-$${Math.abs(result.summary.totalPnl).toFixed(2)}`}
+                value={fmtUSD(result.summary.totalPnl)}
                 sub={`${fmtPct(result.summary.totalPnlPct)} 투자 대비`}
                 color={result.summary.totalPnl >= 0 ? 'var(--color-price-up)' : 'var(--color-price-down)'}
               />

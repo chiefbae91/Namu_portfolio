@@ -479,12 +479,23 @@ interface MonthlyProjectionRow {
   multiplier: number;
 }
 
+// Safe compound: monthlyPct is already in % (e.g. 1.23 means 1.23%)
+// Caps input at ±15 %/month to prevent astronomical results from outlier trades
+function safeCompound(monthlyPct: number, periods: number): number {
+  const capped = Math.min(15, Math.max(-30, monthlyPct)); // realistic monthly ceiling
+  const monthly = capped / 100;
+  const result  = (Math.pow(1 + monthly, periods) - 1) * 100;
+  if (!isFinite(result) || isNaN(result)) return 0;
+  return Math.round(result * 100) / 100;
+}
+
 function makeProjections(monthlyRate: number): MonthlyProjectionRow[] {
   const periods = [1, 3, 6, 9, 12, 24, 36, 48, 60, 120];
   const labels  = ['1개월','3개월','6개월','9개월','12개월','24개월','36개월','48개월','60개월','120개월'];
   return periods.map((m, i) => {
-    const mult = (1 + monthlyRate / 100) ** m;
-    return { months: m, label: labels[i], cumulativePct: (mult - 1) * 100, multiplier: mult };
+    const pct  = safeCompound(monthlyRate, m);
+    const mult = 1 + pct / 100;
+    return { months: m, label: labels[i], cumulativePct: pct, multiplier: mult };
   });
 }
 
@@ -520,11 +531,22 @@ function calcReturnPrediction(trades: ClosedTrade[], txs: TxRow[]): {
   const winning = trades.filter(t => t.realizedPnlPct > 0);
   const losing  = trades.filter(t => t.realizedPnlPct <= 0);
 
-  const winRate    = winning.length / trades.length;
+  const winRate = winning.length / trades.length;
+
+  // Cap individual trade gains/losses at 100% to avoid single-outlier distortion
+  // (e.g. a 300% meme-stock win skewing the whole model)
+  const cappedGainPct = winning.length > 0
+    ? winning.reduce((s, t) => s + Math.min(t.realizedPnlPct, 100), 0) / winning.length
+    : 0;
+  const cappedLossPct = losing.length > 0
+    ? Math.abs(losing.reduce((s, t) => s + Math.max(t.realizedPnlPct, -100), 0)) / losing.length
+    : 0;
+
+  // Raw (uncapped) averages for display only
   const avgGainPct = winning.length > 0 ? winning.reduce((s, t) => s + t.realizedPnlPct, 0) / winning.length : 0;
   const avgLossPct = losing.length > 0  ? Math.abs(losing.reduce((s, t) => s + t.realizedPnlPct, 0) / losing.length) : 0;
 
-  const expectedPerTrade = winRate * avgGainPct - (1 - winRate) * avgLossPct;
+  const expectedPerTrade = winRate * cappedGainPct - (1 - winRate) * cappedLossPct;
   const avgHoldDays = trades.reduce((s, t) => s + t.holdDays, 0) / trades.length || 30;
 
   const buyTxs = txs.filter(t => t.type === 'buy');
@@ -534,12 +556,17 @@ function calcReturnPrediction(trades: ClosedTrade[], txs: TxRow[]): {
   const dataMonths = Math.max(1, (maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
   const tradesPerMonth = buyTxs.length / dataMonths;
 
-  const turnsPerMonth   = tradesPerMonth * Math.min(avgHoldDays, 30) / 30;
-  const monthlyExpected = expectedPerTrade * Math.max(0.1, turnsPerMonth);
+  // turnsPerMonth: clamp to [0.1, 4] — prevents unrealistic multiplication
+  const rawTurns = tradesPerMonth * Math.min(avgHoldDays, 30) / 30;
+  const turnsPerMonth = Math.min(4, Math.max(0.1, rawTurns));
 
-  const yearlyExpected   = ((1 + monthlyExpected / 100) ** 12  - 1) * 100;
-  const fiveYearExpected = ((1 + monthlyExpected / 100) ** 60  - 1) * 100;
-  const tenYearExpected  = ((1 + monthlyExpected / 100) ** 120 - 1) * 100;
+  // monthlyExpected: cap at ±15% — even the best month-traders rarely exceed this consistently
+  const rawMonthly = expectedPerTrade * turnsPerMonth;
+  const monthlyExpected = Math.min(15, Math.max(-30, rawMonthly));
+
+  const yearlyExpected   = safeCompound(monthlyExpected, 12);
+  const fiveYearExpected = safeCompound(monthlyExpected, 60);
+  const tenYearExpected  = safeCompound(monthlyExpected, 120);
 
   const totalPnl  = trades.reduce((s, t) => s + t.realizedPnl, 0);
   const totalCost = trades.reduce((s, t) => s + t.buyPrice * t.quantity, 0);
@@ -547,18 +574,20 @@ function calcReturnPrediction(trades: ClosedTrade[], txs: TxRow[]): {
 
   const confidence = Math.min(85, 15 + Math.min(trades.length, 20) * 3);
 
-  // Net monthly win/loss amounts (just relative, no absolute $)
-  const netMonthlyWin  = winRate * avgGainPct * Math.max(0.1, turnsPerMonth);
-  const netMonthlyLoss = (1 - winRate) * avgLossPct * Math.max(0.1, turnsPerMonth);
+  // Net monthly win/loss: use capped values so display stays in sane range
+  const netMonthlyWin  = winRate * cappedGainPct * turnsPerMonth;
+  const netMonthlyLoss = (1 - winRate) * cappedLossPct * turnsPerMonth;
 
-  // Scenario analysis
+  // Scenario analysis — all use safeCompound to avoid overflow
+  const consRate = monthlyExpected * 0.69;
+  const aggrRate = monthlyExpected * 1.34;
   const scenarios: ReturnScenario[] = [
     {
       label: '보수적',
-      monthlyRate: monthlyExpected * 0.69,
-      yearlyPct:    ((1 + monthlyExpected * 0.69 / 100) ** 12  - 1) * 100,
-      fiveYearPct:  ((1 + monthlyExpected * 0.69 / 100) ** 60  - 1) * 100,
-      tenYearPct:   ((1 + monthlyExpected * 0.69 / 100) ** 120 - 1) * 100,
+      monthlyRate: Math.round(consRate * 100) / 100,
+      yearlyPct:    safeCompound(consRate, 12),
+      fiveYearPct:  safeCompound(consRate, 60),
+      tenYearPct:   safeCompound(consRate, 120),
       riskLevel: '낮음',
     },
     {
@@ -571,10 +600,10 @@ function calcReturnPrediction(trades: ClosedTrade[], txs: TxRow[]): {
     },
     {
       label: '공격적',
-      monthlyRate: monthlyExpected * 1.34,
-      yearlyPct:    ((1 + monthlyExpected * 1.34 / 100) ** 12  - 1) * 100,
-      fiveYearPct:  ((1 + monthlyExpected * 1.34 / 100) ** 60  - 1) * 100,
-      tenYearPct:   ((1 + monthlyExpected * 1.34 / 100) ** 120 - 1) * 100,
+      monthlyRate: Math.round(aggrRate * 100) / 100,
+      yearlyPct:    safeCompound(aggrRate, 12),
+      fiveYearPct:  safeCompound(aggrRate, 60),
+      tenYearPct:   safeCompound(aggrRate, 120),
       riskLevel: '높음',
     },
   ];
