@@ -7,6 +7,7 @@ import { BarChart2, ArrowLeft, RefreshCw } from 'lucide-react';
 import FOMOAnalysis, { FomoScoreData } from '@/components/FOMOAnalysis';
 import StopLossAnalysis, { StopLossData } from '@/components/StopLossAnalysis';
 import ConcentrationAnalysis, { ConcentrationData } from '@/components/ConcentrationAnalysis';
+import ReturnPrediction, { ReturnPredictionData } from '@/components/ReturnPrediction';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -40,17 +41,7 @@ interface AnalysisResult {
     detail: string;
     recommendation: string | null;
   };
-  returnPrediction: {
-    currentPnlPct: number;
-    currentPnl: number;
-    monthlyExpected: number;
-    yearlyExpected: number;
-    fiveYearExpected: number;
-    confidence: number;
-    winRate: number;
-    avgGainPct: number;
-    avgLossPct: number;
-  };
+  returnPrediction: ReturnPredictionData;
   recommendations: string[];
 }
 
@@ -402,47 +393,17 @@ export default function AnalysisPage() {
                 </div>
               </div>
 
-              {/* F. Return Prediction */}
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>F. 장기 수익률 예측</div>
-                {result.returnPrediction.confidence > 0 ? (
-                  <>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-                      {[
-                        { label: '실현 수익률',     value: fmtPct(result.returnPrediction.currentPnlPct) },
-                        { label: '월 예상',         value: fmtPct(result.returnPrediction.monthlyExpected) },
-                        { label: '1년 예상',         value: fmtPct(result.returnPrediction.yearlyExpected) },
-                        { label: '5년 예상 (복리)', value: fmtPct(result.returnPrediction.fiveYearExpected) },
-                      ].map(item => (
-                        <div key={item.label} style={{ background: 'var(--bg)', borderRadius: 6, padding: '8px 10px' }}>
-                          <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 2 }}>{item.label}</div>
-                          <div style={{
-                            fontSize: 15, fontWeight: 700,
-                            color: item.value.startsWith('+') ? 'var(--color-price-up)'
-                              : item.value.startsWith('-') ? 'var(--color-price-down)' : 'var(--text)',
-                          }}>{item.value}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
-                      신뢰도 {result.returnPrediction.confidence}%
-                      · 승률 {result.returnPrediction.winRate.toFixed(2)}%
-                      · 평균 수익 +{result.returnPrediction.avgGainPct.toFixed(2)}%
-                      · 평균 손실 -{result.returnPrediction.avgLossPct.toFixed(2)}%
-                    </div>
-                    <div style={{
-                      fontSize: 10, color: 'var(--muted)', lineHeight: 1.5, opacity: 0.7,
-                      borderTop: '1px solid var(--border)', paddingTop: 8,
-                    }}>
-                      ⚠ 예측은 과거 거래 성과 기반이며 미래 수익을 보장하지 않습니다.
-                    </div>
-                  </>
-                ) : (
+              {/* F. Return Prediction — full expandable card */}
+              {result.returnPrediction.confidence > 0 ? (
+                <ReturnPrediction data={result.returnPrediction} />
+              ) : (
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>F. 장기 수익률 예측</div>
                   <div style={{ color: 'var(--muted)', fontSize: 13 }}>
                     예측에 필요한 거래 데이터가 부족합니다. (최소 3건 필요)
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
 

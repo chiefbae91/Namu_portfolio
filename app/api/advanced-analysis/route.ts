@@ -463,18 +463,58 @@ function calcTaxEfficiency(trades: ClosedTrade[]): {
   };
 }
 
+interface ReturnScenario {
+  label: string;
+  monthlyRate: number;
+  yearlyPct: number;
+  fiveYearPct: number;
+  tenYearPct: number;
+  riskLevel: string;
+}
+
+interface MonthlyProjectionRow {
+  months: number;
+  label: string;
+  cumulativePct: number;
+  multiplier: number;
+}
+
+function makeProjections(monthlyRate: number): MonthlyProjectionRow[] {
+  const periods = [1, 3, 6, 9, 12, 24, 36, 48, 60, 120];
+  const labels  = ['1개월','3개월','6개월','9개월','12개월','24개월','36개월','48개월','60개월','120개월'];
+  return periods.map((m, i) => {
+    const mult = (1 + monthlyRate / 100) ** m;
+    return { months: m, label: labels[i], cumulativePct: (mult - 1) * 100, multiplier: mult };
+  });
+}
+
 function calcReturnPrediction(trades: ClosedTrade[], txs: TxRow[]): {
   currentPnlPct: number;
   currentPnl: number;
   monthlyExpected: number;
   yearlyExpected: number;
   fiveYearExpected: number;
+  tenYearExpected: number;
   confidence: number;
   winRate: number;
   avgGainPct: number;
   avgLossPct: number;
+  tradesPerMonth: number;
+  dataStartDate: string;
+  dataEndDate: string;
+  dataMonths: number;
+  netMonthlyWin: number;
+  netMonthlyLoss: number;
+  scenarios: ReturnScenario[];
+  projections: MonthlyProjectionRow[];
 } {
-  const empty = { currentPnlPct: 0, currentPnl: 0, monthlyExpected: 0, yearlyExpected: 0, fiveYearExpected: 0, confidence: 0, winRate: 0, avgGainPct: 0, avgLossPct: 0 };
+  const empty = {
+    currentPnlPct: 0, currentPnl: 0, monthlyExpected: 0,
+    yearlyExpected: 0, fiveYearExpected: 0, tenYearExpected: 0,
+    confidence: 0, winRate: 0, avgGainPct: 0, avgLossPct: 0,
+    tradesPerMonth: 0, dataStartDate: '', dataEndDate: '', dataMonths: 0,
+    netMonthlyWin: 0, netMonthlyLoss: 0, scenarios: [], projections: [],
+  };
   if (trades.length < 3) return empty;
 
   const winning = trades.filter(t => t.realizedPnlPct > 0);
@@ -488,23 +528,56 @@ function calcReturnPrediction(trades: ClosedTrade[], txs: TxRow[]): {
   const avgHoldDays = trades.reduce((s, t) => s + t.holdDays, 0) / trades.length || 30;
 
   const buyTxs = txs.filter(t => t.type === 'buy');
-  const dates  = buyTxs.map(t => new Date(t.date).getTime());
-  const monthsDiff = dates.length > 1
-    ? Math.max(1, (Math.max(...dates) - Math.min(...dates)) / (1000 * 60 * 60 * 24 * 30))
-    : 1;
-  const tradesPerMonth = buyTxs.length / monthsDiff;
+  const allDates = buyTxs.map(t => new Date(t.date).getTime());
+  const minDate = new Date(Math.min(...allDates));
+  const maxDate = new Date(Math.max(...allDates));
+  const dataMonths = Math.max(1, (maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
+  const tradesPerMonth = buyTxs.length / dataMonths;
 
-  const turnsPerMonth  = tradesPerMonth * Math.min(avgHoldDays, 30) / 30;
+  const turnsPerMonth   = tradesPerMonth * Math.min(avgHoldDays, 30) / 30;
   const monthlyExpected = expectedPerTrade * Math.max(0.1, turnsPerMonth);
 
-  const yearlyExpected   = ((1 + monthlyExpected / 100) ** 12 - 1) * 100;
-  const fiveYearExpected = ((1 + monthlyExpected / 100) ** 60 - 1) * 100;
+  const yearlyExpected   = ((1 + monthlyExpected / 100) ** 12  - 1) * 100;
+  const fiveYearExpected = ((1 + monthlyExpected / 100) ** 60  - 1) * 100;
+  const tenYearExpected  = ((1 + monthlyExpected / 100) ** 120 - 1) * 100;
 
   const totalPnl  = trades.reduce((s, t) => s + t.realizedPnl, 0);
   const totalCost = trades.reduce((s, t) => s + t.buyPrice * t.quantity, 0);
   const currentPnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
 
-  const confidence = Math.min(85, 15 + trades.length * 3);
+  const confidence = Math.min(85, 15 + Math.min(trades.length, 20) * 3);
+
+  // Net monthly win/loss amounts (just relative, no absolute $)
+  const netMonthlyWin  = winRate * avgGainPct * Math.max(0.1, turnsPerMonth);
+  const netMonthlyLoss = (1 - winRate) * avgLossPct * Math.max(0.1, turnsPerMonth);
+
+  // Scenario analysis
+  const scenarios: ReturnScenario[] = [
+    {
+      label: '보수적',
+      monthlyRate: monthlyExpected * 0.69,
+      yearlyPct:    ((1 + monthlyExpected * 0.69 / 100) ** 12  - 1) * 100,
+      fiveYearPct:  ((1 + monthlyExpected * 0.69 / 100) ** 60  - 1) * 100,
+      tenYearPct:   ((1 + monthlyExpected * 0.69 / 100) ** 120 - 1) * 100,
+      riskLevel: '낮음',
+    },
+    {
+      label: '중립',
+      monthlyRate: monthlyExpected,
+      yearlyPct:   yearlyExpected,
+      fiveYearPct: fiveYearExpected,
+      tenYearPct:  tenYearExpected,
+      riskLevel: '중간',
+    },
+    {
+      label: '공격적',
+      monthlyRate: monthlyExpected * 1.34,
+      yearlyPct:    ((1 + monthlyExpected * 1.34 / 100) ** 12  - 1) * 100,
+      fiveYearPct:  ((1 + monthlyExpected * 1.34 / 100) ** 60  - 1) * 100,
+      tenYearPct:   ((1 + monthlyExpected * 1.34 / 100) ** 120 - 1) * 100,
+      riskLevel: '높음',
+    },
+  ];
 
   return {
     currentPnl: totalPnl,
@@ -512,10 +585,19 @@ function calcReturnPrediction(trades: ClosedTrade[], txs: TxRow[]): {
     monthlyExpected,
     yearlyExpected,
     fiveYearExpected,
+    tenYearExpected,
     confidence,
     winRate: winRate * 100,
     avgGainPct,
     avgLossPct,
+    tradesPerMonth,
+    dataStartDate: minDate.toISOString().slice(0, 7),
+    dataEndDate:   maxDate.toISOString().slice(0, 7),
+    dataMonths: Math.round(dataMonths),
+    netMonthlyWin,
+    netMonthlyLoss,
+    scenarios,
+    projections: makeProjections(monthlyExpected),
   };
 }
 
