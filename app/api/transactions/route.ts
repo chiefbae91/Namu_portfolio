@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     .order('transaction_date', { ascending: false })
     .order('id', { ascending: false });
 
-  if (ticker) query = query.eq('ticker', ticker);
+  if (ticker) query = query.ilike('ticker', ticker);
   if (accountIds) {
     const ids = accountIds.split(',').filter(Boolean);
     if (ids.length > 0) query = query.in('account_id', ids);
@@ -38,6 +38,7 @@ export async function GET(req: NextRequest) {
     ...tx,
     date: tx.transaction_date,
     notes: tx.note,
+    type: (tx.type ?? '').toLowerCase(),   // normalise 'BUY'→'buy' for client filters
     currency: 'USD',
     lot_method: null,
     subtype: null,

@@ -152,7 +152,7 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
   // When the transactions list changes (e.g. account switch), reset filter if the
   // selected ticker no longer exists in the new data, and clear all selections.
   useEffect(() => {
-    if (tickerFilter && !transactions.some(t => t.ticker === tickerFilter)) {
+    if (tickerFilter && !transactions.some(t => t.ticker?.toUpperCase() === tickerFilter.toUpperCase())) {
       setTickerFilter('');
     }
     setSelected(new Set());
@@ -166,9 +166,10 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
     .filter(t => !tickerFilter || (t.ticker && t.ticker.toUpperCase().includes(tickerFilter.toUpperCase())))
     .filter(t => {
       if (!typeFilter) return true;
+      const tType = t.type?.toLowerCase() ?? '';
       if (typeFilter === 'dividend_reinvest') return t.subtype === 'DIVIDEND_REINVEST';
-      if (typeFilter === 'buy') return t.type === 'buy' && t.subtype !== 'DIVIDEND_REINVEST';
-      return t.type === typeFilter;
+      if (typeFilter === 'buy') return tType === 'buy' && t.subtype !== 'DIVIDEND_REINVEST';
+      return tType === typeFilter;
     });
   const filteredIds = filtered.map(t => t.id);
 
