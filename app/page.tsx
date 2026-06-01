@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Settings, RefreshCw, LogOut, LogIn, HelpCircle } from 'lucide-react';
+import { Settings, RefreshCw, LogOut, LogIn, HelpCircle, BarChart2 } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
 import { Account, AccountBreakdown, AccountType, ExchangeRates, HintAlert, HintNotification, PortfolioPosition, SummaryData, Transaction, TradingHint, WatchlistQuote } from '@/lib/types';
@@ -600,6 +600,17 @@ export default function Home() {
             }}
             onTickerClick={ticker => { setAnalysisInitialTab('hints'); setAnalysisTicker(ticker); }}
           />
+        )}
+
+        {!!userEmail && (
+          <Link
+            href="/analysis"
+            title="거래 성향 분석"
+            style={{ background: 'none', color: 'var(--muted)', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}
+          >
+            <BarChart2 size={15} />
+            <span className="mobile-hide">분석</span>
+          </Link>
         )}
 
         <Link

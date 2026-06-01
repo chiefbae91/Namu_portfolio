@@ -527,7 +527,7 @@ export default function TradeAnalysisModal({
           <div style={{ width: 1, height: 18, background: 'var(--border)' }} />
           {/* Toggles */}
           <Toggle checked={showTrades}   onChange={setShowTrades}                                                                                    label="Trades"   />
-          <Toggle checked={showHints}    onChange={on => { setShowHints(on); if (on) { setActiveTab('hints'); if (!hintsLoaded && !hintsLoading) refreshHints(); } }} label="Hints"    />
+          <Toggle checked={showHints}    onChange={on => { setShowHints(on); if (on) { setActiveTab('hints'); if (!hintsLoaded && !hintsLoading) refreshHints(); } }} label="Trading Hints" />
           <Toggle checked={showPatterns} onChange={handlePatternsToggle}                                                                                            label="Patterns" />
         </div>
 
