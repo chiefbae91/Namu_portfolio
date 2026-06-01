@@ -306,25 +306,43 @@ function calcConcentration(txs: TxRow[]): {
   recommendation: string | null;
   expectedImprovement: { targetPct: number };
 } {
-  const volByTicker = new Map<string, number>();
+  // Build current positions: net shares (buys - sells) per ticker
+  // Use average cost basis of all buys as price proxy (no live prices available here)
+  const netShares  = new Map<string, number>();
+  const buyTotal   = new Map<string, number>(); // cumulative buy cost
+  const buyQtySum  = new Map<string, number>(); // cumulative buy qty
+
   for (const tx of txs) {
-    if (tx.type !== 'buy') continue;
-    volByTicker.set(tx.ticker, (volByTicker.get(tx.ticker) || 0) + tx.quantity * tx.price);
+    if (tx.type === 'buy') {
+      netShares.set(tx.ticker, (netShares.get(tx.ticker) ?? 0) + tx.quantity);
+      buyTotal.set(tx.ticker,  (buyTotal.get(tx.ticker)  ?? 0) + tx.quantity * tx.price);
+      buyQtySum.set(tx.ticker, (buyQtySum.get(tx.ticker) ?? 0) + tx.quantity);
+    } else if (tx.type === 'sell') {
+      netShares.set(tx.ticker, (netShares.get(tx.ticker) ?? 0) - tx.quantity);
+    }
   }
 
-  const total = [...volByTicker.values()].reduce((a, b) => a + b, 0);
+  // Only keep currently-held tickers (net > 0)
+  const positions: Array<{ ticker: string; value: number }> = [];
+  for (const [ticker, net] of netShares) {
+    if (net < 0.001) continue;
+    const avgCost = (buyTotal.get(ticker) ?? 0) / (buyQtySum.get(ticker) ?? 1);
+    positions.push({ ticker, value: net * avgCost });
+  }
+
+  const total = positions.reduce((s, p) => s + p.value, 0);
   if (total === 0) {
     return {
       score: 0, topHoldings: [], top3pct: 0, top5pct: 0, top10pct: 0,
       totalTickers: 0, hhi: 0, levelNum: 2, level: '데이터 부족',
       scenario: { top1impact: 0, top3impact: 0 },
-      detail: '데이터 부족', recommendation: null,
+      detail: '현재 보유 포지션 없음', recommendation: null,
       expectedImprovement: { targetPct: 30 },
     };
   }
 
-  const sorted = [...volByTicker.entries()]
-    .map(([ticker, vol]) => ({ ticker, pct: (vol / total) * 100 }))
+  const sorted = positions
+    .map(p => ({ ticker: p.ticker, pct: (p.value / total) * 100 }))
     .sort((a, b) => b.pct - a.pct);
 
   const hhi = sorted.reduce((s, h) => s + (h.pct / 100) ** 2, 0);
@@ -367,7 +385,7 @@ function calcConcentration(txs: TxRow[]): {
       top1impact: Math.round(top1impact * 100) / 100,
       top3impact: Math.round(top3impact * 100) / 100,
     },
-    detail: `집중도: Top 3 = ${top3pct.toFixed(2)}% — ${level}`,
+    detail: `집중도: Top 3 = ${top3pct.toFixed(2)}% (현재 보유 기준) — ${level}`,
     recommendation,
     expectedImprovement: { targetPct: Math.max(20, top3pct - 10) },
   };

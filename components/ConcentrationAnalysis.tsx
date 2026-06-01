@@ -97,7 +97,7 @@ export default function ConcentrationAnalysis({ data }: { data: ConcentrationDat
             background: levelBg(data.levelNum), color,
           }}>{data.level}</div>
           <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6, lineHeight: 1.6 }}>
-            Top 3 = {data.top3pct.toFixed(2)}%
+            현재 보유 기준 — Top 3 = {data.top3pct.toFixed(2)}%
             &nbsp;·&nbsp; Top 5 = {data.top5pct.toFixed(2)}%
             &nbsp;·&nbsp; 총 {data.totalTickers}개 종목
           </div>
@@ -124,8 +124,8 @@ export default function ConcentrationAnalysis({ data }: { data: ConcentrationDat
           }}>
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>집중투자 성향이란?</div>
             <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.8 }}>
-              포트폴리오가 <strong>특정 종목에 얼마나 집중</strong>되어 있는지 측정합니다.
-              현재 Top 3 종목이 전체의 {data.top3pct.toFixed(1)}%를 차지합니다.
+              <strong>현재 보유 포지션</strong>이 특정 종목에 얼마나 집중되어 있는지 측정합니다.
+              (매도한 종목 제외, 코스트 베이시스 기준) 현재 Top 3 종목이 전체의 {data.top3pct.toFixed(1)}%를 차지합니다.
               {data.levelNum === 2 && (
                 <><br />• 다양한 종목에 투자 중<br />• 위험이 분산되어 있음<br />• 균형 잡힌 포트폴리오</>
               )}
@@ -195,7 +195,7 @@ export default function ConcentrationAnalysis({ data }: { data: ConcentrationDat
           {/* Top 10 Holdings Table */}
           {data.topHoldings.length > 0 && (
             <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>포트폴리오 분포 (매수금액 기준 Top 10)</div>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>포트폴리오 분포 (현재 보유 포지션 Top 10)</div>
               <div style={{ overflowX: 'auto' }}>
                 <table>
                   <thead>
