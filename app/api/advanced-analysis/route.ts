@@ -709,7 +709,7 @@ export async function POST(req: NextRequest) {
   const txs: TxRow[] = (raw || [])
     .map((r: Record<string, unknown>) => ({
       date:       r.transaction_date as string,
-      ticker:     r.ticker as string,
+      ticker:     String(r.ticker ?? '').toUpperCase(),
       type:       String(r.type).toLowerCase(),
       quantity:   Number(r.quantity),
       price:      Number(r.price),
