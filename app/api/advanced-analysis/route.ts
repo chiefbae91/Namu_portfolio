@@ -291,7 +291,33 @@ function calcStopLossScore(trades: ClosedTrade[]): {
   };
 }
 
-function calcConcentration(txs: TxRow[]): {
+// Fetch live prices for a list of tickers in parallel.
+// Returns a map of ticker → current price; silently skips failures.
+async function fetchCurrentPrices(tickers: string[]): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (tickers.length === 0) return map;
+
+  await Promise.all(
+    tickers.map(async ticker => {
+      try {
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`;
+        const res = await fetch(url, {
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+          cache: 'no-store',
+          signal: AbortSignal.timeout(6000),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const price: number | undefined = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+        if (typeof price === 'number' && price > 0) map.set(ticker, price);
+      } catch { /* ignore per-ticker failures */ }
+    })
+  );
+
+  return map;
+}
+
+async function calcConcentration(txs: TxRow[]): Promise<{
   score: number;
   topHoldings: { ticker: string; pct: number }[];
   top3pct: number;
@@ -305,12 +331,11 @@ function calcConcentration(txs: TxRow[]): {
   detail: string;
   recommendation: string | null;
   expectedImprovement: { targetPct: number };
-} {
-  // Build current positions: net shares (buys - sells) per ticker
-  // Use average cost basis of all buys as price proxy (no live prices available here)
-  const netShares  = new Map<string, number>();
-  const buyTotal   = new Map<string, number>(); // cumulative buy cost
-  const buyQtySum  = new Map<string, number>(); // cumulative buy qty
+}> {
+  // Step 1: compute net positions from transaction history
+  const netShares = new Map<string, number>();
+  const buyTotal  = new Map<string, number>();
+  const buyQtySum = new Map<string, number>();
 
   for (const tx of txs) {
     if (tx.type === 'buy') {
@@ -322,13 +347,22 @@ function calcConcentration(txs: TxRow[]): {
     }
   }
 
-  // Only keep currently-held tickers (net > 0)
-  const positions: Array<{ ticker: string; value: number }> = [];
+  // Step 2: keep tickers with positive net shares, compute cost basis
+  const held: Array<{ ticker: string; netShares: number; avgCost: number }> = [];
   for (const [ticker, net] of netShares) {
     if (net < 0.001) continue;
     const avgCost = (buyTotal.get(ticker) ?? 0) / (buyQtySum.get(ticker) ?? 1);
-    positions.push({ ticker, value: net * avgCost });
+    held.push({ ticker, netShares: net, avgCost });
   }
+
+  // Step 3: fetch live prices for all held tickers (portfolio-accurate market values)
+  const livePrices = await fetchCurrentPrices(held.map(h => h.ticker));
+
+  // Step 4: compute market value — prefer live price, fall back to avg cost
+  const positions: Array<{ ticker: string; value: number }> = held.map(h => {
+    const price = livePrices.get(h.ticker) ?? h.avgCost;
+    return { ticker: h.ticker, value: h.netShares * price };
+  });
 
   const total = positions.reduce((s, p) => s + p.value, 0);
   if (total === 0) {
@@ -692,10 +726,12 @@ export async function POST(req: NextRequest) {
 
   const fomo        = calcFomoScore(txs, trades);
   const stopLoss    = calcStopLossScore(trades);
-  const conc        = calcConcentration(txs);
+  const [conc, prediction] = await Promise.all([
+    calcConcentration(txs),
+    Promise.resolve(calcReturnPrediction(trades, txs)),
+  ]);
   const style       = calcTradingStyle(trades, txs);
   const tax         = calcTaxEfficiency(trades);
-  const prediction  = calcReturnPrediction(trades, txs);
 
   const totalTrades = trades.length;
   const winningTrades = trades.filter(t => t.realizedPnlPct > 0).length;
