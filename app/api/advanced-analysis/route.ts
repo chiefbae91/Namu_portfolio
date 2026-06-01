@@ -345,8 +345,8 @@ export async function POST(req: NextRequest) {
     .from('transactions')
     .select('account_id, ticker, type, quantity, price, fee, transaction_date')
     .eq('user_id', user.id)
-    .in('type', ['buy', 'sell', 'dividend'])
-    .order('transaction_date', { ascending: true });
+    .order('transaction_date', { ascending: true })
+    .limit(10000);
 
   if (accountIds && accountIds.length > 0) {
     query = query.in('account_id', accountIds);
@@ -355,17 +355,19 @@ export async function POST(req: NextRequest) {
   const { data: raw, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  // Normalise type to lowercase to handle 'Buy'/'buy'/'BUY' variants
+  const VALID_TYPES = new Set(['buy', 'sell', 'dividend']);
   const txs: TxRow[] = (raw || [])
     .map((r: Record<string, unknown>) => ({
       date:       r.transaction_date as string,
       ticker:     r.ticker as string,
-      type:       r.type as string,
+      type:       String(r.type).toLowerCase(),
       quantity:   Number(r.quantity),
       price:      Number(r.price),
       fee:        Number(r.fee),
       account_id: r.account_id as string,
     }))
-    .filter(t => t.ticker && t.quantity > 0 && t.price > 0);
+    .filter(t => t.ticker && t.quantity > 0 && t.price > 0 && VALID_TYPES.has(t.type));
 
   if (txs.length === 0) {
     return NextResponse.json({ empty: true });
