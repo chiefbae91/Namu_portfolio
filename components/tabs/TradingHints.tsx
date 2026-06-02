@@ -112,14 +112,18 @@ export default function TradingHints({ hints, onEdit, onDelete, onSymbolClick, o
 
   const today = toISODate(new Date());
 
+  const normalizeTicker = (t: string) => t.trim().toUpperCase();
+
   const tickers = [...new Set(hints.map(h => h.ticker))].sort();
 
   const activeRange = dateMode === 'custom'
     ? (customFrom || customTo ? { from: customFrom || '0000-01-01', to: customTo || today } : null)
     : getPresetRange(dateMode);
 
+  if (tickerFilter) console.log('[TradingHints] Exact Match:', normalizeTicker(tickerFilter));
+
   const filtered = hints.filter(h => {
-    if (tickerFilter && !h.ticker.toUpperCase().includes(tickerFilter.toUpperCase())) return false;
+    if (tickerFilter && h.ticker.toUpperCase() !== normalizeTicker(tickerFilter)) return false;
     if (typeFilter && h.type !== typeFilter) return false;
     if (activeRange) {
       if (activeRange.from && h.hint_date < activeRange.from) return false;

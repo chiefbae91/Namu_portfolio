@@ -161,9 +161,14 @@ export default function TransactionHistory({ transactions, currency, rates, onEd
 
   const fmt = (usd: number) => formatCurrency(usd, currency, rates);
 
+  const normalizeTicker = (t: string) => t.trim().toUpperCase();
+
   const tickers = [...new Set(transactions.map(t => t.ticker).filter(Boolean))].sort();
+
+  if (tickerFilter) console.log('[TransactionHistory] Exact Match:', normalizeTicker(tickerFilter));
+
   const filtered = transactions
-    .filter(t => !tickerFilter || (t.ticker && t.ticker.toUpperCase().includes(tickerFilter.toUpperCase())))
+    .filter(t => !tickerFilter || (t.ticker && t.ticker.toUpperCase() === normalizeTicker(tickerFilter)))
     .filter(t => {
       if (!typeFilter) return true;
       const tType = t.type?.toLowerCase() ?? '';

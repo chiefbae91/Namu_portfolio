@@ -21,7 +21,11 @@ export async function GET(req: NextRequest) {
     .order('transaction_date', { ascending: false })
     .order('id', { ascending: false });
 
-  if (ticker) query = query.ilike('ticker', ticker);
+  if (ticker) {
+    const normalizedTicker = ticker.trim().toUpperCase();
+    console.log('[Transactions] Exact Match:', normalizedTicker);
+    query = query.eq('ticker', normalizedTicker);
+  }
   if (accountIds) {
     const ids = accountIds.split(',').filter(Boolean);
     if (ids.length > 0) query = query.in('account_id', ids);
