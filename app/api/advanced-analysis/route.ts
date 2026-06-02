@@ -668,26 +668,34 @@ function calcReturnPrediction(trades: ClosedTrade[], txs: TxRow[]): {
   };
   if (trades.length < 3) return empty;
 
+  // ── 실현 수익률: 총이익 ÷ 총투자금 × 100 ───────────────────────────────────
+  const totalPnl  = trades.reduce((s, t) => s + t.realizedPnl, 0);
+  const totalCost = trades.reduce((s, t) => s + t.buyPrice * t.quantity, 0);
+  const currentPnlPct = totalCost > 0
+    ? Math.round((totalPnl / totalCost) * 100 * 100) / 100
+    : 0;
+
+  // ── 월 평균: 실현 수익률 ÷ 12 ─────────────────────────────────────────────
+  const monthlyExpected = Math.round((currentPnlPct / 12) * 100) / 100;
+
+  // ── 1년 예상: 실현 수익률과 동일 ─────────────────────────────────────────
+  const yearlyExpected = Math.round(currentPnlPct * 100) / 100;
+
+  // ── 5년 예상: (1 + 실현수익률/100)^5 - 1 × 100 (복리) ───────────────────
+  const fiveYearExpected = Math.round(((Math.pow(1 + currentPnlPct / 100, 5) - 1) * 100) * 100) / 100;
+
+  // ── 10년 예상 (복리) ──────────────────────────────────────────────────────
+  const tenYearExpected = Math.round(((Math.pow(1 + currentPnlPct / 100, 10) - 1) * 100) * 100) / 100;
+
+  // ── 신뢰도: (거래수 ÷ 10) × 10% (최대 100%) ─────────────────────────────
+  const confidence = Math.min(100, Math.round((trades.length / 10) * 10 * 100) / 100);
+
   const winning = trades.filter(t => t.realizedPnlPct > 0);
   const losing  = trades.filter(t => t.realizedPnlPct <= 0);
-
   const winRate = winning.length / trades.length;
 
-  // Cap individual trade gains/losses at 100% to avoid single-outlier distortion
-  // (e.g. a 300% meme-stock win skewing the whole model)
-  const cappedGainPct = winning.length > 0
-    ? winning.reduce((s, t) => s + Math.min(t.realizedPnlPct, 100), 0) / winning.length
-    : 0;
-  const cappedLossPct = losing.length > 0
-    ? Math.abs(losing.reduce((s, t) => s + Math.max(t.realizedPnlPct, -100), 0)) / losing.length
-    : 0;
-
-  // Raw (uncapped) averages for display only
   const avgGainPct = winning.length > 0 ? winning.reduce((s, t) => s + t.realizedPnlPct, 0) / winning.length : 0;
   const avgLossPct = losing.length > 0  ? Math.abs(losing.reduce((s, t) => s + t.realizedPnlPct, 0) / losing.length) : 0;
-
-  const expectedPerTrade = winRate * cappedGainPct - (1 - winRate) * cappedLossPct;
-  const avgHoldDays = trades.reduce((s, t) => s + t.holdDays, 0) / trades.length || 30;
 
   const buyTxs = txs.filter(t => t.type === 'buy');
   const allDates = buyTxs.map(t => new Date(t.date).getTime());
@@ -696,38 +704,30 @@ function calcReturnPrediction(trades: ClosedTrade[], txs: TxRow[]): {
   const dataMonths = Math.max(1, (maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
   const tradesPerMonth = buyTxs.length / dataMonths;
 
-  // turnsPerMonth: clamp to [0.1, 4] — prevents unrealistic multiplication
-  const rawTurns = tradesPerMonth * Math.min(avgHoldDays, 30) / 30;
-  const turnsPerMonth = Math.min(4, Math.max(0.1, rawTurns));
+  const netMonthlyWin  = winRate * avgGainPct * (tradesPerMonth / Math.max(1, dataMonths));
+  const netMonthlyLoss = (1 - winRate) * avgLossPct * (tradesPerMonth / Math.max(1, dataMonths));
 
-  // monthlyExpected: cap at ±15% — even the best month-traders rarely exceed this consistently
-  const rawMonthly = expectedPerTrade * turnsPerMonth;
-  const monthlyExpected = Math.min(15, Math.max(-30, rawMonthly));
+  // ── 콘솔 로그: 계산 과정 ──────────────────────────────────────────────────
+  console.log('[ReturnPrediction] 계산 과정:');
+  console.log(`  총 체결 거래수: ${trades.length}건`);
+  console.log(`  총이익: $${totalPnl.toFixed(2)}`);
+  console.log(`  총투자금: $${totalCost.toFixed(2)}`);
+  console.log(`  실현 수익률: ${totalPnl.toFixed(2)} ÷ ${totalCost.toFixed(2)} × 100 = ${currentPnlPct.toFixed(2)}%`);
+  console.log(`  월 평균: ${currentPnlPct.toFixed(2)} ÷ 12 = ${monthlyExpected.toFixed(2)}%`);
+  console.log(`  1년 예상: ${yearlyExpected.toFixed(2)}% (실현 수익률과 동일)`);
+  console.log(`  5년 예상 (복리): (1 + ${currentPnlPct.toFixed(2)}/100)^5 - 1 × 100 = ${fiveYearExpected.toFixed(2)}%`);
+  console.log(`  신뢰도: (${trades.length} ÷ 10) × 10% = ${confidence.toFixed(2)}% (최대 100%)`);
 
-  const yearlyExpected   = safeCompound(monthlyExpected, 12);
-  const fiveYearExpected = safeCompound(monthlyExpected, 60);
-  const tenYearExpected  = safeCompound(monthlyExpected, 120);
-
-  const totalPnl  = trades.reduce((s, t) => s + t.realizedPnl, 0);
-  const totalCost = trades.reduce((s, t) => s + t.buyPrice * t.quantity, 0);
-  const currentPnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
-
-  const confidence = Math.min(85, 15 + Math.min(trades.length, 20) * 3);
-
-  // Net monthly win/loss: use capped values so display stays in sane range
-  const netMonthlyWin  = winRate * cappedGainPct * turnsPerMonth;
-  const netMonthlyLoss = (1 - winRate) * cappedLossPct * turnsPerMonth;
-
-  // Scenario analysis — all use safeCompound to avoid overflow
-  const consRate = monthlyExpected * 0.69;
-  const aggrRate = monthlyExpected * 1.34;
+  // ── 시나리오 분석 ─────────────────────────────────────────────────────────
+  const consRate = currentPnlPct * 0.69;
+  const aggrRate = currentPnlPct * 1.34;
   const scenarios: ReturnScenario[] = [
     {
       label: '보수적',
-      monthlyRate: Math.round(consRate * 100) / 100,
-      yearlyPct:    safeCompound(consRate, 12),
-      fiveYearPct:  safeCompound(consRate, 60),
-      tenYearPct:   safeCompound(consRate, 120),
+      monthlyRate: Math.round((consRate / 12) * 100) / 100,
+      yearlyPct:    Math.round(consRate * 100) / 100,
+      fiveYearPct:  Math.round(((Math.pow(1 + consRate / 100, 5) - 1) * 100) * 100) / 100,
+      tenYearPct:   Math.round(((Math.pow(1 + consRate / 100, 10) - 1) * 100) * 100) / 100,
       riskLevel: '낮음',
     },
     {
@@ -740,10 +740,10 @@ function calcReturnPrediction(trades: ClosedTrade[], txs: TxRow[]): {
     },
     {
       label: '공격적',
-      monthlyRate: Math.round(aggrRate * 100) / 100,
-      yearlyPct:    safeCompound(aggrRate, 12),
-      fiveYearPct:  safeCompound(aggrRate, 60),
-      tenYearPct:   safeCompound(aggrRate, 120),
+      monthlyRate: Math.round((aggrRate / 12) * 100) / 100,
+      yearlyPct:    Math.round(aggrRate * 100) / 100,
+      fiveYearPct:  Math.round(((Math.pow(1 + aggrRate / 100, 5) - 1) * 100) * 100) / 100,
+      tenYearPct:   Math.round(((Math.pow(1 + aggrRate / 100, 10) - 1) * 100) * 100) / 100,
       riskLevel: '높음',
     },
   ];

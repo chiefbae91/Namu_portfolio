@@ -95,11 +95,21 @@ export default function ReturnPrediction({ data }: { data: ReturnPredictionData 
         {/* Confidence + expand */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
           <div style={{
-            background: 'var(--bg)', borderRadius: 8, padding: '8px 14px', textAlign: 'center',
+            background: 'var(--bg)', borderRadius: 8, padding: '8px 14px', textAlign: 'center', minWidth: 90,
           }}>
-            <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 2 }}>신뢰도</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: confidenceColor(conf) }}>
+            <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4 }}>신뢰도</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: confidenceColor(conf), marginBottom: 6 }}>
               {conf.toFixed(2)}%
+            </div>
+            {/* Confidence bar */}
+            <div style={{ height: 5, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
+              <div style={{
+                height: '100%',
+                width: `${Math.min(100, conf)}%`,
+                background: confidenceColor(conf),
+                borderRadius: 3,
+                transition: 'width 0.4s ease',
+              }} />
             </div>
           </div>
           <button onClick={() => setExpanded(v => !v)} style={{
