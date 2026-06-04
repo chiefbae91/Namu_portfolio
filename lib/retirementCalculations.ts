@@ -3,6 +3,7 @@ export interface RetirementAccount {
   name: string;
   currentBalance: number;
   annualReturn: number;
+  withdrawalRate: number;   // % of post-return balance to withdraw each year
   withdrawalStartYear: number;
 }
 
@@ -109,7 +110,7 @@ export function calculateRetirementPlan(params: RetirementParams): RetirementRes
 
       let withdrawal = 0;
       if (year >= acc.withdrawalStartYear) {
-        withdrawal = newBalance * 0.04;
+        withdrawal = newBalance * (acc.withdrawalRate / 100);
         newBalance -= withdrawal;
       }
       newBalance = Math.max(0, newBalance);

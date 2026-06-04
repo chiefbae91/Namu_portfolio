@@ -67,6 +67,7 @@ export function RetirementInputPanel({ initialAccounts, onCalculate, onReset }: 
         name: a.name,
         currentBalance: a.totalValue,
         annualReturn: 7.5,
+        withdrawalRate: 4,
         withdrawalStartYear: new Date().getFullYear(),
       })),
     }));
@@ -126,26 +127,55 @@ export function RetirementInputPanel({ initialAccounts, onCalculate, onReset }: 
         {inputs.accounts.length === 0 && (
           <p style={{ fontSize: 11, color: 'var(--muted)' }}>잔액 있는 계좌를 불러오는 중...</p>
         )}
-        {inputs.accounts.map((acc, idx) => (
-          <div key={idx} style={cardStyle}>
-            <p style={{ margin: '0 0 7px', fontSize: 12, fontWeight: 500 }}>{acc.name}</p>
-            <p style={{ margin: '0 0 7px', fontSize: 10, color: 'var(--muted)' }}>
-              현재 잔액: ${acc.currentBalance.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-            </p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--muted)', display: 'block', marginBottom: 2 }}>연 수익률 (%)</label>
-                <input type="number" step="0.1" value={acc.annualReturn} style={inputStyle}
-                  onChange={e => updateAccount(idx, 'annualReturn', +e.target.value)} />
+        {inputs.accounts.map((acc, idx) => {
+          const annualWithdrawal = acc.currentBalance * (1 + acc.annualReturn / 100) * (acc.withdrawalRate / 100);
+          return (
+            <div key={idx} style={cardStyle}>
+              <p style={{ margin: '0 0 7px', fontSize: 12, fontWeight: 500 }}>{acc.name}</p>
+              <p style={{ margin: '0 0 8px', fontSize: 10, color: 'var(--muted)' }}>
+                현재 잔액: ${acc.currentBalance.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+              </p>
+
+              {/* 연 수익률 + 출금 시작 년도 */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+                <div>
+                  <label style={{ fontSize: 10, color: 'var(--muted)', display: 'block', marginBottom: 2 }}>연 수익률 (%)</label>
+                  <input type="number" step="0.1" value={acc.annualReturn} style={inputStyle}
+                    onChange={e => updateAccount(idx, 'annualReturn', +e.target.value)} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, color: 'var(--muted)', display: 'block', marginBottom: 2 }}>출금 시작 년도</label>
+                  <input type="number" value={acc.withdrawalStartYear} style={inputStyle}
+                    onChange={e => updateAccount(idx, 'withdrawalStartYear', +e.target.value)} />
+                </div>
               </div>
+
+              {/* 인출률 슬라이더 */}
               <div>
-                <label style={{ fontSize: 10, color: 'var(--muted)', display: 'block', marginBottom: 2 }}>출금 시작 년도</label>
-                <input type="number" value={acc.withdrawalStartYear} style={inputStyle}
-                  onChange={e => updateAccount(idx, 'withdrawalStartYear', +e.target.value)} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <label style={{ fontSize: 10, color: 'var(--muted)' }}>연 인출률</label>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: acc.withdrawalRate <= 4 ? 'var(--green)' : acc.withdrawalRate <= 7 ? '#f59e0b' : 'var(--red)' }}>
+                    {acc.withdrawalRate.toFixed(1)}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0} max={15} step={0.5}
+                  value={acc.withdrawalRate}
+                  onChange={e => updateAccount(idx, 'withdrawalRate', +e.target.value)}
+                  style={{ width: '100%', accentColor: acc.withdrawalRate <= 4 ? 'var(--green)' : acc.withdrawalRate <= 7 ? '#f59e0b' : 'var(--red)', cursor: 'pointer' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+                  <span style={{ fontSize: 9, color: 'var(--muted)' }}>0%</span>
+                  <span style={{ fontSize: 10, color: 'var(--muted)' }}>
+                    ≈ ${annualWithdrawal.toLocaleString('en-US', { maximumFractionDigits: 0 })}/년
+                  </span>
+                  <span style={{ fontSize: 9, color: 'var(--muted)' }}>15%</span>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Social Security */}

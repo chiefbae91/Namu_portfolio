@@ -7,7 +7,7 @@ function baseParams(overrides: Partial<RetirementParams> = {}): RetirementParams
     startYear: 2026,
     endYear: 2028,             // 3년: 결과 검증 범위를 좁게 유지
     accounts: [
-      { id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: 7, withdrawalStartYear: 2026 },
+      { id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: 7, withdrawalRate: 4, withdrawalStartYear: 2026 },
     ],
     socialSecurity: { startYear: 2026, monthlyAmount: 1_000, colaPercent: 0 },
     livingExpenses: [{ year: 2026, amount: 30_000 }],
@@ -21,7 +21,7 @@ function baseParams(overrides: Partial<RetirementParams> = {}): RetirementParams
 describe('연 수익률(annualReturn)', () => {
   it('수익률 0% — 잔액은 출금(4%)만큼씩만 감소한다', () => {
     const { plan } = calculateRetirementPlan(baseParams({
-      accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: 0, withdrawalStartYear: 2026 }],
+      accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: 0, withdrawalRate: 4, withdrawalStartYear: 2026 }],
       socialSecurity: { startYear: 9999, monthlyAmount: 0, colaPercent: 0 }, // SS 제외
       livingExpenses: [{ year: 2026, amount: 0 }],                           // 생활비 제외
     }));
@@ -51,9 +51,9 @@ describe('연 수익률(annualReturn)', () => {
   });
 
   it('수익률이 높을수록 3년 후 잔액이 더 크다', () => {
-    const low  = calculateRetirementPlan(baseParams({ accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: 4, withdrawalStartYear: 2026 }] }));
+    const low  = calculateRetirementPlan(baseParams({ accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: 4, withdrawalRate: 4, withdrawalStartYear: 2026 }] }));
     const mid  = calculateRetirementPlan(baseParams());                   // 7%
-    const high = calculateRetirementPlan(baseParams({ accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: 10, withdrawalStartYear: 2026 }] }));
+    const high = calculateRetirementPlan(baseParams({ accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: 10, withdrawalRate: 4, withdrawalStartYear: 2026 }] }));
 
     expect(low.summary.endingAssets).toBeLessThan(mid.summary.endingAssets);
     expect(mid.summary.endingAssets).toBeLessThan(high.summary.endingAssets);
@@ -61,7 +61,7 @@ describe('연 수익률(annualReturn)', () => {
 
   it('수익률이 높을수록 출금액(4% * 잔액 후 수익)도 첫 해에 더 많다', () => {
     const make = (r: number) => calculateRetirementPlan(baseParams({
-      accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: r, withdrawalStartYear: 2026 }],
+      accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: r, withdrawalRate: 4, withdrawalStartYear: 2026 }],
     }));
 
     const w7  = make(7).plan[0].accountBalances['IRA'].withdrawal;
@@ -75,7 +75,7 @@ describe('연 수익률(annualReturn)', () => {
 
   it('수익률 마이너스(-5%) — 잔액은 손실 + 출금으로 매년 급감한다', () => {
     const { plan } = calculateRetirementPlan(baseParams({
-      accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: -5, withdrawalStartYear: 2026 }],
+      accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: -5, withdrawalRate: 4, withdrawalStartYear: 2026 }],
       socialSecurity: { startYear: 9999, monthlyAmount: 0, colaPercent: 0 },
       livingExpenses: [{ year: 2026, amount: 0 }],
     }));
@@ -96,7 +96,7 @@ describe('연 수익률(annualReturn)', () => {
 describe('출금 시작 연도(withdrawalStartYear)', () => {
   it('출금 시작 전 년도에는 withdrawal = 0', () => {
     const { plan } = calculateRetirementPlan(baseParams({
-      accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: 7, withdrawalStartYear: 2028 }],
+      accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: 7, withdrawalRate: 4, withdrawalStartYear: 2028 }],
     }));
 
     expect(plan[0].accountBalances['IRA'].withdrawal).toBe(0);  // 2026 < 2028
@@ -106,7 +106,7 @@ describe('출금 시작 연도(withdrawalStartYear)', () => {
 
   it('출금 시작 연도에 정확히 4% 출금이 시작된다', () => {
     const { plan } = calculateRetirementPlan(baseParams({
-      accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: 7, withdrawalStartYear: 2027 }],
+      accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: 7, withdrawalRate: 4, withdrawalStartYear: 2027 }],
     }));
 
     // 2026: no withdrawal, end = 107_000
@@ -123,7 +123,7 @@ describe('출금 시작 연도(withdrawalStartYear)', () => {
     const make = (startYear: number) => calculateRetirementPlan({
       ...baseParams(),
       endYear: 2030,
-      accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: 7, withdrawalStartYear: startYear }],
+      accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: 7, withdrawalRate: 4, withdrawalStartYear: startYear }],
       socialSecurity: { startYear: 9999, monthlyAmount: 0, colaPercent: 0 },
       livingExpenses: [{ year: 2026, amount: 0 }],
     });
@@ -137,7 +137,7 @@ describe('출금 시작 연도(withdrawalStartYear)', () => {
 
   it('출금 시작 전 기간에는 복리 효과로 잔액이 순증가한다', () => {
     const { plan } = calculateRetirementPlan(baseParams({
-      accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: 7, withdrawalStartYear: 2028 }],
+      accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: 7, withdrawalRate: 4, withdrawalStartYear: 2028 }],
       socialSecurity: { startYear: 9999, monthlyAmount: 0, colaPercent: 0 },
       livingExpenses: [{ year: 2026, amount: 0 }],
     }));
@@ -153,8 +153,8 @@ describe('출금 시작 연도(withdrawalStartYear)', () => {
     const { plan } = calculateRetirementPlan({
       ...baseParams(),
       accounts: [
-        { id: 1, name: 'IRA',  currentBalance: 100_000, annualReturn: 7, withdrawalStartYear: 2026 },
-        { id: 2, name: '401k', currentBalance: 200_000, annualReturn: 7, withdrawalStartYear: 2028 },
+        { id: 1, name: 'IRA',  currentBalance: 100_000, annualReturn: 7, withdrawalRate: 4, withdrawalStartYear: 2026 },
+        { id: 2, name: '401k', currentBalance: 200_000, annualReturn: 7, withdrawalRate: 4, withdrawalStartYear: 2028 },
       ],
     });
 
@@ -175,7 +175,7 @@ describe('출금액(4% 규칙)', () => {
     const balance  = 500_000;
     const returnPct = 8;
     const { plan } = calculateRetirementPlan(baseParams({
-      accounts: [{ id: 1, name: 'IRA', currentBalance: balance, annualReturn: returnPct, withdrawalStartYear: 2026 }],
+      accounts: [{ id: 1, name: 'IRA', currentBalance: balance, annualReturn: returnPct, withdrawalRate: 4, withdrawalStartYear: 2026 }],
     }));
 
     const acc = plan[0].accountBalances['IRA'];
@@ -185,7 +185,7 @@ describe('출금액(4% 규칙)', () => {
 
   it('잔액이 클수록 출금액도 크다 (같은 수익률)', () => {
     const make = (bal: number) => calculateRetirementPlan(baseParams({
-      accounts: [{ id: 1, name: 'IRA', currentBalance: bal, annualReturn: 7, withdrawalStartYear: 2026 }],
+      accounts: [{ id: 1, name: 'IRA', currentBalance: bal, annualReturn: 7, withdrawalRate: 4, withdrawalStartYear: 2026 }],
     }));
 
     const small = make(100_000).plan[0].accountBalances['IRA'].withdrawal;
@@ -205,7 +205,7 @@ describe('출금액(4% 규칙)', () => {
     // beginBalance * 1.04 * 0.96 = beginBalance * 0.9984 ≈ 시작보다 소폭 감소
     // 정확히: 4% 수익 → 출금 4% → net ~ -0.16%
     const { plan } = calculateRetirementPlan(baseParams({
-      accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: 4, withdrawalStartYear: 2026 }],
+      accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: 4, withdrawalRate: 4, withdrawalStartYear: 2026 }],
     }));
     // 100_000 * 1.04 * 0.96 = 99_840
     expect(plan[0].accountBalances['IRA'].endBalance).toBeCloseTo(99_840, 2);
@@ -216,7 +216,7 @@ describe('출금액(4% 규칙)', () => {
     const { plan } = calculateRetirementPlan({
       ...baseParams(),
       endYear: 2060,
-      accounts: [{ id: 1, name: 'IRA', currentBalance: 1_000, annualReturn: 0, withdrawalStartYear: 2026 }],
+      accounts: [{ id: 1, name: 'IRA', currentBalance: 1_000, annualReturn: 0, withdrawalRate: 4, withdrawalStartYear: 2026 }],
       socialSecurity: { startYear: 9999, monthlyAmount: 0, colaPercent: 0 },
       livingExpenses: [{ year: 2026, amount: 0 }],
     });
@@ -230,7 +230,7 @@ describe('출금액(4% 규칙)', () => {
     const initial = 100_000;
     const { plan } = calculateRetirementPlan({
       ...baseParams(),
-      accounts: [{ id: 1, name: 'IRA', currentBalance: initial, annualReturn: 0, withdrawalStartYear: 2026 }],
+      accounts: [{ id: 1, name: 'IRA', currentBalance: initial, annualReturn: 0, withdrawalRate: 4, withdrawalStartYear: 2026 }],
       socialSecurity: { startYear: 9999, monthlyAmount: 0, colaPercent: 0 },
       livingExpenses: [{ year: 2026, amount: 0 }],
     });
@@ -393,8 +393,8 @@ describe('요약 통계(summary)', () => {
   it('startingAssets = 모든 계좌 currentBalance 합산', () => {
     const { summary } = calculateRetirementPlan(baseParams({
       accounts: [
-        { id: 1, name: 'IRA',  currentBalance: 100_000, annualReturn: 7, withdrawalStartYear: 2026 },
-        { id: 2, name: '401k', currentBalance: 200_000, annualReturn: 7, withdrawalStartYear: 2026 },
+        { id: 1, name: 'IRA',  currentBalance: 100_000, annualReturn: 7, withdrawalRate: 4, withdrawalStartYear: 2026 },
+        { id: 2, name: '401k', currentBalance: 200_000, annualReturn: 7, withdrawalRate: 4, withdrawalStartYear: 2026 },
       ],
     }));
     expect(summary.startingAssets).toBeCloseTo(300_000, 4);
@@ -408,7 +408,7 @@ describe('요약 통계(summary)', () => {
   it('hasShortfall = true: 순현금흐름이 음수인 해가 존재할 때', () => {
     // 생활비 > 수입이 되도록 설정
     const { summary } = calculateRetirementPlan(baseParams({
-      accounts: [{ id: 1, name: 'IRA', currentBalance: 10_000, annualReturn: 0, withdrawalStartYear: 2026 }],
+      accounts: [{ id: 1, name: 'IRA', currentBalance: 10_000, annualReturn: 0, withdrawalRate: 4, withdrawalStartYear: 2026 }],
       socialSecurity: { startYear: 9999, monthlyAmount: 0, colaPercent: 0 },
       livingExpenses: [{ year: 2026, amount: 999_999 }],
     }));
@@ -418,7 +418,7 @@ describe('요약 통계(summary)', () => {
   it('hasShortfall = false: 모든 해 순현금흐름이 0 이상일 때', () => {
     // 출금 + SS가 생활비를 충당
     const { summary } = calculateRetirementPlan(baseParams({
-      accounts: [{ id: 1, name: 'IRA', currentBalance: 10_000_000, annualReturn: 7, withdrawalStartYear: 2026 }],
+      accounts: [{ id: 1, name: 'IRA', currentBalance: 10_000_000, annualReturn: 7, withdrawalRate: 4, withdrawalStartYear: 2026 }],
       socialSecurity: { startYear: 2026, monthlyAmount: 10_000, colaPercent: 0 },
       livingExpenses: [{ year: 2026, amount: 10_000 }],
     }));
@@ -428,7 +428,7 @@ describe('요약 통계(summary)', () => {
   it('shortfallStartYear = 처음으로 netCashFlow < 0 인 연도', () => {
     const { plan, summary } = calculateRetirementPlan(baseParams({
       endYear: 2035,
-      accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: 0, withdrawalStartYear: 2026 }],
+      accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: 0, withdrawalRate: 4, withdrawalStartYear: 2026 }],
       socialSecurity: { startYear: 2026, monthlyAmount: 500, colaPercent: 0 }, // SS = 6_000/년
       livingExpenses: [{ year: 2026, amount: 30_000 }],
     }));
@@ -444,7 +444,7 @@ describe('요약 통계(summary)', () => {
 
   it('shortfallStartYear = null: 부족 없음', () => {
     const { summary } = calculateRetirementPlan(baseParams({
-      accounts: [{ id: 1, name: 'IRA', currentBalance: 10_000_000, annualReturn: 10, withdrawalStartYear: 2026 }],
+      accounts: [{ id: 1, name: 'IRA', currentBalance: 10_000_000, annualReturn: 10, withdrawalRate: 4, withdrawalStartYear: 2026 }],
       livingExpenses: [{ year: 2026, amount: 1_000 }],
     }));
     expect(summary.shortfallStartYear).toBeNull();
@@ -452,7 +452,7 @@ describe('요약 통계(summary)', () => {
 
   it('safetyMargin = 100%: 모든 해 흑자', () => {
     const { summary } = calculateRetirementPlan(baseParams({
-      accounts: [{ id: 1, name: 'IRA', currentBalance: 10_000_000, annualReturn: 7, withdrawalStartYear: 2026 }],
+      accounts: [{ id: 1, name: 'IRA', currentBalance: 10_000_000, annualReturn: 7, withdrawalRate: 4, withdrawalStartYear: 2026 }],
       livingExpenses: [{ year: 2026, amount: 1 }],
     }));
     expect(summary.safetyMargin).toBe(100);
@@ -460,7 +460,7 @@ describe('요약 통계(summary)', () => {
 
   it('safetyMargin = 0%: 모든 해 적자', () => {
     const { summary } = calculateRetirementPlan(baseParams({
-      accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: 0, withdrawalStartYear: 2026 }],
+      accounts: [{ id: 1, name: 'IRA', currentBalance: 100_000, annualReturn: 0, withdrawalRate: 4, withdrawalStartYear: 2026 }],
       socialSecurity: { startYear: 9999, monthlyAmount: 0, colaPercent: 0 },
       livingExpenses: [{ year: 2026, amount: 999_999 }],
     }));
@@ -470,14 +470,14 @@ describe('요약 통계(summary)', () => {
   it('safetyMargin 부분 계산 — 3년 중 2년 흑자 → 66.67%', () => {
     // 2027년만 적자가 되도록 설계: 쉽지 않으므로 독립 계산으로 검증
     const { plan } = calculateRetirementPlan(baseParams({
-      accounts: [{ id: 1, name: 'IRA', currentBalance: 10_000_000, annualReturn: 7, withdrawalStartYear: 2026 }],
+      accounts: [{ id: 1, name: 'IRA', currentBalance: 10_000_000, annualReturn: 7, withdrawalRate: 4, withdrawalStartYear: 2026 }],
       socialSecurity: { startYear: 2026, monthlyAmount: 5_000, colaPercent: 0 },
       livingExpenses: [{ year: 2026, amount: 1_000 }],
     }));
     // 모두 흑자인 케이스 확인
     const positiveYears = plan.filter(y => y.netCashFlow >= 0).length;
     const { summary } = calculateRetirementPlan(baseParams({
-      accounts: [{ id: 1, name: 'IRA', currentBalance: 10_000_000, annualReturn: 7, withdrawalStartYear: 2026 }],
+      accounts: [{ id: 1, name: 'IRA', currentBalance: 10_000_000, annualReturn: 7, withdrawalRate: 4, withdrawalStartYear: 2026 }],
       socialSecurity: { startYear: 2026, monthlyAmount: 5_000, colaPercent: 0 },
       livingExpenses: [{ year: 2026, amount: 1_000 }],
     }));
@@ -502,9 +502,9 @@ describe('복합 시나리오', () => {
     const { plan } = calculateRetirementPlan({
       ...baseParams(),
       accounts: [
-        { id: 1, name: 'IRA',  currentBalance: 100_000, annualReturn: 7, withdrawalStartYear: 2026 },
-        { id: 2, name: '401k', currentBalance: 200_000, annualReturn: 5, withdrawalStartYear: 2026 },
-        { id: 3, name: 'Brokerage', currentBalance: 50_000, annualReturn: 9, withdrawalStartYear: 2028 },
+        { id: 1, name: 'IRA',  currentBalance: 100_000, annualReturn: 7, withdrawalRate: 4, withdrawalStartYear: 2026 },
+        { id: 2, name: '401k', currentBalance: 200_000, annualReturn: 5, withdrawalRate: 4, withdrawalStartYear: 2026 },
+        { id: 3, name: 'Brokerage', currentBalance: 50_000, annualReturn: 9, withdrawalRate: 4, withdrawalStartYear: 2028 },
       ],
     });
 
@@ -517,8 +517,8 @@ describe('복합 시나리오', () => {
   it('totalIncome = SS + 모든 계좌 출금 합산', () => {
     const { plan } = calculateRetirementPlan(baseParams({
       accounts: [
-        { id: 1, name: 'IRA',  currentBalance: 100_000, annualReturn: 7, withdrawalStartYear: 2026 },
-        { id: 2, name: '401k', currentBalance: 200_000, annualReturn: 5, withdrawalStartYear: 2026 },
+        { id: 1, name: 'IRA',  currentBalance: 100_000, annualReturn: 7, withdrawalRate: 4, withdrawalStartYear: 2026 },
+        { id: 2, name: '401k', currentBalance: 200_000, annualReturn: 5, withdrawalRate: 4, withdrawalStartYear: 2026 },
       ],
     }));
 
@@ -544,7 +544,7 @@ describe('복합 시나리오', () => {
     const poor = calculateRetirementPlan({
       ...baseParams(),
       endYear: 2040,
-      accounts: [{ id: 1, name: 'IRA', currentBalance: 500_000, annualReturn: 4, withdrawalStartYear: 2026 }],
+      accounts: [{ id: 1, name: 'IRA', currentBalance: 500_000, annualReturn: 4, withdrawalRate: 4, withdrawalStartYear: 2026 }],
       socialSecurity: { startYear: 2026, monthlyAmount: 1_000, colaPercent: 0 },
       livingExpenses: [{ year: 2026, amount: 50_000 }],
       inflationRate: 3,
@@ -553,7 +553,7 @@ describe('복합 시나리오', () => {
     const good = calculateRetirementPlan({
       ...baseParams(),
       endYear: 2040,
-      accounts: [{ id: 1, name: 'IRA', currentBalance: 500_000, annualReturn: 9, withdrawalStartYear: 2030 }],
+      accounts: [{ id: 1, name: 'IRA', currentBalance: 500_000, annualReturn: 9, withdrawalRate: 4, withdrawalStartYear: 2030 }],
       socialSecurity: { startYear: 2026, monthlyAmount: 1_000, colaPercent: 3 },
       livingExpenses: [{ year: 2026, amount: 50_000 }],
       inflationRate: 3,
