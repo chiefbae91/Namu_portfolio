@@ -66,175 +66,70 @@ export function NewsCarousel({ onTickerClick }: NewsCarouselProps) {
 
   return (
     <>
-      <div
-        onClick={() => setSelectedNews(item)}
-        style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 8,
-          padding: '12px 16px',
-          marginBottom: 16,
-          cursor: 'pointer',
-          transition: 'box-shadow 0.2s ease',
-        }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
-        }}
-      >
-        {/* 제목 + 배지 */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 6 }}>
-          <h3 style={{
-            margin: 0,
-            flex: 1,
-            fontSize: 17,
-            fontWeight: 800,
-            color: 'var(--blue)',
-            lineHeight: 1.4,
-            height: '2.8em',
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-          }}>
-            {item.title}
-          </h3>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-            <span style={{
-              background: 'var(--blue)',
-              color: 'white',
-              padding: '2px 7px',
-              borderRadius: 4,
-              fontSize: 10,
-              fontWeight: 700,
-              whiteSpace: 'nowrap',
-            }}>
+      {/* 풀너비 배너 */}
+      <div style={{ position: 'relative', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
+        {/* 왼쪽 화살표 */}
+        <button
+          onClick={(e) => { e.stopPropagation(); setCurrentIndex((prev) => (prev - 1 + news.length) % news.length); }}
+          style={{
+            position: 'absolute', left: 0, top: 0, bottom: 0,
+            width: 36, background: 'none', border: 'none',
+            color: 'var(--muted)', cursor: 'pointer', fontSize: 20,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1,
+          }}
+        >
+          ‹
+        </button>
+
+        {/* 콘텐츠 (양쪽 화살표 공간 확보) */}
+        <div
+          onClick={() => setSelectedNews(item)}
+          style={{ padding: '10px 44px', cursor: 'pointer' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
+            {/* 배지 */}
+            <span style={{ background: 'var(--blue)', color: 'white', padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>
               금융
             </span>
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              background: 'var(--bg)',
-              border: `1px solid ${impactColor}`,
-              color: 'var(--text)',
-              padding: '2px 7px',
-              borderRadius: 4,
-              fontSize: 10,
-              fontWeight: 600,
-              whiteSpace: 'nowrap',
-            }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--bg)', border: `1px solid ${impactColor}`, color: 'var(--text)', padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: impactColor, display: 'inline-block', flexShrink: 0 }} />
               중요도 {item.impact_score}
             </span>
-          </div>
-        </div>
 
-        {/* 요약 */}
-        <div style={{ height: '3.2em', overflow: 'hidden', marginBottom: 8 }}>
-          <p style={{
-            margin: 0,
-            fontSize: 12,
-            color: 'var(--text)',
-            opacity: 0.75,
-            lineHeight: 1.6,
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-          }}>
-            {item.summary}
-          </p>
-        </div>
-
-        {/* 푸터 */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          {/* 왼쪽: 이전/다음 버튼 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setCurrentIndex((prev) => (prev - 1 + news.length) % news.length);
-              }}
-              style={{
-                background: 'var(--bg)',
-                border: '1px solid var(--border)',
-                borderRadius: 4,
-                color: 'var(--text)',
-                width: 24,
-                height: 24,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 12,
-                flexShrink: 0,
-              }}
-            >
-              ‹
-            </button>
-            <span style={{ fontSize: 11, color: 'var(--muted)', minWidth: 32, textAlign: 'center' }}>
-              {currentIndex + 1} / {news.length}
+            {/* 제목 */}
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
+              {item.title}
             </span>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setCurrentIndex((prev) => (prev + 1) % news.length);
-              }}
-              style={{
-                background: 'var(--bg)',
-                border: '1px solid var(--border)',
-                borderRadius: 4,
-                color: 'var(--text)',
-                width: 24,
-                height: 24,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 12,
-                flexShrink: 0,
-              }}
-            >
-              ›
-            </button>
-          </div>
 
-          {/* 오른쪽: 티커 링크 + 출처 + 자세히 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            {onTickerClick && item.tickers && item.tickers.length > 0 && (
-              <div style={{ display: 'flex', gap: 4 }}>
-                {item.tickers.slice(0, 4).map((ticker) => (
-                  <button
-                    key={ticker}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onTickerClick(ticker);
-                    }}
-                    style={{
-                      background: 'var(--blue)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: 4,
-                      padding: '1px 7px',
-                      fontSize: 11,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      letterSpacing: '0.03em',
-                    }}
-                  >
-                    ${ticker}
-                  </button>
-                ))}
-              </div>
-            )}
-            <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-              {item.source} · {new Date(item.published_at).toLocaleDateString('ko-KR')}
-            </span>
+            {/* 티커 + 출처 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              {onTickerClick && item.tickers && item.tickers.slice(0, 3).map((ticker) => (
+                <button key={ticker} onClick={(e) => { e.stopPropagation(); onTickerClick(ticker); }}
+                  style={{ background: 'var(--blue)', color: 'white', border: 'none', borderRadius: 4, padding: '1px 7px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                  ${ticker}
+                </button>
+              ))}
+              <span style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                {item.source} · {currentIndex + 1}/{news.length}
+              </span>
+            </div>
           </div>
         </div>
+
+        {/* 오른쪽 화살표 */}
+        <button
+          onClick={(e) => { e.stopPropagation(); setCurrentIndex((prev) => (prev + 1) % news.length); }}
+          style={{
+            position: 'absolute', right: 0, top: 0, bottom: 0,
+            width: 36, background: 'none', border: 'none',
+            color: 'var(--muted)', cursor: 'pointer', fontSize: 20,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1,
+          }}
+        >
+          ›
+        </button>
       </div>
 
       {selectedNews && (

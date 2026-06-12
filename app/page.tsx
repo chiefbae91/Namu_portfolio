@@ -716,6 +716,9 @@ export default function Home() {
         );
       })()}
 
+      {/* 금융 뉴스 배너 */}
+      <NewsCarousel onTickerClick={(ticker) => { setAnalysisInitialTab('history'); setAnalysisTicker(ticker); }} />
+
       {/* Onboarding banner — only when no accounts */}
       {accountsLoaded && accounts.length === 0 && !!userEmail && (
         <AccountBanner onOpenAccounts={() => setAccountSettingsOpen(true)} />
@@ -933,9 +936,6 @@ export default function Home() {
             )}
           </div>
         </div>
-
-        {/* 금융 뉴스 배너 */}
-        <NewsCarousel onTickerClick={(ticker) => { setAnalysisInitialTab('history'); setAnalysisTicker(ticker); }} />
 
         {/* Summary Cards — hidden when no accounts */}
         {accountsLoaded && accounts.length > 0 && (
