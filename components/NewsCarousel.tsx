@@ -93,7 +93,7 @@ export function NewsCarousel({ onTickerClick }: NewsCarouselProps) {
               {item.title}
             </span>
 
-            {/* 티커 + 출처 */}
+            {/* 티커 + 중요도 + 카운터 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
               {onTickerClick && item.tickers && item.tickers.slice(0, 3).map((ticker) => (
                 <button key={ticker} onClick={(e) => { e.stopPropagation(); onTickerClick(ticker); }}
@@ -101,22 +101,9 @@ export function NewsCarousel({ onTickerClick }: NewsCarouselProps) {
                   ${ticker}
                 </button>
               ))}
-              <span style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                {item.source}
-              </span>
-            </div>
-
-            {/* 배지 + 카운터 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-              <span style={{ background: 'var(--blue)', color: 'white', padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' }}>
-                금융
-              </span>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--bg)', border: `1px solid ${impactColor}`, color: 'var(--text)', padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap' }}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: impactColor, display: 'inline-block', flexShrink: 0 }} />
                 중요도 {item.impact_score}
-              </span>
-              <span style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                · {currentIndex + 1}/{news.length}
               </span>
             </div>
           </div>
