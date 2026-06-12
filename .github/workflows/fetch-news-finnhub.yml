@@ -1,0 +1,17 @@
+name: Fetch News - Finnhub
+
+on:
+  schedule:
+    # 월-금 08:05-23:55 UTC, 10분마다 +5분 오프셋 (Marketaux와 번갈아)
+    - cron: '5,15,25,35,45,55 8-23 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Finnhub news
+        run: |
+          curl -s -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/fetch-news?source=finnhub"

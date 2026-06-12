@@ -1,17 +1,17 @@
-name: Fetch Financial News
+name: Fetch News - Marketaux
 
 on:
   schedule:
-    # 월-금 08:00-23:50 UTC (ET 프리장~애프터마켓), 10분마다
-    - cron: '*/10 8-23 * * 1-5'
-  workflow_dispatch: # 수동 트리거 가능
+    # 월-금 08:00-23:50 UTC, 10분마다 정각 (Marketaux 96/100 req/day)
+    - cron: '0,10,20,30,40,50 8-23 * * 1-5'
+  workflow_dispatch:
 
 jobs:
   fetch:
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch news
+      - name: Fetch Marketaux news
         run: |
           curl -s -X GET \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.APP_URL }}/api/cron/fetch-news"
+            "${{ secrets.APP_URL }}/api/cron/fetch-news?source=marketaux"

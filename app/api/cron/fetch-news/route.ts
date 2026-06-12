@@ -6,16 +6,21 @@ export const runtime = 'nodejs';
 export const maxDuration = 30;
 
 export async function GET(req: Request) {
-  // Protect endpoint with CRON_SECRET
   const authHeader = req.headers.get('authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const { searchParams } = new URL(req.url);
+  const source = searchParams.get('source'); // 'marketaux' | 'finnhub' | null (= all)
+  const providers = source
+    ? activeProviders.filter((p) => p.name === source)
+    : activeProviders;
+
   const supabase = getAdminClient();
   const results: Record<string, { inserted: number; error?: string }> = {};
 
-  for (const provider of activeProviders) {
+  for (const provider of providers) {
     try {
       const articles = (await provider.fetch(10)).filter((a) => a.impact_score >= 5);
 
