@@ -93,6 +93,7 @@ export function NewsCarousel({ onTickerClick }: NewsCarouselProps) {
             fontWeight: 800,
             color: 'var(--blue)',
             lineHeight: 1.4,
+            height: '2.8em',
             display: '-webkit-box',
             WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical',
@@ -132,19 +133,21 @@ export function NewsCarousel({ onTickerClick }: NewsCarouselProps) {
         </div>
 
         {/* 요약 */}
-        <p style={{
-          margin: '0 0 8px',
-          fontSize: 12,
-          color: 'var(--text)',
-          opacity: 0.75,
-          lineHeight: 1.6,
-          display: '-webkit-box',
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: 'vertical',
-          overflow: 'hidden',
-        }}>
-          {item.summary}
-        </p>
+        <div style={{ height: '3.2em', overflow: 'hidden', marginBottom: 8 }}>
+          <p style={{
+            margin: 0,
+            fontSize: 12,
+            color: 'var(--text)',
+            opacity: 0.75,
+            lineHeight: 1.6,
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}>
+            {item.summary}
+          </p>
+        </div>
 
         {/* 푸터 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
