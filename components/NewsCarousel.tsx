@@ -88,15 +88,6 @@ export function NewsCarousel({ onTickerClick }: NewsCarouselProps) {
           style={{ padding: '10px 44px', cursor: 'pointer' }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
-            {/* 배지 */}
-            <span style={{ background: 'var(--blue)', color: 'white', padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>
-              금융
-            </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--bg)', border: `1px solid ${impactColor}`, color: 'var(--text)', padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: impactColor, display: 'inline-block', flexShrink: 0 }} />
-              중요도 {item.impact_score}
-            </span>
-
             {/* 제목 */}
             <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
               {item.title}
@@ -111,7 +102,21 @@ export function NewsCarousel({ onTickerClick }: NewsCarouselProps) {
                 </button>
               ))}
               <span style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                {item.source} · {currentIndex + 1}/{news.length}
+                {item.source}
+              </span>
+            </div>
+
+            {/* 배지 + 카운터 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              <span style={{ background: 'var(--blue)', color: 'white', padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                금융
+              </span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--bg)', border: `1px solid ${impactColor}`, color: 'var(--text)', padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: impactColor, display: 'inline-block', flexShrink: 0 }} />
+                중요도 {item.impact_score}
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                · {currentIndex + 1}/{news.length}
               </span>
             </div>
           </div>
