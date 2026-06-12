@@ -28,6 +28,8 @@ export function NewsCarousel({ onTickerClick }: NewsCarouselProps) {
 
   useEffect(() => {
     fetchLatestNews();
+    const interval = setInterval(fetchLatestNews, 3 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   async function fetchLatestNews() {
