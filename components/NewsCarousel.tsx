@@ -34,7 +34,7 @@ export function NewsCarousel({ onTickerClick }: NewsCarouselProps) {
 
   async function fetchLatestNews() {
     try {
-      const res = await fetch('/api/news');
+      const res = await fetch('/api/news', { cache: 'no-store' });
       const data = await res.json();
       setNews(Array.isArray(data) ? data : []);
     } catch (error) {
