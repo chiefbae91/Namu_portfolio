@@ -8,6 +8,7 @@ export async function GET() {
     .select('*')
     .not('summary', 'ilike', 'http%')
     .gt('summary', '')
+    .gte('impact_score', 5)
     .order('published_at', { ascending: false })
     .limit(20);
 
