@@ -17,7 +17,7 @@ export async function GET(req: Request) {
 
   for (const provider of activeProviders) {
     try {
-      const articles = await provider.fetch(10);
+      const articles = (await provider.fetch(10)).filter((a) => a.impact_score >= 5);
 
       // Deduplicate against existing URLs in DB
       const { data: existing } = await supabase
