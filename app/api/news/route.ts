@@ -8,8 +8,6 @@ export async function GET() {
   const { data, error } = await supabase
     .from('financial_news')
     .select('*')
-    .not('summary', 'ilike', 'http%')
-    .gt('summary', '')
     .order('published_at', { ascending: false })
     .limit(20);
 
