@@ -225,7 +225,7 @@ export function NewsCarousel({ onTickerClick }: NewsCarouselProps) {
                       letterSpacing: '0.03em',
                     }}
                   >
-                    {ticker}
+                    ${ticker}
                   </button>
                 ))}
               </div>
