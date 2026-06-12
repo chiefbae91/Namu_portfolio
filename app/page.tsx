@@ -16,6 +16,7 @@ import SummaryCards from '@/components/SummaryCards';
 import AccountBanner from '@/components/AccountBanner';
 import PriceAlertToasts, { PriceAlert, HintToast } from '@/components/PriceAlertToasts';
 import AlertBell from '@/components/AlertBell';
+import { NewsCarousel } from '@/components/NewsCarousel';
 
 const TRANSFER_PREFIX = 'tf-';
 
@@ -932,6 +933,9 @@ export default function Home() {
             )}
           </div>
         </div>
+
+        {/* 금융 뉴스 배너 */}
+        <NewsCarousel onTickerClick={(ticker) => { setAnalysisInitialTab('history'); setAnalysisTicker(ticker); }} />
 
         {/* Summary Cards — hidden when no accounts */}
         {accountsLoaded && accounts.length > 0 && (

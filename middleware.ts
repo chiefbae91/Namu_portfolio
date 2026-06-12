@@ -38,6 +38,9 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/trading-hints') ||
     pathname.startsWith('/api/exchange-rates') ||
     pathname.startsWith('/api/quotes') ||
+    pathname.startsWith('/api/cron') ||
+    pathname.startsWith('/api/news') ||
+    pathname.startsWith('/api/translate') ||
     pathname.startsWith('/_next') ||
     pathname === '/favicon.ico';
 
