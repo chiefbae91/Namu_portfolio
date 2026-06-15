@@ -61,11 +61,14 @@ export async function middleware(request: NextRequest) {
   if (user && !isPublic) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('discord_verified')
+      .select('discord_verified, discord_verified_at')
       .eq('id', user.id)
       .single();
 
-    if (!profile?.discord_verified) {
+    const verifiedAt = profile?.discord_verified_at ? new Date(profile.discord_verified_at) : null;
+    const isExpired = !verifiedAt || Date.now() - verifiedAt.getTime() > 30 * 24 * 60 * 60 * 1000;
+
+    if (!profile?.discord_verified || isExpired) {
       const url = request.nextUrl.clone();
       url.pathname = '/auth/discord-verify';
       return NextResponse.redirect(url);
