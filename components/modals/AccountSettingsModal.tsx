@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { X, Trash2, EyeOff, Eye, Edit2, Check, Sun, Moon } from 'lucide-react';
 import { Account, AccountType } from '@/lib/types';
 import { DateFormat } from '@/lib/format';
+import { createClient } from '@/lib/supabase';
 
 export type { DateFormat };
 
@@ -23,6 +24,7 @@ interface Props {
   onRenameType: (id: string | number, name: string, color: string) => Promise<void>;
   onDeleteType: (id: string | number) => Promise<void>;
   onAssignType: (accountId: string | number, typeId: string | number | null) => Promise<void>;
+  userEmail: string | null;
   showKrw: boolean;
   setShowKrw: (v: boolean) => void;
   showEur: boolean;
@@ -37,13 +39,32 @@ export default function AccountSettingsModal({
   accounts, accountTypes, onClose,
   onAddAccount, onRename, onToggleHidden, onDelete,
   onAddType, onRenameType, onDeleteType, onAssignType,
-  showKrw, setShowKrw, showEur, setShowEur,
+  userEmail, showKrw, setShowKrw, showEur, setShowEur,
   dateFormat, setDateFormat, theme, setTheme,
 }: Props) {
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState<string | number | null>(null);
   const [editName, setEditName] = useState('');
   const [error, setError] = useState('');
+
+  const [newEmail, setNewEmail] = useState('');
+  const [emailMsg, setEmailMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [emailLoading, setEmailLoading] = useState(false);
+
+  const handleEmailUpdate = async () => {
+    const email = newEmail.trim();
+    if (!email || email === userEmail) return;
+    setEmailLoading(true);
+    setEmailMsg(null);
+    const { error } = await createClient().auth.updateUser({ email });
+    setEmailLoading(false);
+    if (error) {
+      setEmailMsg({ type: 'err', text: error.message });
+    } else {
+      setEmailMsg({ type: 'ok', text: `확인 링크를 ${email} 로 발송했습니다.` });
+      setNewEmail('');
+    }
+  };
 
   const [newTypeName, setNewTypeName] = useState('');
   const [newTypeColor, setNewTypeColor] = useState(COLOR_PALETTE[0]);
@@ -117,6 +138,36 @@ export default function AccountSettingsModal({
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Settings</h2>
           <button onClick={onClose} style={{ background: 'none', color: 'var(--muted)' }}><X size={18} /></button>
         </div>
+
+        {/* ── Email ── */}
+        <div style={sectionLabel as React.CSSProperties}>계정</div>
+        <div style={{ ...settingRow, alignItems: 'flex-start', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
+          <span style={{ fontSize: 12, color: 'var(--muted)' }}>현재: <b style={{ color: 'var(--text)' }}>{userEmail}</b></span>
+          <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+            <input
+              type="email"
+              value={newEmail}
+              onChange={e => setNewEmail(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleEmailUpdate()}
+              placeholder="새 이메일 주소"
+              style={{ flex: 1, fontSize: 13 }}
+            />
+            <button
+              className="btn-primary btn-sm"
+              onClick={handleEmailUpdate}
+              disabled={emailLoading || !newEmail.trim() || newEmail.trim() === userEmail}
+            >
+              {emailLoading ? '...' : '변경'}
+            </button>
+          </div>
+          {emailMsg && (
+            <span style={{ fontSize: 12, color: emailMsg.type === 'ok' ? 'var(--green)' : 'var(--red)' }}>
+              {emailMsg.text}
+            </span>
+          )}
+        </div>
+
+        <div style={{ borderTop: '1px solid var(--border)', marginBottom: 24 }} />
 
         {/* ── Local Settings ── */}
         <div style={sectionLabel as React.CSSProperties}>Local Settings</div>

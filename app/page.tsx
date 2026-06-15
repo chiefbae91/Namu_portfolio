@@ -962,6 +962,7 @@ export default function Home() {
           onRenameType={handleRenameType}
           onDeleteType={handleDeleteType}
           onAssignType={handleAssignType}
+          userEmail={userEmail}
           showKrw={showKrw}
           setShowKrw={setShowKrw}
           showEur={showEur}
