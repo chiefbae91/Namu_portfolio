@@ -70,13 +70,23 @@ async function fetchMarketaux(limit = 20) {
 }
 
 // ── Finnhub ───────────────────────────────────────────────────────────────────
-const HIGH_KW = ['fed','federal reserve','rate hike','rate cut','inflation','recession',
-  'crash','collapse','surge','plunge','gdp','cpi','fomc','powell',
-  'earnings beat','earnings miss','bankruptcy','merger','acquisition',
+const HIGH_KW = [
+  'fed','federal reserve','rate hike','rate cut','interest rate',
+  'fomc','powell','ecb','bank of england','bank of japan','boj',
+  'pboc','rba','boc','snb','central bank','monetary policy',
+  'basis point','quantitative','tightening','easing',
+  'inflation','recession','gdp','cpi','ppi','unemployment',
+  'crash','collapse','surge','plunge',
+  'dollar','exchange rate','currency','devaluation','depreciation',
+  'yuan','yen','euro','forex','fx ',
+  'bankruptcy','chapter 11','default','insolvency','liquidat',
+  'merger','acquisition','takeover','buyout','ipo','spinoff',
+  'earnings beat','earnings miss','layoff','restructur',
   'war','attack','strike','sanction','tariff','iran','israel','china',
   'russia','ukraine','missile','oil','opec','conflict','invasion',
   'hormuz','strait','nuclear','ceasefire','peace deal','peace agreement',
-  'escalat','troops','pentagon','nato','coup','embargo'];
+  'escalat','troops','pentagon','nato','coup','embargo',
+];
 
 async function fetchFinnhub(limit = 20) {
   const res = await fetch(`https://finnhub.io/api/v1/news?category=general&token=${FINNHUB_KEY}`);

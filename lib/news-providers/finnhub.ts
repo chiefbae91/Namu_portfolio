@@ -12,10 +12,21 @@ interface FinnhubArticle {
 }
 
 const HIGH_IMPACT_KEYWORDS = [
-  // 금융/경제
-  'fed', 'federal reserve', 'rate hike', 'rate cut', 'inflation', 'recession',
-  'crash', 'collapse', 'surge', 'plunge', 'gdp', 'cpi', 'fomc', 'powell',
-  'earnings beat', 'earnings miss', 'bankruptcy', 'merger', 'acquisition',
+  // 중앙은행 / 금리
+  'fed', 'federal reserve', 'rate hike', 'rate cut', 'interest rate',
+  'fomc', 'powell', 'ecb', 'bank of england', 'bank of japan', 'boj',
+  'pboc', 'rba', 'boc', 'snb', 'central bank', 'monetary policy',
+  'basis point', 'quantitative', 'tightening', 'easing',
+  // 거시경제
+  'inflation', 'recession', 'gdp', 'cpi', 'ppi', 'unemployment',
+  'crash', 'collapse', 'surge', 'plunge',
+  // 환율
+  'dollar', 'exchange rate', 'currency', 'devaluation', 'depreciation',
+  'yuan', 'yen', 'euro', 'forex', 'fx ',
+  // 기업 이벤트
+  'bankruptcy', 'chapter 11', 'default', 'insolvency', 'liquidat',
+  'merger', 'acquisition', 'takeover', 'buyout', 'ipo', 'spinoff',
+  'earnings beat', 'earnings miss', 'layoff', 'restructur',
   // 지정학
   'war', 'attack', 'strike', 'sanction', 'tariff', 'iran', 'israel', 'china',
   'russia', 'ukraine', 'missile', 'oil', 'opec', 'conflict', 'invasion',
