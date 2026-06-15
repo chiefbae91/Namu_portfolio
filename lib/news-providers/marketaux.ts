@@ -40,7 +40,6 @@ export const marketauxProvider: NewsProvider = {
     const params = new URLSearchParams({
       api_token: apiKey,
       language: 'en',
-      filter_entities: 'true',
       limit: String(limit),
     });
 

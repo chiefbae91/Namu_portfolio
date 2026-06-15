@@ -12,9 +12,13 @@ interface FinnhubArticle {
 }
 
 const HIGH_IMPACT_KEYWORDS = [
+  // 금융/경제
   'fed', 'federal reserve', 'rate hike', 'rate cut', 'inflation', 'recession',
   'crash', 'collapse', 'surge', 'plunge', 'gdp', 'cpi', 'fomc', 'powell',
   'earnings beat', 'earnings miss', 'bankruptcy', 'merger', 'acquisition',
+  // 지정학
+  'war', 'attack', 'strike', 'sanction', 'tariff', 'iran', 'israel', 'china',
+  'russia', 'ukraine', 'missile', 'oil', 'opec', 'conflict', 'invasion',
 ];
 
 function calcImpactScore(headline: string, summary: string): number {
