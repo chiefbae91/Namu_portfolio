@@ -56,5 +56,16 @@ export async function GET(req: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, results });
+  // 36시간 이전 뉴스 자동 삭제
+  const cutoff = new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString();
+  const { error: deleteError, count: deletedCount } = await supabase
+    .from('financial_news')
+    .delete({ count: 'exact' })
+    .lt('published_at', cutoff);
+
+  if (deleteError) {
+    console.error('오래된 뉴스 삭제 실패:', deleteError.message);
+  }
+
+  return NextResponse.json({ ok: true, results, deleted: deletedCount ?? 0 });
 }
