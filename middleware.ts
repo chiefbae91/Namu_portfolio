@@ -58,7 +58,8 @@ export async function middleware(request: NextRequest) {
   }
 
   // Discord verification check for authenticated users
-  if (user && !isPublic) {
+  // Set DISCORD_VERIFY_ENABLED=false to bypass
+  if (user && !isPublic && process.env.DISCORD_VERIFY_ENABLED === 'true') {
     const { data: profile } = await supabase
       .from('profiles')
       .select('discord_verified, discord_verified_at')
