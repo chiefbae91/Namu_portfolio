@@ -58,7 +58,7 @@ async function fetchMarketaux(limit = 20) {
       const keywords = entities.map((e) => e.name).filter(Boolean).slice(0, 5);
       const scores   = entities.map((e) => Math.abs(e.sentiment_score ?? 0)).filter((s) => s > 0);
       const max      = scores.length ? Math.max(...scores) : 0;
-      const impact   = max >= 0.7 ? 9 : max >= 0.5 ? 7 : max >= 0.3 ? 5 : 3;
+      const impact   = entities.length === 0 ? 5 : max >= 0.7 ? 9 : max >= 0.5 ? 7 : max >= 0.3 ? 5 : 3;
       const summary  = a.description ?? a.snippet ?? '';
       return {
         title: a.title, summary, source: a.source,
@@ -72,7 +72,11 @@ async function fetchMarketaux(limit = 20) {
 // ── Finnhub ───────────────────────────────────────────────────────────────────
 const HIGH_KW = ['fed','federal reserve','rate hike','rate cut','inflation','recession',
   'crash','collapse','surge','plunge','gdp','cpi','fomc','powell',
-  'earnings beat','earnings miss','bankruptcy','merger','acquisition'];
+  'earnings beat','earnings miss','bankruptcy','merger','acquisition',
+  'war','attack','strike','sanction','tariff','iran','israel','china',
+  'russia','ukraine','missile','oil','opec','conflict','invasion',
+  'hormuz','strait','nuclear','ceasefire','peace deal','peace agreement',
+  'escalat','troops','pentagon','nato','coup','embargo'];
 
 async function fetchFinnhub(limit = 20) {
   const res = await fetch(`https://finnhub.io/api/v1/news?category=general&token=${FINNHUB_KEY}`);

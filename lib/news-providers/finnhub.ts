@@ -19,6 +19,8 @@ const HIGH_IMPACT_KEYWORDS = [
   // 지정학
   'war', 'attack', 'strike', 'sanction', 'tariff', 'iran', 'israel', 'china',
   'russia', 'ukraine', 'missile', 'oil', 'opec', 'conflict', 'invasion',
+  'hormuz', 'strait', 'nuclear', 'ceasefire', 'peace deal', 'peace agreement',
+  'escalat', 'troops', 'pentagon', 'nato', 'coup', 'embargo',
 ];
 
 function calcImpactScore(headline: string, summary: string): number {
