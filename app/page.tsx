@@ -214,6 +214,15 @@ export default function Home() {
     } catch {}
   }, []);
 
+  // Sync userEmail when auth session changes (e.g. after email confirmation)
+  useEffect(() => {
+    const { data: { subscription } } = createClient().auth.onAuthStateChange((_event, session) => {
+      const email = session?.user?.email ?? null;
+      setUserEmail(email);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   // Auto-refresh rates every 5 minutes
   useEffect(() => {
     const id = setInterval(fetchRates, 300_000);
