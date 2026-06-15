@@ -5,41 +5,34 @@ export interface DiscordRoleResult {
   message: string;
 }
 
-export async function getUserDiscordRoles(discordUserId: string): Promise<DiscordRoleResult> {
+// Uses the user's own access token (no bot needed)
+// DISCORD_ALLOWED_ROLE_IDS: comma-separated role IDs (right-click role in Discord → Copy ID)
+export async function getUserDiscordRoles(accessToken: string): Promise<DiscordRoleResult> {
   const serverId    = process.env.DISCORD_SERVER_ID!;
-  const botToken    = process.env.DISCORD_BOT_TOKEN!;
-  const allowedRoles = (process.env.DISCORD_ALLOWED_ROLES ?? '').split(',').map(r => r.trim()).filter(Boolean);
+  const allowedIds  = (process.env.DISCORD_ALLOWED_ROLE_IDS ?? '').split(',').map(r => r.trim()).filter(Boolean);
   const blockedMsg  = process.env.DISCORD_BLOCKED_MESSAGE ?? '디스코드 프리미엄 멤버만 접근이 가능합니다.';
 
   try {
-    const memberRes = await fetch(
-      `https://discord.com/api/v10/guilds/${serverId}/members/${discordUserId}`,
-      { headers: { Authorization: `Bot ${botToken}` } }
+    const res = await fetch(
+      `https://discord.com/api/v10/users/@me/guilds/${serverId}/member`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
     );
 
-    if (!memberRes.ok) {
+    if (res.status === 404 || res.status === 403) {
       return { isMember: false, roles: [], hasPermission: false, message: '디스코드 서버에 가입해주세요.' };
     }
 
-    const memberData = await memberRes.json();
-    const roleIds: string[] = memberData.roles ?? [];
-
-    const rolesRes = await fetch(
-      `https://discord.com/api/v10/guilds/${serverId}/roles`,
-      { headers: { Authorization: `Bot ${botToken}` } }
-    );
-
-    if (!rolesRes.ok) {
-      return { isMember: true, roles: [], hasPermission: false, message: '역할 정보를 확인할 수 없습니다.' };
+    if (!res.ok) {
+      return { isMember: false, roles: [], hasPermission: false, message: '서버 멤버 정보를 가져올 수 없습니다.' };
     }
 
-    const allRoles: Array<{ id: string; name: string }> = await rolesRes.json();
-    const userRoles = allRoles.filter(r => roleIds.includes(r.id)).map(r => r.name);
-    const hasPermission = userRoles.some(r => allowedRoles.includes(r));
+    const member = await res.json();
+    const roleIds: string[] = member.roles ?? [];
+    const hasPermission = allowedIds.length === 0 || roleIds.some(id => allowedIds.includes(id));
 
     return {
       isMember: true,
-      roles: userRoles,
+      roles: roleIds,
       hasPermission,
       message: hasPermission ? '접근 허용됩니다.' : blockedMsg,
     };

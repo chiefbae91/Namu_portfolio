@@ -63,8 +63,8 @@ export async function GET(req: NextRequest) {
   const discordUser = await userRes.json();
   const discordId: string = discordUser.id;
 
-  // Check guild roles via bot
-  const roleCheck = await getUserDiscordRoles(discordId);
+  // Check guild roles via user's own token (no bot needed)
+  const roleCheck = await getUserDiscordRoles(access_token);
 
   // Update profiles table (service role bypasses RLS)
   await getAdminClient().from('profiles').upsert({
