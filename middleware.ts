@@ -34,10 +34,11 @@ export async function middleware(request: NextRequest) {
   const isPublic =
     pathname === '/' ||
     pathname === '/login' ||
+    pathname === '/auth/discord-verify' ||
+    pathname === '/auth/discord-denied' ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/api/trading-hints') ||
     pathname.startsWith('/api/exchange-rates') ||
-    pathname.startsWith('/api/quotes') ||
     pathname.startsWith('/api/cron') ||
     pathname.startsWith('/api/news') ||
     pathname.startsWith('/api/translate') ||
@@ -54,6 +55,21 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = '/';
     return NextResponse.redirect(url);
+  }
+
+  // Discord verification check for authenticated users
+  if (user && !isPublic) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('discord_verified')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile?.discord_verified) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/auth/discord-verify';
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;
