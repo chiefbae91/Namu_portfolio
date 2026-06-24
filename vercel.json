@@ -2,11 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/fetch-news?source=marketaux",
-      "schedule": "*/10 23,0-8 * * *"
-    },
-    {
-      "path": "/api/cron/fetch-news?source=finnhub",
-      "schedule": "5-59/10 23,0-8 * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
