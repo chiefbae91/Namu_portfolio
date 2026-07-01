@@ -133,9 +133,19 @@ export default function LoginPage() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.04em' }}>
-              PASSWORD
-            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.04em' }}>
+                PASSWORD
+              </label>
+              {mode === 'signin' && (
+                <a
+                  href="/auth/forgot-password"
+                  style={{ fontSize: 12, color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}
+                >
+                  비밀번호를 잊으셨나요?
+                </a>
+              )}
+            </div>
             <input
               type="password"
               value={password}

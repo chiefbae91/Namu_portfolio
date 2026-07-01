@@ -36,6 +36,8 @@ export async function middleware(request: NextRequest) {
     pathname === '/login' ||
     pathname === '/auth/discord-verify' ||
     pathname === '/auth/discord-denied' ||
+    pathname === '/auth/forgot-password' ||
+    pathname === '/auth/reset-password' ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/api/trading-hints') ||
     pathname.startsWith('/api/exchange-rates') ||
