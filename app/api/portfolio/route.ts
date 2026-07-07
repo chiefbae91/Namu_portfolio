@@ -32,6 +32,37 @@ async function fetchPriceData(ticker: string): Promise<{ price: number; prevClos
   } catch { return { price: 0, prevClose: 0, quoteType: '', leverage: '' }; }
 }
 
+interface Lot { id: string; ticker: string; account_id: string; quantity: number; price: number; fee: number; remaining: number; }
+
+// Deplete lots oldest-first (fifo) or newest-first (lifo); returns leftover unfulfilled quantity.
+function depleteOrdered(candidates: Lot[], need: number, reverse: boolean): number {
+  const ordered = reverse ? [...candidates].reverse() : candidates;
+  for (const lot of ordered) {
+    if (need <= 0.00001) break;
+    if (lot.remaining < 0.00001) continue;
+    const use = Math.min(lot.remaining, need);
+    lot.remaining -= use;
+    need -= use;
+  }
+  return need;
+}
+
+// Deplete lots proportionally to their remaining share (average-cost semantics); returns leftover unfulfilled quantity.
+function depleteProRata(candidates: Lot[], need: number): number {
+  const eligible = candidates.filter(l => l.remaining > 0.00001);
+  const total = eligible.reduce((s, l) => s + l.remaining, 0);
+  if (total <= 0.00001) return need;
+  const take = Math.min(total, need);
+  let used = 0;
+  eligible.forEach((lot, i) => {
+    const isLast = i === eligible.length - 1;
+    const use = isLast ? (take - used) : Math.min(lot.remaining, (lot.remaining / total) * take);
+    lot.remaining -= use;
+    used += use;
+  });
+  return need - used;
+}
+
 export async function GET(req: NextRequest) {
   const user = await getAuthUser();
   if (!user) return unauthorized();
@@ -53,7 +84,7 @@ export async function GET(req: NextRequest) {
   ] = await Promise.all([
     supabase.from('transactions').select('id, transaction_date, ticker, account_id, quantity, price, fee')
       .eq('user_id', user.id).ilike('type', 'buy').order('transaction_date').order('id'),
-    supabase.from('transactions').select('id, transaction_date, ticker, account_id, quantity')
+    supabase.from('transactions').select('id, transaction_date, ticker, account_id, quantity, lot_method')
       .eq('user_id', user.id).ilike('type', 'sell').order('transaction_date').order('id'),
     supabase.from('transactions').select('id, transaction_date, ticker, account_id, quantity, type')
       .eq('user_id', user.id).or('type.ilike.split,type.ilike.consolidation').order('transaction_date').order('id'),
@@ -61,14 +92,26 @@ export async function GET(req: NextRequest) {
     supabase.from('cash_flow').select('account_id, amount, type').eq('user_id', user.id),
   ]);
 
-  interface Lot { id: string; ticker: string; account_id: string; quantity: number; price: number; fee: number; remaining: number; }
+  // Sells with specific-lot selections need their saved buy-lot assignments
+  const specificSellIds = (sellRows || []).filter((r: any) => r.lot_method === 'specific').map((r: any) => r.id);
+  const assignmentsBySell: Record<string, { buy_tx_id: string; quantity: number }[]> = {};
+  if (specificSellIds.length > 0) {
+    const { data: assignRows } = await supabase
+      .from('lot_assignments')
+      .select('sell_tx_id, buy_tx_id, quantity')
+      .eq('user_id', user.id)
+      .in('sell_tx_id', specificSellIds);
+    for (const row of assignRows || []) {
+      (assignmentsBySell[row.sell_tx_id] ??= []).push({ buy_tx_id: row.buy_tx_id, quantity: row.quantity });
+    }
+  }
 
   // Pass 1: create all lots from buys regardless of date order
   // (handles bad data where sell date < buy date)
   const lots: Lot[] = (buyRows || []).map((r: any) => ({ ...r, remaining: r.quantity }));
 
   // Pass 2: process sells and splits in chronological order
-  type SellEvent  = { _kind: 'sell';                     id: string; transaction_date: string; ticker: string; account_id: string; quantity: number; };
+  type SellEvent  = { _kind: 'sell';                     id: string; transaction_date: string; ticker: string; account_id: string; quantity: number; lot_method: string | null; };
   type SplitEvent = { _kind: 'split' | 'consolidation'; id: string; transaction_date: string; ticker: string; account_id: string; quantity: number; };
 
   const timeline: (SellEvent | SplitEvent)[] = [
@@ -82,7 +125,7 @@ export async function GET(req: NextRequest) {
   });
 
   for (const ev of timeline) {
-    if (ev._kind === 'split' || ev._kind === 'consolidation') {
+    if (ev._kind !== 'sell') {
       const ratio = ev.quantity;
       for (const lot of lots) {
         if (lot.ticker !== ev.ticker || lot.account_id !== ev.account_id || lot.remaining < 0.00001) continue;
@@ -97,19 +140,33 @@ export async function GET(req: NextRequest) {
         }
       }
     } else {
-      // sell — FIFO same account first, then cross-account fallback
-      let need = ev.quantity;
-      for (const lot of lots) {
-        if (need <= 0) break;
-        if (lot.ticker !== ev.ticker || lot.account_id !== ev.account_id || lot.remaining < 0.00001) continue;
-        const use = Math.min(lot.remaining, need); lot.remaining -= use; need -= use;
-      }
-      if (need > 0.00001) {
-        for (const lot of lots) {
-          if (need <= 0) break;
-          if (lot.ticker !== ev.ticker || lot.remaining < 0.00001) continue;
-          const use = Math.min(lot.remaining, need); lot.remaining -= use; need -= use;
+      // sell — depletion order follows the transaction's chosen tax-lot method,
+      // same-account lots first, then cross-account fallback for mismatched data
+      const sameAcct = lots.filter(l => l.ticker === ev.ticker && l.account_id === ev.account_id);
+      const allForTicker = lots.filter(l => l.ticker === ev.ticker);
+      const method = ev.lot_method || 'fifo';
+
+      if (method === 'specific') {
+        const byId = new Map(allForTicker.map(l => [String(l.id), l]));
+        let used = 0;
+        for (const a of assignmentsBySell[ev.id] || []) {
+          const lot = byId.get(String(a.buy_tx_id));
+          if (!lot) continue;
+          const use = Math.min(lot.remaining, a.quantity);
+          lot.remaining -= use;
+          used += use;
         }
+        // Fall back to FIFO for any shortfall (e.g. stale assignments) so quantities stay consistent
+        let need = ev.quantity - used;
+        if (need > 0.00001) need = depleteOrdered(sameAcct, need, false);
+        if (need > 0.00001) depleteOrdered(allForTicker, need, false);
+      } else if (method === 'average_cost') {
+        const need = depleteProRata(sameAcct, ev.quantity);
+        if (need > 0.00001) depleteProRata(allForTicker, need);
+      } else {
+        const reverse = method === 'lifo';
+        const need = depleteOrdered(sameAcct, ev.quantity, reverse);
+        if (need > 0.00001) depleteOrdered(allForTicker, need, reverse);
       }
     }
   }

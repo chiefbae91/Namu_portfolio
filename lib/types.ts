@@ -54,6 +54,8 @@ export interface Transaction {
   fee: number;
   currency: string;
   notes?: string;
+  lot_method?: TaxLotMethod | null;
+  lot_assignments?: { buy_tx_id: string; quantity: number }[] | null;
   subtype?: string | null;
   dividend_id?: number | null;
   // populated only on dividend rows that have a linked reinvest

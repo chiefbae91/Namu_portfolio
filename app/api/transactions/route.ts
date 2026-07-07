@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 
   let query = supabase
     .from('transactions')
-    .select('id, account_id, ticker, type, quantity, price, fee, note, transaction_date, created_at')
+    .select('id, account_id, ticker, type, quantity, price, fee, note, transaction_date, created_at, lot_method')
     .eq('user_id', user.id)
     .order('transaction_date', { ascending: false })
     .order('id', { ascending: false });
@@ -38,13 +38,30 @@ export async function GET(req: NextRequest) {
   const unknownIds = [...new Set((txData || []).map((tx: any) => tx.account_id).filter((id: string) => !nameMap[id]))].sort() as string[];
   const acctLabel: Record<string, string> = Object.fromEntries(unknownIds.map((id, i) => [id, `Acct ${i + 1}`]));
 
+  // Specific-lot sells need their saved buy-lot assignments so editing doesn't lose the selection
+  const specificSellIds = (txData || [])
+    .filter((tx: any) => (tx.type ?? '').toLowerCase() === 'sell' && tx.lot_method === 'specific')
+    .map((tx: any) => tx.id);
+  const assignmentsBySell: Record<string, { buy_tx_id: string; quantity: number }[]> = {};
+  if (specificSellIds.length > 0) {
+    const { data: assignRows } = await supabase
+      .from('lot_assignments')
+      .select('sell_tx_id, buy_tx_id, quantity')
+      .eq('user_id', user.id)
+      .in('sell_tx_id', specificSellIds);
+    for (const row of assignRows || []) {
+      (assignmentsBySell[row.sell_tx_id] ??= []).push({ buy_tx_id: row.buy_tx_id, quantity: row.quantity });
+    }
+  }
+
   const result = (txData || []).map((tx: any) => ({
     ...tx,
     date: tx.transaction_date,
     notes: tx.note,
     type: (tx.type ?? '').toLowerCase(),   // normalise 'BUY'→'buy' for client filters
     currency: 'USD',
-    lot_method: null,
+    lot_method: tx.lot_method ?? null,
+    lot_assignments: assignmentsBySell[tx.id] ?? null,
     subtype: null,
     dividend_id: null,
     reinvest_id: null,
@@ -61,7 +78,7 @@ export async function POST(req: NextRequest) {
   if (!user) return unauthorized();
   const supabase = getAdminClient();
   const body = await req.json();
-  const { account_id, date, ticker, type, quantity, price, fee, notes } = body;
+  const { account_id, date, ticker, type, quantity, price, fee, notes, lot_method, lot_assignments } = body;
 
   if (!account_id || !date || !type) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -79,12 +96,25 @@ export async function POST(req: NextRequest) {
       fee: fee || 0,
       note: notes || '',
       user_id: user.id,
+      lot_method: type === 'sell' ? (lot_method || null) : null,
     })
     .select()
     .single();
 
   if (txError) return NextResponse.json({ error: txError.message }, { status: 500 });
 
-  const tx = { ...newTx, date: newTx.transaction_date, notes: newTx.note, currency: 'USD', lot_method: null, subtype: null, dividend_id: null };
+  if (type === 'sell' && lot_method === 'specific' && Array.isArray(lot_assignments) && lot_assignments.length > 0) {
+    const { error: laError } = await supabase.from('lot_assignments').insert(
+      lot_assignments.map((a: { buy_tx_id: string; quantity: number }) => ({
+        sell_tx_id: newTx.id,
+        buy_tx_id: a.buy_tx_id,
+        quantity: a.quantity,
+        user_id: user.id,
+      }))
+    );
+    if (laError) return NextResponse.json({ error: laError.message }, { status: 500 });
+  }
+
+  const tx = { ...newTx, date: newTx.transaction_date, notes: newTx.note, currency: 'USD', lot_assignments: lot_assignments ?? null, subtype: null, dividend_id: null };
   return NextResponse.json([tx], { status: 201 });
 }

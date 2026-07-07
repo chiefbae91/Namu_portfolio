@@ -82,7 +82,7 @@ function TaxLotPanel({ ticker, accountId, sellQty, sellPrice, method, onMethodCh
 
   const specificQty = Object.values(specificSelections).reduce((s,v) => s+(parseFloat(v)||0), 0);
   const specificCost = Object.entries(specificSelections).reduce((s,[id,v]) => {
-    const lot = lots.find(l=>l.id===Number(id));
+    const lot = lots.find(l=>l.id===id);
     return s + (lot ? (parseFloat(v)||0)*lot.price : 0);
   }, 0);
   const activeCps = method==='specific' ? (specificQty>0 ? specificCost/specificQty : 0) : costPerShare;
@@ -241,7 +241,9 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
   const [csvResult, setCsvResult] = useState<{ imported: number } | null>(null);
 
   // ── Load editing tx ───────────────────────────────────────────
+  const skipSpecificResetRef = useRef(false);
   useEffect(() => {
+    skipSpecificResetRef.current = true;
     if (editingTx) {
       if (editingTx.type === 'transfer_deposit' || editingTx.type === 'transfer_withdraw') {
         setType('transfer');
@@ -263,6 +265,15 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
       } else {
         setReinvest(false); setReinvestQty(''); setReinvestPrice('');
       }
+      if (editingTx.type === 'sell') {
+        const method = editingTx.lot_method ?? 'average_cost';
+        setLotMethod(method);
+        setSpecificSelections(method === 'specific' && editingTx.lot_assignments
+          ? Object.fromEntries(editingTx.lot_assignments.map(a => [a.buy_tx_id, String(a.quantity)]))
+          : {});
+      } else {
+        setLotMethod('average_cost'); setSpecificSelections({});
+      }
     } else {
       setType('buy'); setTicker(prefillTicker ?? ''); setDate(todayStr());
       setQty(''); setPrice(''); setFee(''); setNotes('');
@@ -273,7 +284,10 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
     }
   }, [editingTx]);
 
-  useEffect(() => { setSpecificSelections({}); }, [ticker, accountId, lotMethod]);
+  useEffect(() => {
+    if (skipSpecificResetRef.current) { skipSpecificResetRef.current = false; return; }
+    setSpecificSelections({});
+  }, [ticker, accountId, lotMethod]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -354,7 +368,7 @@ export default function TransactionModal({ accounts, currency, editingTx, onSubm
         const lot_assignments = type==='sell' && lotMethod==='specific'
           ? Object.entries(specificSelections)
               .filter(([,v]) => parseFloat(v)>0)
-              .map(([id,v]) => ({ buy_tx_id: Number(id), quantity: parseFloat(v) }))
+              .map(([id,v]) => ({ buy_tx_id: id, quantity: parseFloat(v) }))
           : undefined;
 
         await onSubmit({
