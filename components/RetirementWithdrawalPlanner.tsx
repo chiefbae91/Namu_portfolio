@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AreaChart, Area, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, ReferenceLine,
@@ -39,6 +39,19 @@ const DEFAULT_ACCOUNTS: AccountConfig[] = [
 
 const CURRENT_AGE = 53;
 const END_AGE = 98;
+
+const SETTINGS_KEY = 'retirement_planner';
+
+interface SavedSettings {
+  accounts: AccountConfig[];
+  fxRate: number;
+  baseMonthlyLivingKRW: number;
+  expenseAdjustPct: number;
+  inflationPct: number;
+  ssMonthlyUSD: number;
+  ssColaPct: number;
+  ssStartAge: number;
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -101,6 +114,50 @@ export default function RetirementWithdrawalPlanner() {
   const [ssStartAge, setSsStartAge] = useState(62);
 
   const [viewMode, setViewMode] = useState<'table' | 'chart'>('table');
+
+  // ===== 설정 불러오기 / 저장 =====
+  const [loaded, setLoaded] = useState(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`/api/settings?key=${SETTINGS_KEY}`);
+        if (res.ok) {
+          const { value } = await res.json();
+          if (value) {
+            const saved: Partial<SavedSettings> = JSON.parse(value);
+            if (saved.accounts) setAccounts(saved.accounts);
+            if (saved.fxRate != null) setFxRate(saved.fxRate);
+            if (saved.baseMonthlyLivingKRW != null) setBaseMonthlyLivingKRW(saved.baseMonthlyLivingKRW);
+            if (saved.expenseAdjustPct != null) setExpenseAdjustPct(saved.expenseAdjustPct);
+            if (saved.inflationPct != null) setInflationPct(saved.inflationPct);
+            if (saved.ssMonthlyUSD != null) setSsMonthlyUSD(saved.ssMonthlyUSD);
+            if (saved.ssColaPct != null) setSsColaPct(saved.ssColaPct);
+            if (saved.ssStartAge != null) setSsStartAge(saved.ssStartAge);
+          }
+        }
+      } finally {
+        setLoaded(true);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!loaded) return; // 불러오기 완료 전에는 저장하지 않음 (기본값으로 덮어쓰기 방지)
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      const value: SavedSettings = {
+        accounts, fxRate, baseMonthlyLivingKRW, expenseAdjustPct, inflationPct,
+        ssMonthlyUSD, ssColaPct, ssStartAge,
+      };
+      fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: SETTINGS_KEY, value: JSON.stringify(value) }),
+      });
+    }, 500);
+  }, [accounts, fxRate, baseMonthlyLivingKRW, expenseAdjustPct, inflationPct, ssMonthlyUSD, ssColaPct, ssStartAge, loaded]);
 
   const updateAccount = (id: string, field: keyof AccountConfig, value: number) => {
     setAccounts(prev => prev.map(a => a.id === id ? { ...a, [field]: value } : a));
