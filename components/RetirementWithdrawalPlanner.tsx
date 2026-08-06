@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Plus, X } from 'lucide-react';
 import {
   AreaChart, Area, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, ReferenceLine,
@@ -7,15 +8,27 @@ import {
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
+interface WithdrawalRule {
+  fromAge: number; // 이 연령부터 적용
+  rate: number;    // %/년
+}
+
 interface AccountConfig {
   id: string;
   name: string;
-  balance: number;        // USD
-  expectedReturn: number; // %/년
-  withdrawalRate: number; // %/년
-  startAge: number;       // 인출 시작 연령
+  balance: number;                    // USD
+  expectedReturn: number;             // %/년
+  withdrawalSchedule: WithdrawalRule[]; // 연령 구간별 인출률
+  startAge: number;                   // 인출 시작 연령
   taxable: boolean;
-  isBuffer: boolean;      // 자동조정 계좌 — 정확히 하나만 true
+  isBuffer: boolean;                  // 자동조정 계좌 — 정확히 하나만 true
+}
+
+// 주어진 나이 시점에 적용되는 인출률: fromAge <= age인 규칙 중 가장 늦게 시작하는 규칙
+function effectiveWithdrawalRate(schedule: WithdrawalRule[], age: number): number {
+  const applicable = schedule.filter(r => r.fromAge <= age);
+  if (applicable.length === 0) return 0;
+  return applicable.reduce((latest, r) => (r.fromAge > latest.fromAge ? r : latest)).rate;
 }
 
 interface SimulationRow {
@@ -31,11 +44,18 @@ interface SimulationRow {
 }
 
 const DEFAULT_ACCOUNTS: AccountConfig[] = [
-  { id: 'chase',     name: 'Chase (과세)',     balance: 1_400_127, expectedReturn: 8.4, withdrawalRate: 2.0, startAge: 54, taxable: true,  isBuffer: true },
-  { id: 'robinhood', name: 'Robinhood (과세)', balance: 510_000,   expectedReturn: 8.4, withdrawalRate: 2.0, startAge: 54, taxable: true,  isBuffer: false },
-  { id: 'trad_ira',  name: 'Traditional IRA',  balance: 193_000,   expectedReturn: 7.5, withdrawalRate: 0.0, startAge: 73, taxable: true,  isBuffer: false },
-  { id: 'roth_ira',  name: 'Roth IRA',         balance: 100_000,   expectedReturn: 7.5, withdrawalRate: 0.0, startAge: 85, taxable: false, isBuffer: false },
+  { id: 'chase',     name: 'Chase (과세)',     balance: 1_400_127, expectedReturn: 8.4, withdrawalSchedule: [{ fromAge: 54, rate: 2.0 }], startAge: 54, taxable: true,  isBuffer: true },
+  { id: 'robinhood', name: 'Robinhood (과세)', balance: 510_000,   expectedReturn: 8.4, withdrawalSchedule: [{ fromAge: 54, rate: 2.0 }], startAge: 54, taxable: true,  isBuffer: false },
+  { id: 'trad_ira',  name: 'Traditional IRA',  balance: 193_000,   expectedReturn: 7.5, withdrawalSchedule: [{ fromAge: 73, rate: 0.0 }], startAge: 73, taxable: true,  isBuffer: false },
+  { id: 'roth_ira',  name: 'Roth IRA',         balance: 100_000,   expectedReturn: 7.5, withdrawalSchedule: [{ fromAge: 85, rate: 0.0 }], startAge: 85, taxable: false, isBuffer: false },
 ];
+
+// 구버전(단일 withdrawalRate) 저장 데이터를 스케줄 형태로 이전
+function normalizeAccount(a: any): AccountConfig {
+  if (Array.isArray(a.withdrawalSchedule) && a.withdrawalSchedule.length > 0) return a as AccountConfig;
+  const rate = typeof a.withdrawalRate === 'number' ? a.withdrawalRate : 0;
+  return { ...a, withdrawalSchedule: [{ fromAge: a.startAge ?? CURRENT_AGE, rate }] };
+}
 
 const CURRENT_AGE = 53;
 const END_AGE = 98;
@@ -127,7 +147,7 @@ export default function RetirementWithdrawalPlanner() {
           const { value } = await res.json();
           if (value) {
             const saved: Partial<SavedSettings> = JSON.parse(value);
-            if (saved.accounts) setAccounts(saved.accounts);
+            if (saved.accounts) setAccounts(saved.accounts.map(normalizeAccount));
             if (saved.fxRate != null) setFxRate(saved.fxRate);
             if (saved.baseMonthlyLivingKRW != null) setBaseMonthlyLivingKRW(saved.baseMonthlyLivingKRW);
             if (saved.expenseAdjustPct != null) setExpenseAdjustPct(saved.expenseAdjustPct);
@@ -167,6 +187,30 @@ export default function RetirementWithdrawalPlanner() {
     setAccounts(prev => prev.map(a => ({ ...a, isBuffer: a.id === id })));
   };
 
+  const addScheduleRule = (accountId: string) => {
+    setAccounts(prev => prev.map(a => {
+      if (a.id !== accountId) return a;
+      const lastRule = [...a.withdrawalSchedule].sort((x, y) => x.fromAge - y.fromAge).pop();
+      const nextFromAge = Math.min(END_AGE, (lastRule?.fromAge ?? a.startAge) + 5);
+      return { ...a, withdrawalSchedule: [...a.withdrawalSchedule, { fromAge: nextFromAge, rate: lastRule?.rate ?? 0 }] };
+    }));
+  };
+
+  const updateScheduleRule = (accountId: string, ruleIndex: number, field: keyof WithdrawalRule, value: number) => {
+    setAccounts(prev => prev.map(a => {
+      if (a.id !== accountId) return a;
+      const withdrawalSchedule = a.withdrawalSchedule.map((r, i) => i === ruleIndex ? { ...r, [field]: value } : r);
+      return { ...a, withdrawalSchedule };
+    }));
+  };
+
+  const removeScheduleRule = (accountId: string, ruleIndex: number) => {
+    setAccounts(prev => prev.map(a => {
+      if (a.id !== accountId || a.withdrawalSchedule.length <= 1) return a;
+      return { ...a, withdrawalSchedule: a.withdrawalSchedule.filter((_, i) => i !== ruleIndex) };
+    }));
+  };
+
   // ===== 핵심 시뮬레이션 =====
   const simulation = useMemo<SimulationRow[]>(() => {
     const rows: SimulationRow[] = [];
@@ -201,7 +245,8 @@ export default function RetirementWithdrawalPlanner() {
         if (a.isBuffer) return a; // 자동조정 계좌는 Step B에서 처리
         let withdrawnUSD = 0;
         if (age >= a.startAge && a.balance > 0) {
-          withdrawnUSD = Math.min(a.balance * (a.withdrawalRate / 100), a.balance);
+          const rate = effectiveWithdrawalRate(a.withdrawalSchedule, age);
+          withdrawnUSD = Math.min(a.balance * (rate / 100), a.balance);
         }
         const withdrawnKRW = (withdrawnUSD * fxRate) / 1e8;
         nonBufferWithdrawnKRW += withdrawnKRW;
@@ -219,7 +264,8 @@ export default function RetirementWithdrawalPlanner() {
         let withdrawnUSD = 0;
         const canWithdraw = age >= a.startAge && a.balance > 0;
         if (canWithdraw) {
-          const minWithdrawUSD = a.balance * (a.withdrawalRate / 100);
+          const rate = effectiveWithdrawalRate(a.withdrawalSchedule, age);
+          const minWithdrawUSD = a.balance * (rate / 100);
           const shortfallUSD = (shortfallBeforeBufferKRW * 1e8) / fxRate;
           // 최소 인출률만큼은 기본으로 인출하고, 부족분이 그보다 크면 부족분만큼 인출
           withdrawnUSD = Math.min(Math.max(minWithdrawUSD, shortfallUSD), a.balance);
@@ -349,15 +395,41 @@ export default function RetirementWithdrawalPlanner() {
             <tbody>
               {accounts.map(a => (
                 <tr key={a.id}>
-                  <td style={{ fontWeight: 600 }}>{a.name}</td>
-                  <td><NumberField value={a.balance} onChange={v => updateAccount(a.id, 'balance', v)} width={120} /></td>
-                  <td><NumberField value={a.expectedReturn} onChange={v => updateAccount(a.id, 'expectedReturn', v)} step={0.1} width={80} /></td>
-                  <td>
-                    <NumberField value={a.withdrawalRate} onChange={v => updateAccount(a.id, 'withdrawalRate', v)} step={0.5} width={80} />
-                    {a.isBuffer && <span style={{ fontSize: 10, color: 'var(--muted)', display: 'block', marginTop: 2 }}>최소 인출률</span>}
+                  <td style={{ fontWeight: 600, verticalAlign: 'top' }}>{a.name}</td>
+                  <td style={{ verticalAlign: 'top' }}><NumberField value={a.balance} onChange={v => updateAccount(a.id, 'balance', v)} width={120} /></td>
+                  <td style={{ verticalAlign: 'top' }}><NumberField value={a.expectedReturn} onChange={v => updateAccount(a.id, 'expectedReturn', v)} step={0.1} width={80} /></td>
+                  <td style={{ verticalAlign: 'top' }}>
+                    {[...a.withdrawalSchedule]
+                      .map((rule, i) => ({ rule, i }))
+                      .sort((x, y) => x.rule.fromAge - y.rule.fromAge)
+                      .map(({ rule, i }) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                          <NumberField value={rule.fromAge} onChange={v => updateScheduleRule(a.id, i, 'fromAge', v)} width={50} />
+                          <span style={{ fontSize: 12, color: 'var(--muted)' }}>세~</span>
+                          <NumberField value={rule.rate} onChange={v => updateScheduleRule(a.id, i, 'rate', v)} step={0.5} width={55} />
+                          <span style={{ fontSize: 12, color: 'var(--muted)' }}>%</span>
+                          {a.withdrawalSchedule.length > 1 && (
+                            <button
+                              onClick={() => removeScheduleRule(a.id, i)}
+                              title="구간 삭제"
+                              style={{ background: 'none', padding: 2, color: 'var(--muted)', display: 'flex' }}
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    <button
+                      onClick={() => addScheduleRule(a.id)}
+                      className="btn-sm btn-secondary"
+                      style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}
+                    >
+                      <Plus size={11} /> 구간 추가
+                    </button>
+                    {a.isBuffer && <span style={{ fontSize: 10, color: 'var(--muted)', display: 'block', marginTop: 4 }}>최소 인출률</span>}
                   </td>
-                  <td><NumberField value={a.startAge} onChange={v => updateAccount(a.id, 'startAge', v)} width={80} /></td>
-                  <td style={{ textAlign: 'center' }}>
+                  <td style={{ verticalAlign: 'top' }}><NumberField value={a.startAge} onChange={v => updateAccount(a.id, 'startAge', v)} width={80} /></td>
+                  <td style={{ textAlign: 'center', verticalAlign: 'top' }}>
                     <input
                       type="radio" name="bufferAccount" checked={a.isBuffer}
                       onChange={() => setBufferAccount(a.id)}
@@ -370,6 +442,8 @@ export default function RetirementWithdrawalPlanner() {
           </table>
         </div>
         <p style={helpTextStyle}>
+          인출률은 계좌마다 여러 연령 구간으로 나눠 설정할 수 있습니다 (예: 54세~2%, 65세~4%).
+          각 나이에는 시작 연령이 그 나이 이하인 구간 중 가장 늦게 시작하는 구간의 인출률이 적용됩니다.
           "자동조정" 계좌는 설정한 인출률만큼을 <strong>최소 인출액</strong>으로 매년 인출하고,
           나머지 계좌들의 인출액 합이 필요액에 못 미치면 그 부족분과 최소 인출액 중 더 큰 금액을 인출합니다.
           정확히 한 계좌만 선택할 수 있습니다.
