@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Settings, RefreshCw, LogOut, LogIn, HelpCircle, BarChart2 } from 'lucide-react';
+import { Settings, RefreshCw, LogOut, LogIn, HelpCircle, BarChart2, PiggyBank } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
 import { Account, AccountBreakdown, AccountType, ExchangeRates, HintAlert, HintNotification, PortfolioPosition, SummaryData, Transaction, TradingHint } from '@/lib/types';
@@ -578,6 +578,17 @@ export default function Home() {
           >
             <BarChart2 size={15} />
             <span className="mobile-hide">분석</span>
+          </Link>
+        )}
+
+        {!!userEmail && (
+          <Link
+            href="/retirement-planner"
+            title="은퇴 인출 계획 시뮬레이터"
+            style={{ background: 'none', color: 'var(--muted)', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}
+          >
+            <PiggyBank size={15} />
+            <span className="mobile-hide">은퇴</span>
           </Link>
         )}
 
