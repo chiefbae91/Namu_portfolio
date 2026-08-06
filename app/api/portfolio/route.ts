@@ -32,7 +32,7 @@ async function fetchPriceData(ticker: string): Promise<{ price: number; prevClos
   } catch { return { price: 0, prevClose: 0, quoteType: '', leverage: '' }; }
 }
 
-interface Lot { id: string; ticker: string; account_id: string; quantity: number; price: number; fee: number; remaining: number; }
+interface Lot { id: string; ticker: string; account_id: string; transaction_date: string; quantity: number; price: number; fee: number; remaining: number; }
 
 // Deplete lots oldest-first (fifo) or newest-first (lifo); returns leftover unfulfilled quantity.
 function depleteOrdered(candidates: Lot[], need: number, reverse: boolean): number {
@@ -141,13 +141,22 @@ export async function GET(req: NextRequest) {
       }
     } else {
       // sell — depletion order follows the transaction's chosen tax-lot method,
-      // same-account lots first, then cross-account fallback for mismatched data
-      const sameAcct = lots.filter(l => l.ticker === ev.ticker && l.account_id === ev.account_id);
-      const allForTicker = lots.filter(l => l.ticker === ev.ticker);
+      // same-account lots first, then cross-account fallback for mismatched data.
+      // Within each tier, lots dated on/before the sell are tried first; lots dated
+      // *after* the sell (e.g. a position fully closed out and later reopened) are
+      // only used as a last-resort fallback for out-of-order/bad data, so a rebuy
+      // can never bleed its cost basis backward into an earlier, already-closed sale.
+      const isEligible = (l: Lot) => l.transaction_date <= ev.transaction_date;
+      const sameAcctAll = lots.filter(l => l.ticker === ev.ticker && l.account_id === ev.account_id);
+      const allForTickerAll = lots.filter(l => l.ticker === ev.ticker);
+      const sameAcctEligible = sameAcctAll.filter(isEligible);
+      const sameAcctFuture = sameAcctAll.filter(l => !isEligible(l));
+      const allEligible = allForTickerAll.filter(isEligible);
+      const allFuture = allForTickerAll.filter(l => !isEligible(l));
       const method = ev.lot_method || 'fifo';
 
       if (method === 'specific') {
-        const byId = new Map(allForTicker.map(l => [String(l.id), l]));
+        const byId = new Map(allForTickerAll.map(l => [String(l.id), l]));
         let used = 0;
         for (const a of assignmentsBySell[ev.id] || []) {
           const lot = byId.get(String(a.buy_tx_id));
@@ -158,15 +167,21 @@ export async function GET(req: NextRequest) {
         }
         // Fall back to FIFO for any shortfall (e.g. stale assignments) so quantities stay consistent
         let need = ev.quantity - used;
-        if (need > 0.00001) need = depleteOrdered(sameAcct, need, false);
-        if (need > 0.00001) depleteOrdered(allForTicker, need, false);
+        if (need > 0.00001) need = depleteOrdered(sameAcctEligible, need, false);
+        if (need > 0.00001) need = depleteOrdered(allEligible, need, false);
+        if (need > 0.00001) need = depleteOrdered(sameAcctFuture, need, false);
+        if (need > 0.00001) depleteOrdered(allFuture, need, false);
       } else if (method === 'average_cost') {
-        const need = depleteProRata(sameAcct, ev.quantity);
-        if (need > 0.00001) depleteProRata(allForTicker, need);
+        let need = depleteProRata(sameAcctEligible, ev.quantity);
+        if (need > 0.00001) need = depleteProRata(allEligible, need);
+        if (need > 0.00001) need = depleteProRata(sameAcctFuture, need);
+        if (need > 0.00001) depleteProRata(allFuture, need);
       } else {
         const reverse = method === 'lifo';
-        const need = depleteOrdered(sameAcct, ev.quantity, reverse);
-        if (need > 0.00001) depleteOrdered(allForTicker, need, reverse);
+        let need = depleteOrdered(sameAcctEligible, ev.quantity, reverse);
+        if (need > 0.00001) need = depleteOrdered(allEligible, need, reverse);
+        if (need > 0.00001) need = depleteOrdered(sameAcctFuture, need, reverse);
+        if (need > 0.00001) depleteOrdered(allFuture, need, reverse);
       }
     }
   }
