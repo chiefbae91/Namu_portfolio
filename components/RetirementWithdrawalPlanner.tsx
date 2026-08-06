@@ -52,10 +52,10 @@ function effectiveLivingBase(schedule: LivingExpenseRule[], age: number, fallbac
   return applicable.reduce((latest, r) => (r.fromAge > latest.fromAge ? r : latest)).monthlyKRW;
 }
 
-interface AccountWithdrawal {
+interface AccountAmount {
   id: string;
   name: string;
-  withdrawnKRW: number; // 억원
+  amountKRW: number; // 억원
 }
 
 interface SimulationRow {
@@ -68,7 +68,8 @@ interface SimulationRow {
   surplusKRW: number;         // 억원, 고정 인출 계좌만으로 필요액을 초과한 잉여현금
   totalBalanceKRW: number;    // 억원
   totalBalanceUSD: number;
-  accountWithdrawals: AccountWithdrawal[]; // 계좌별 출금 상세
+  accountWithdrawals: AccountAmount[]; // 계좌별 출금 상세
+  accountBalances: AccountAmount[];    // 계좌별 연말 잔액 상세
 }
 
 const DEFAULT_ACCOUNTS: AccountConfig[] = [
@@ -148,15 +149,23 @@ function spendingMultiplier(age: number) {
 
 // ── Small building blocks ─────────────────────────────────────────────────────
 
-function WithdrawalDetailButton({ items }: { items: AccountWithdrawal[] }) {
+// 클릭으로만 열리고(hover로는 안 뜸), 바깥을 클릭하면 닫히는 계좌별 상세 팝오버
+function AccountDetailButton({ items, title, emptyLabel }: { items: AccountAmount[]; title: string; emptyLabel: string }) {
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
 
-  const show = () => btnRef.current && setAnchor(btnRef.current.getBoundingClientRect());
-  const hide = () => setAnchor(null);
-  const toggle = () => (anchor ? hide() : show());
+  const toggle = () => setAnchor(anchor ? null : (btnRef.current?.getBoundingClientRect() ?? null));
 
-  const withdrawn = items.filter(it => it.withdrawnKRW > 0.00001);
+  useEffect(() => {
+    if (!anchor) return;
+    const onDocMouseDown = (e: MouseEvent) => {
+      if (btnRef.current && !btnRef.current.contains(e.target as Node)) setAnchor(null);
+    };
+    document.addEventListener('mousedown', onDocMouseDown);
+    return () => document.removeEventListener('mousedown', onDocMouseDown);
+  }, [anchor]);
+
+  const nonZero = items.filter(it => Math.abs(it.amountKRW) > 0.00001);
   const tipLeft = anchor ? Math.min(anchor.left, window.innerWidth - 220) : 0;
   const tipTop = anchor ? anchor.bottom + 6 : 0;
 
@@ -164,10 +173,8 @@ function WithdrawalDetailButton({ items }: { items: AccountWithdrawal[] }) {
     <>
       <button
         ref={btnRef}
-        onMouseEnter={show}
-        onMouseLeave={hide}
         onClick={toggle}
-        title="계좌별 출금액 보기"
+        title={title}
         style={{ background: 'none', padding: 4, color: 'var(--muted)', display: 'inline-flex' }}
       >
         <List size={14} />
@@ -179,12 +186,12 @@ function WithdrawalDetailButton({ items }: { items: AccountWithdrawal[] }) {
           padding: '10px 12px', minWidth: 180, fontSize: 12, color: 'var(--text)',
           boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
         }}>
-          {withdrawn.length === 0
-            ? <div style={{ color: 'var(--muted)' }}>인출 없음</div>
-            : withdrawn.map(it => (
+          {nonZero.length === 0
+            ? <div style={{ color: 'var(--muted)' }}>{emptyLabel}</div>
+            : nonZero.map(it => (
               <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 14, marginBottom: 4 }}>
                 <span style={{ color: 'var(--muted)' }}>{it.name}</span>
-                <span style={{ fontWeight: 600 }}>{fmtWon(it.withdrawnKRW * 1e8 / 1e4)}만원</span>
+                <span style={{ fontWeight: 600 }}>{fmtWon(it.amountKRW * 1e8 / 1e4)}만원</span>
               </div>
             ))}
         </div>,
@@ -438,7 +445,7 @@ export default function RetirementWithdrawalPlanner() {
       //    Step B: 자동조정 계좌는 (필요액 - A에서 나온 금액)만큼만 추가 인출.
       //            이미 충분하면 0원 인출, 부족하면 그 차액을 인출.
       let nonBufferWithdrawnKRW = 0;
-      const accountWithdrawals: AccountWithdrawal[] = [];
+      const accountWithdrawals: AccountAmount[] = [];
 
       accState = accState.map(a => {
         if (a.isBuffer) return a; // 자동조정 계좌는 Step B에서 처리
@@ -449,7 +456,7 @@ export default function RetirementWithdrawalPlanner() {
         }
         const withdrawnKRW = (withdrawnUSD * effectiveFxRate) / 1e8;
         nonBufferWithdrawnKRW += withdrawnKRW;
-        accountWithdrawals.push({ id: a.id, name: a.name, withdrawnKRW });
+        accountWithdrawals.push({ id: a.id, name: a.name, amountKRW: withdrawnKRW });
 
         const balanceAfterWithdrawal = a.balance - withdrawnUSD;
         const balanceAfterGrowth = balanceAfterWithdrawal * (1 + a.expectedReturn / 100);
@@ -472,7 +479,7 @@ export default function RetirementWithdrawalPlanner() {
         }
         const withdrawnKRW = (withdrawnUSD * effectiveFxRate) / 1e8;
         bufferWithdrawnKRW = withdrawnKRW;
-        accountWithdrawals.push({ id: a.id, name: a.name, withdrawnKRW });
+        accountWithdrawals.push({ id: a.id, name: a.name, amountKRW: withdrawnKRW });
 
         const balanceAfterWithdrawal = a.balance - withdrawnUSD;
         const balanceAfterGrowth = balanceAfterWithdrawal * (1 + a.expectedReturn / 100);
@@ -482,6 +489,9 @@ export default function RetirementWithdrawalPlanner() {
       const totalWithdrawnKRW = nonBufferWithdrawnKRW + bufferWithdrawnKRW;
       const totalBalanceUSD = accState.reduce((sum, a) => sum + a.balance, 0);
       const totalBalanceKRW = (totalBalanceUSD * effectiveFxRate) / 1e8;
+      const accountBalances: AccountAmount[] = accState.map(a => ({
+        id: a.id, name: a.name, amountKRW: (a.balance * effectiveFxRate) / 1e8,
+      }));
 
       // 여전히 부족한 경우 (자동조정 계좌 최소인출+부족분 충당으로도 못 채운 경우) → 부족분
       const shortfallKRW = Math.max(0, netNeedKRW - totalWithdrawnKRW);
@@ -499,6 +509,7 @@ export default function RetirementWithdrawalPlanner() {
         totalBalanceKRW,
         totalBalanceUSD,
         accountWithdrawals,
+        accountBalances,
       });
     }
     return rows;
@@ -608,13 +619,12 @@ export default function RetirementWithdrawalPlanner() {
             <thead>
               <tr>
                 <th>나이</th>
-                <th>필요생활비</th>
+                <th>월 필요생활비</th>
                 <th>SS수급액</th>
                 <th>순인출필요액</th>
                 <th>계좌인출액</th>
                 <th>출금상세</th>
-                <th>부족분</th>
-                <th>잉여현금</th>
+                <th>과부족</th>
                 <th>자산잔액</th>
               </tr>
             </thead>
@@ -622,18 +632,21 @@ export default function RetirementWithdrawalPlanner() {
               {simulation.map(r => (
                 <tr key={r.age}>
                   <td>{r.age}세</td>
-                  <td>{fmtWon(r.livingNominal * 1e8 / 1e4)}만원</td>
+                  <td>{fmtWon(r.livingNominal * 1e8 / 1e4 / 12)}만원</td>
                   <td>{fmtWon(r.ssNominalKRW * 1e8 / 1e4)}만원</td>
                   <td>{fmtWon(r.netNeedKRW * 1e8 / 1e4)}만원</td>
                   <td>{fmtWon(r.totalWithdrawnKRW * 1e8 / 1e4)}만원</td>
-                  <td><WithdrawalDetailButton items={r.accountWithdrawals} /></td>
-                  <td style={{ color: r.shortfallKRW > 0 ? 'var(--color-price-down)' : 'var(--muted)' }}>
-                    {r.shortfallKRW > 0 ? `-${fmtWon(r.shortfallKRW * 1e8 / 1e4)}만원` : '-'}
+                  <td><AccountDetailButton items={r.accountWithdrawals} title="계좌별 출금액 보기" emptyLabel="인출 없음" /></td>
+                  <td style={{ color: r.shortfallKRW > 0 ? 'var(--color-price-down)' : r.surplusKRW > 0 ? 'var(--color-price-up)' : 'var(--muted)' }}>
+                    {r.shortfallKRW > 0 ? `-${fmtWon(r.shortfallKRW * 1e8 / 1e4)}만원`
+                      : r.surplusKRW > 0 ? `+${fmtWon(r.surplusKRW * 1e8 / 1e4)}만원` : '-'}
                   </td>
-                  <td style={{ color: r.surplusKRW > 0 ? 'var(--color-price-up)' : 'var(--muted)' }}>
-                    {r.surplusKRW > 0 ? `+${fmtWon(r.surplusKRW * 1e8 / 1e4)}만원` : '-'}
+                  <td style={{ fontWeight: 600 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {fmtWon(r.totalBalanceKRW)}억원
+                      <AccountDetailButton items={r.accountBalances} title="계좌별 잔액 보기" emptyLabel="잔액 없음" />
+                    </div>
                   </td>
-                  <td style={{ fontWeight: 600 }}>{fmtWon(r.totalBalanceKRW)}억원</td>
                 </tr>
               ))}
             </tbody>
