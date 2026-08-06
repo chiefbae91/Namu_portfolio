@@ -59,8 +59,8 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   return <label style={{ display: 'block', fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>{children}</label>;
 }
 
-function NumberField({ value, onChange, step, min, max, width, disabled }: {
-  value: number; onChange: (v: number) => void; step?: number; min?: number; max?: number; width?: number; disabled?: boolean;
+function NumberField({ value, onChange, step, min, max, width }: {
+  value: number; onChange: (v: number) => void; step?: number; min?: number; max?: number; width?: number;
 }) {
   return (
     <input
@@ -69,9 +69,8 @@ function NumberField({ value, onChange, step, min, max, width, disabled }: {
       step={step}
       min={min}
       max={max}
-      disabled={disabled}
       onChange={e => onChange(Number(e.target.value))}
-      style={{ width: width ?? '100%', opacity: disabled ? 0.4 : 1 }}
+      style={{ width: width ?? '100%' }}
     />
   );
 }
@@ -162,9 +161,11 @@ export default function RetirementWithdrawalPlanner() {
         if (!a.isBuffer) return a;
         let withdrawnUSD = 0;
         const canWithdraw = age >= a.startAge && a.balance > 0;
-        if (canWithdraw && shortfallBeforeBufferKRW > 0) {
-          const neededUSD = (shortfallBeforeBufferKRW * 1e8) / fxRate;
-          withdrawnUSD = Math.min(neededUSD, a.balance);
+        if (canWithdraw) {
+          const minWithdrawUSD = a.balance * (a.withdrawalRate / 100);
+          const shortfallUSD = (shortfallBeforeBufferKRW * 1e8) / fxRate;
+          // 최소 인출률만큼은 기본으로 인출하고, 부족분이 그보다 크면 부족분만큼 인출
+          withdrawnUSD = Math.min(Math.max(minWithdrawUSD, shortfallUSD), a.balance);
         }
         const withdrawnKRW = (withdrawnUSD * fxRate) / 1e8;
         bufferWithdrawnKRW = withdrawnKRW;
@@ -178,10 +179,10 @@ export default function RetirementWithdrawalPlanner() {
       const totalBalanceUSD = accState.reduce((sum, a) => sum + a.balance, 0);
       const totalBalanceKRW = (totalBalanceUSD * fxRate) / 1e8;
 
-      // 여전히 부족한 경우 (자동조정 계좌도 소진됐거나 아직 시작연령 전인 경우) → 부족분
+      // 여전히 부족한 경우 (자동조정 계좌 최소인출+부족분 충당으로도 못 채운 경우) → 부족분
       const shortfallKRW = Math.max(0, netNeedKRW - totalWithdrawnKRW);
-      // 고정 인출 계좌들만으로 이미 필요액을 초과한 경우 → 잉여현금 (자동조정 계좌는 0원 인출했으므로 초과분은 재투자되지 않고 남는 현금)
-      const surplusKRW = Math.max(0, nonBufferWithdrawnKRW - netNeedKRW);
+      // 전체 인출액이 필요액을 초과한 경우 → 잉여현금 (자동조정 계좌 최소인출률로 인한 초과 포함)
+      const surplusKRW = Math.max(0, totalWithdrawnKRW - netNeedKRW);
 
       rows.push({
         age,
@@ -294,7 +295,10 @@ export default function RetirementWithdrawalPlanner() {
                   <td style={{ fontWeight: 600 }}>{a.name}</td>
                   <td><NumberField value={a.balance} onChange={v => updateAccount(a.id, 'balance', v)} width={120} /></td>
                   <td><NumberField value={a.expectedReturn} onChange={v => updateAccount(a.id, 'expectedReturn', v)} step={0.1} width={80} /></td>
-                  <td><NumberField value={a.withdrawalRate} onChange={v => updateAccount(a.id, 'withdrawalRate', v)} step={0.5} width={80} disabled={a.isBuffer} /></td>
+                  <td>
+                    <NumberField value={a.withdrawalRate} onChange={v => updateAccount(a.id, 'withdrawalRate', v)} step={0.5} width={80} />
+                    {a.isBuffer && <span style={{ fontSize: 10, color: 'var(--muted)', display: 'block', marginTop: 2 }}>최소 인출률</span>}
+                  </td>
                   <td><NumberField value={a.startAge} onChange={v => updateAccount(a.id, 'startAge', v)} width={80} /></td>
                   <td style={{ textAlign: 'center' }}>
                     <input
@@ -309,8 +313,9 @@ export default function RetirementWithdrawalPlanner() {
           </table>
         </div>
         <p style={helpTextStyle}>
-          "자동조정" 계좌는 나머지 계좌들의 인출액 합이 필요액에 못 미치면 그 차액만큼 자동으로 추가 인출하고,
-          이미 충분하면 인출하지 않습니다 (인출률 설정 무시). 정확히 한 계좌만 선택할 수 있습니다.
+          "자동조정" 계좌는 설정한 인출률만큼을 <strong>최소 인출액</strong>으로 매년 인출하고,
+          나머지 계좌들의 인출액 합이 필요액에 못 미치면 그 부족분과 최소 인출액 중 더 큰 금액을 인출합니다.
+          정확히 한 계좌만 선택할 수 있습니다.
         </p>
       </section>
 
