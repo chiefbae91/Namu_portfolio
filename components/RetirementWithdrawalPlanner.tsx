@@ -74,7 +74,7 @@ const SETTINGS_KEY = 'retirement_planner';
 interface SavedSettings {
   accounts: AccountConfig[];
   fxRate: number;
-  fxAdjustPct: number;
+  fxAdjustKRW: number;
   baseMonthlyLivingKRW: number;
   expenseAdjustPct: number;
   inflationPct: number;
@@ -161,7 +161,7 @@ function SummaryTile({ label, value, warn }: { label: string; value: string; war
 export default function RetirementWithdrawalPlanner() {
   const [accounts, setAccounts] = useState<AccountConfig[]>(DEFAULT_ACCOUNTS);
   const [fxRate, setFxRate] = useState(1450);
-  const [fxAdjustPct, setFxAdjustPct] = useState(0); // -20 ~ +20
+  const [fxAdjustKRW, setFxAdjustKRW] = useState(0); // -200 ~ +200원
   const [baseMonthlyLivingKRW, setBaseMonthlyLivingKRW] = useState(13_000_000); // 월 1,300만원
   const [expenseAdjustPct, setExpenseAdjustPct] = useState(0); // -20 ~ +20
   const [inflationPct, setInflationPct] = useState(3.0);
@@ -188,7 +188,7 @@ export default function RetirementWithdrawalPlanner() {
             const saved: Partial<SavedSettings> = JSON.parse(value);
             if (saved.accounts) setAccounts(saved.accounts.map(normalizeAccount));
             if (saved.fxRate != null) { setFxRate(saved.fxRate); hasSavedFxRate = true; }
-            if (saved.fxAdjustPct != null) setFxAdjustPct(saved.fxAdjustPct);
+            if (saved.fxAdjustKRW != null) setFxAdjustKRW(saved.fxAdjustKRW);
             if (saved.baseMonthlyLivingKRW != null) setBaseMonthlyLivingKRW(saved.baseMonthlyLivingKRW);
             if (saved.expenseAdjustPct != null) setExpenseAdjustPct(saved.expenseAdjustPct);
             if (saved.inflationPct != null) setInflationPct(saved.inflationPct);
@@ -218,7 +218,7 @@ export default function RetirementWithdrawalPlanner() {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       const value: SavedSettings = {
-        accounts, fxRate, fxAdjustPct, baseMonthlyLivingKRW, expenseAdjustPct, inflationPct,
+        accounts, fxRate, fxAdjustKRW, baseMonthlyLivingKRW, expenseAdjustPct, inflationPct,
         ssMonthlyUSD, ssColaPct, ssStartAge,
       };
       fetch('/api/settings', {
@@ -227,7 +227,7 @@ export default function RetirementWithdrawalPlanner() {
         body: JSON.stringify({ key: SETTINGS_KEY, value: JSON.stringify(value) }),
       });
     }, 500);
-  }, [accounts, fxRate, fxAdjustPct, baseMonthlyLivingKRW, expenseAdjustPct, inflationPct, ssMonthlyUSD, ssColaPct, ssStartAge, loaded]);
+  }, [accounts, fxRate, fxAdjustKRW, baseMonthlyLivingKRW, expenseAdjustPct, inflationPct, ssMonthlyUSD, ssColaPct, ssStartAge, loaded]);
 
   const updateAccount = (id: string, field: keyof AccountConfig, value: number) => {
     setAccounts(prev => prev.map(a => a.id === id ? { ...a, [field]: value } : a));
@@ -266,7 +266,7 @@ export default function RetirementWithdrawalPlanner() {
     const rows: SimulationRow[] = [];
     let accState = accounts.map(a => ({ ...a }));
     const expenseMult = 1 + expenseAdjustPct / 100;
-    const effectiveFxRate = fxRate * (1 + fxAdjustPct / 100);
+    const effectiveFxRate = fxRate + fxAdjustKRW;
 
     for (let age = CURRENT_AGE + 1; age <= END_AGE; age++) {
       const yearsFromStart = age - CURRENT_AGE;
@@ -355,7 +355,7 @@ export default function RetirementWithdrawalPlanner() {
       });
     }
     return rows;
-  }, [accounts, fxRate, fxAdjustPct, baseMonthlyLivingKRW, expenseAdjustPct, inflationPct, ssMonthlyUSD, ssColaPct, ssStartAge]);
+  }, [accounts, fxRate, fxAdjustKRW, baseMonthlyLivingKRW, expenseAdjustPct, inflationPct, ssMonthlyUSD, ssColaPct, ssStartAge]);
 
   const chartData = simulation.map(r => ({
     age: r.age,
@@ -387,8 +387,8 @@ export default function RetirementWithdrawalPlanner() {
           baseMonthlyLivingKRW={baseMonthlyLivingKRW} setBaseMonthlyLivingKRW={setBaseMonthlyLivingKRW}
           expenseAdjustPct={expenseAdjustPct} setExpenseAdjustPct={setExpenseAdjustPct}
           inflationPct={inflationPct} setInflationPct={setInflationPct}
-          fxRate={fxRate} setFxRate={setFxRate}
-          fxAdjustPct={fxAdjustPct} setFxAdjustPct={setFxAdjustPct}
+          fxRate={fxRate}
+          fxAdjustKRW={fxAdjustKRW} setFxAdjustKRW={setFxAdjustKRW}
           ssMonthlyUSD={ssMonthlyUSD} setSsMonthlyUSD={setSsMonthlyUSD}
           ssColaPct={ssColaPct} setSsColaPct={setSsColaPct}
           ssStartAge={ssStartAge} setSsStartAge={setSsStartAge}
