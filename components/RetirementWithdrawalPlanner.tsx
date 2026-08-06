@@ -18,12 +18,19 @@ export interface WithdrawalRule {
 export interface AccountConfig {
   id: string;
   name: string;
-  balance: number;                    // USD
+  balance: number;                    // USD — 연결된 실제 계좌가 있으면 그 잔액으로 자동 동기화됨
   expectedReturn: number;             // %/년
   withdrawalSchedule: WithdrawalRule[]; // 연령 구간별 인출률
-  startAge: number;                   // 인출 시작 연령
+  startAge: number;                   // 인출 연령
   taxable: boolean;
   isBuffer: boolean;                  // 자동조정 계좌 — 정확히 하나만 true
+  linkedAccountId: string | null;     // 실제 포트폴리오 계좌 ID
+}
+
+export interface RealAccount {
+  id: string;
+  name: string;
+  balanceUSD: number;
 }
 
 // 주어진 나이 시점에 적용되는 인출률: fromAge <= age인 규칙 중 가장 늦게 시작하는 규칙
@@ -53,17 +60,21 @@ interface SimulationRow {
 }
 
 const DEFAULT_ACCOUNTS: AccountConfig[] = [
-  { id: 'chase',     name: 'Chase (과세)',     balance: 1_400_127, expectedReturn: 8.4, withdrawalSchedule: [{ fromAge: 54, rate: 2.0 }], startAge: 54, taxable: true,  isBuffer: true },
-  { id: 'robinhood', name: 'Robinhood (과세)', balance: 510_000,   expectedReturn: 8.4, withdrawalSchedule: [{ fromAge: 54, rate: 2.0 }], startAge: 54, taxable: true,  isBuffer: false },
-  { id: 'trad_ira',  name: 'Traditional IRA',  balance: 193_000,   expectedReturn: 7.5, withdrawalSchedule: [{ fromAge: 73, rate: 0.0 }], startAge: 73, taxable: true,  isBuffer: false },
-  { id: 'roth_ira',  name: 'Roth IRA',         balance: 100_000,   expectedReturn: 7.5, withdrawalSchedule: [{ fromAge: 85, rate: 0.0 }], startAge: 85, taxable: false, isBuffer: false },
+  { id: 'chase',     name: 'Chase (과세)',     balance: 1_400_127, expectedReturn: 8.4, withdrawalSchedule: [{ fromAge: 54, rate: 2.0 }], startAge: 54, taxable: true,  isBuffer: true,  linkedAccountId: null },
+  { id: 'robinhood', name: 'Robinhood (과세)', balance: 510_000,   expectedReturn: 8.4, withdrawalSchedule: [{ fromAge: 54, rate: 2.0 }], startAge: 54, taxable: true,  isBuffer: false, linkedAccountId: null },
+  { id: 'trad_ira',  name: 'Traditional IRA',  balance: 193_000,   expectedReturn: 7.5, withdrawalSchedule: [{ fromAge: 73, rate: 0.0 }], startAge: 73, taxable: true,  isBuffer: false, linkedAccountId: null },
+  { id: 'roth_ira',  name: 'Roth IRA',         balance: 100_000,   expectedReturn: 7.5, withdrawalSchedule: [{ fromAge: 85, rate: 0.0 }], startAge: 85, taxable: false, isBuffer: false, linkedAccountId: null },
 ];
 
-// 구버전(단일 withdrawalRate) 저장 데이터를 스케줄 형태로 이전
+// 구버전 저장 데이터를 최신 스키마로 이전 (withdrawalRate -> schedule, linkedAccountId 기본값)
 function normalizeAccount(a: any): AccountConfig {
-  if (Array.isArray(a.withdrawalSchedule) && a.withdrawalSchedule.length > 0) return a as AccountConfig;
-  const rate = typeof a.withdrawalRate === 'number' ? a.withdrawalRate : 0;
-  return { ...a, withdrawalSchedule: [{ fromAge: a.startAge ?? CURRENT_AGE, rate }] };
+  let account = a;
+  if (!Array.isArray(a.withdrawalSchedule) || a.withdrawalSchedule.length === 0) {
+    const rate = typeof a.withdrawalRate === 'number' ? a.withdrawalRate : 0;
+    account = { ...account, withdrawalSchedule: [{ fromAge: a.startAge ?? CURRENT_AGE, rate }] };
+  }
+  if (account.linkedAccountId === undefined) account = { ...account, linkedAccountId: null };
+  return account as AccountConfig;
 }
 
 const CURRENT_AGE = 53;
@@ -87,6 +98,10 @@ interface SavedSettings {
 
 function fmtWon(v: number) {
   return Math.round(v).toLocaleString('ko-KR');
+}
+
+function fmtUSD(v: number) {
+  return `$${Math.round(v).toLocaleString('en-US')}`;
 }
 
 // 은퇴 지출 스마일 곡선: 65세까지 유지 → 84세 -26% 저점 → 98세 90%까지 회복
@@ -144,6 +159,50 @@ function WithdrawalDetailButton({ items }: { items: AccountWithdrawal[] }) {
   );
 }
 
+function Chip({ children }: { children: React.ReactNode }) {
+  return (
+    <span style={{
+      background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6,
+      padding: '4px 10px', fontSize: 12, color: 'var(--text)', whiteSpace: 'nowrap',
+    }}>
+      {children}
+    </span>
+  );
+}
+
+function SettingsSummary({
+  baseMonthlyLivingKRW, fxRate, fxAdjustKRW, inflationPct, expenseAdjustPct,
+  ssMonthlyUSD, ssColaPct, ssStartAge, accounts,
+}: {
+  baseMonthlyLivingKRW: number; fxRate: number; fxAdjustKRW: number;
+  inflationPct: number; expenseAdjustPct: number;
+  ssMonthlyUSD: number; ssColaPct: number; ssStartAge: number;
+  accounts: AccountConfig[];
+}) {
+  const effectiveFx = fxRate + fxAdjustKRW;
+  return (
+    <div style={{
+      background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10,
+      padding: 14, marginBottom: 20,
+    }}>
+      <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>현재 설정</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+        <Chip>월 생활비 {(baseMonthlyLivingKRW / 10_000).toLocaleString('ko-KR')}만원{expenseAdjustPct !== 0 ? ` (${expenseAdjustPct > 0 ? '+' : ''}${expenseAdjustPct}%)` : ''}</Chip>
+        <Chip>인플레이션 {inflationPct}%/년</Chip>
+        <Chip>환율 {effectiveFx.toLocaleString('ko-KR')}원</Chip>
+        <Chip>SS ${ssMonthlyUSD.toLocaleString('en-US')}/월 · {ssStartAge}세부터 · COLA {ssColaPct}%</Chip>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {accounts.map(a => (
+          <Chip key={a.id}>
+            {a.isBuffer && '⭐ '}{a.name} · {fmtUSD(a.balance)} · {a.startAge}세부터
+          </Chip>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SummaryTile({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
   return (
     <div style={{
@@ -172,10 +231,44 @@ export default function RetirementWithdrawalPlanner() {
 
   const [viewMode, setViewMode] = useState<'table' | 'chart'>('table');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [realAccounts, setRealAccounts] = useState<RealAccount[]>([]);
 
   // ===== 설정 불러오기 / 저장 =====
   const [loaded, setLoaded] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 실제 포트폴리오 계좌 잔액 불러오기 (잔액은 여기서 자동으로 채워지며 직접 수정 불가)
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/portfolio');
+        if (!res.ok) return;
+        const data = await res.json();
+        const list: RealAccount[] = (data.account_breakdown || []).map((a: any) => ({
+          id: String(a.account_id),
+          name: a.account_name,
+          balanceUSD: (a.cash || 0) + (a.stock_value || 0),
+        }));
+        setRealAccounts(list);
+      } catch { /* 실패 시 마지막으로 저장된 잔액 유지 */ }
+    })();
+  }, []);
+
+  // 계좌 연결이 아직 없으면 이름으로 자동 매칭하고, 연결된 계좌는 실제 잔액으로 동기화
+  useEffect(() => {
+    if (!loaded || realAccounts.length === 0) return;
+    setAccounts(prev => prev.map(a => {
+      let linkedAccountId = a.linkedAccountId;
+      if (!linkedAccountId) {
+        const stripped = a.name.replace(/\s*\(.*?\)\s*/g, '').trim().toLowerCase();
+        const match = realAccounts.find(r => r.name.trim().toLowerCase() === stripped);
+        if (match) linkedAccountId = match.id;
+      }
+      const real = realAccounts.find(r => r.id === linkedAccountId);
+      if (!real) return linkedAccountId === a.linkedAccountId ? a : { ...a, linkedAccountId };
+      return { ...a, linkedAccountId, balance: real.balanceUSD };
+    }));
+  }, [realAccounts, loaded]);
 
   useEffect(() => {
     (async () => {
@@ -231,6 +324,13 @@ export default function RetirementWithdrawalPlanner() {
 
   const updateAccount = (id: string, field: keyof AccountConfig, value: number) => {
     setAccounts(prev => prev.map(a => a.id === id ? { ...a, [field]: value } : a));
+  };
+
+  const linkAccount = (id: string, realAccountId: string) => {
+    const real = realAccounts.find(r => r.id === realAccountId);
+    setAccounts(prev => prev.map(a => a.id === id
+      ? { ...a, linkedAccountId: realAccountId || null, balance: real ? real.balanceUSD : a.balance }
+      : a));
   };
 
   const setBufferAccount = (id: string) => {
@@ -398,8 +498,19 @@ export default function RetirementWithdrawalPlanner() {
           addScheduleRule={addScheduleRule}
           updateScheduleRule={updateScheduleRule}
           removeScheduleRule={removeScheduleRule}
+          realAccounts={realAccounts}
+          linkAccount={linkAccount}
         />
       )}
+
+      {/* ===== 현재 설정 요약 ===== */}
+      <SettingsSummary
+        baseMonthlyLivingKRW={baseMonthlyLivingKRW}
+        fxRate={fxRate} fxAdjustKRW={fxAdjustKRW}
+        inflationPct={inflationPct} expenseAdjustPct={expenseAdjustPct}
+        ssMonthlyUSD={ssMonthlyUSD} ssColaPct={ssColaPct} ssStartAge={ssStartAge}
+        accounts={accounts}
+      />
 
       {/* ===== 결과 요약 ===== */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>

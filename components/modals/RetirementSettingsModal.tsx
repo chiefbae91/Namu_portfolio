@@ -1,6 +1,6 @@
 'use client';
 import { X, Plus } from 'lucide-react';
-import type { AccountConfig, WithdrawalRule } from '@/components/RetirementWithdrawalPlanner';
+import type { AccountConfig, RealAccount, WithdrawalRule } from '@/components/RetirementWithdrawalPlanner';
 
 interface Props {
   onClose: () => void;
@@ -18,6 +18,8 @@ interface Props {
   addScheduleRule: (accountId: string) => void;
   updateScheduleRule: (accountId: string, ruleIndex: number, field: keyof WithdrawalRule, value: number) => void;
   removeScheduleRule: (accountId: string, ruleIndex: number) => void;
+  realAccounts: RealAccount[];
+  linkAccount: (id: string, realAccountId: string) => void;
 }
 
 // 1,000만원 ~ 2,000만원, 100만원 단위
@@ -47,6 +49,10 @@ function NumberField({ value, onChange, step, min, max, width }: {
   );
 }
 
+function fmtUSD(v: number) {
+  return `$${Math.round(v).toLocaleString('en-US')}`;
+}
+
 const cardStyle: React.CSSProperties = {
   background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10,
   padding: 16, marginBottom: 16,
@@ -66,12 +72,13 @@ export default function RetirementSettingsModal({
   ssColaPct, setSsColaPct,
   ssStartAge, setSsStartAge,
   accounts, updateAccount, setBufferAccount, addScheduleRule, updateScheduleRule, removeScheduleRule,
+  realAccounts, linkAccount,
 }: Props) {
   const bufferAccountId = accounts.find(a => a.isBuffer)?.id ?? '';
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 720, width: '100%' }} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: 920, width: '100%' }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>은퇴 인출 계획 설정</h2>
           <button onClick={onClose} style={{ background: 'none', color: 'var(--muted)' }}><X size={18} /></button>
@@ -169,14 +176,24 @@ export default function RetirementSettingsModal({
                   <th>잔액 ($)</th>
                   <th>기대수익률 (%)</th>
                   <th>인출률 (%/년)</th>
-                  <th>인출 시작 연령</th>
+                  <th>인출 연령</th>
                 </tr>
               </thead>
               <tbody>
                 {accounts.map(a => (
                   <tr key={a.id}>
                     <td style={{ fontWeight: 600, verticalAlign: 'top' }}>{a.name}</td>
-                    <td style={{ verticalAlign: 'top' }}><NumberField value={a.balance} onChange={v => updateAccount(a.id, 'balance', v)} width={120} /></td>
+                    <td style={{ verticalAlign: 'top' }}>
+                      <div style={{ fontWeight: 600, marginBottom: 4 }}>{fmtUSD(a.balance)}</div>
+                      <select
+                        value={a.linkedAccountId ?? ''}
+                        onChange={e => linkAccount(a.id, e.target.value)}
+                        style={{ fontSize: 11, width: 140 }}
+                      >
+                        <option value="">계좌 연결 안함</option>
+                        {realAccounts.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                      </select>
+                    </td>
                     <td style={{ verticalAlign: 'top' }}><NumberField value={a.expectedReturn} onChange={v => updateAccount(a.id, 'expectedReturn', v)} step={0.1} width={80} /></td>
                     <td style={{ verticalAlign: 'top' }}>
                       {[...a.withdrawalSchedule]
@@ -215,6 +232,7 @@ export default function RetirementSettingsModal({
             </table>
           </div>
           <p style={helpTextStyle}>
+            잔액은 직접 입력할 수 없으며, 연결한 실제 계좌의 현재 잔액(현금+평가금액)이 자동으로 적용됩니다.
             인출률은 계좌마다 여러 연령 구간으로 나눠 설정할 수 있습니다 (예: 54세~2%, 65세~4%).
             각 나이에는 시작 연령이 그 나이 이하인 구간 중 가장 늦게 시작하는 구간의 인출률이 적용됩니다.
             상단의 "자동조정 계좌"는 설정한 인출률만큼을 <strong>최소 인출액</strong>으로 매년 인출하고,
