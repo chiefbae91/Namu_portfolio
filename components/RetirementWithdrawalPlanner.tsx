@@ -1,19 +1,21 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { List, Settings } from 'lucide-react';
 import {
   AreaChart, Area, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, ReferenceLine,
 } from 'recharts';
+import RetirementSettingsModal from '@/components/modals/RetirementSettingsModal';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-interface WithdrawalRule {
+export interface WithdrawalRule {
   fromAge: number; // 이 연령부터 적용
   rate: number;    // %/년
 }
 
-interface AccountConfig {
+export interface AccountConfig {
   id: string;
   name: string;
   balance: number;                    // USD
@@ -31,6 +33,12 @@ function effectiveWithdrawalRate(schedule: WithdrawalRule[], age: number): numbe
   return applicable.reduce((latest, r) => (r.fromAge > latest.fromAge ? r : latest)).rate;
 }
 
+interface AccountWithdrawal {
+  id: string;
+  name: string;
+  withdrawnKRW: number; // 억원
+}
+
 interface SimulationRow {
   age: number;
   livingNominal: number;      // 억원, 명목가치
@@ -41,6 +49,7 @@ interface SimulationRow {
   surplusKRW: number;         // 억원, 고정 인출 계좌만으로 필요액을 초과한 잉여현금
   totalBalanceKRW: number;    // 억원
   totalBalanceUSD: number;
+  accountWithdrawals: AccountWithdrawal[]; // 계좌별 출금 상세
 }
 
 const DEFAULT_ACCOUNTS: AccountConfig[] = [
@@ -65,6 +74,7 @@ const SETTINGS_KEY = 'retirement_planner';
 interface SavedSettings {
   accounts: AccountConfig[];
   fxRate: number;
+  fxAdjustPct: number;
   baseMonthlyLivingKRW: number;
   expenseAdjustPct: number;
   inflationPct: number;
@@ -88,23 +98,49 @@ function spendingMultiplier(age: number) {
 
 // ── Small building blocks ─────────────────────────────────────────────────────
 
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <label style={{ display: 'block', fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>{children}</label>;
-}
+function WithdrawalDetailButton({ items }: { items: AccountWithdrawal[] }) {
+  const [anchor, setAnchor] = useState<DOMRect | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
-function NumberField({ value, onChange, step, min, max, width }: {
-  value: number; onChange: (v: number) => void; step?: number; min?: number; max?: number; width?: number;
-}) {
+  const show = () => btnRef.current && setAnchor(btnRef.current.getBoundingClientRect());
+  const hide = () => setAnchor(null);
+  const toggle = () => (anchor ? hide() : show());
+
+  const withdrawn = items.filter(it => it.withdrawnKRW > 0.00001);
+  const tipLeft = anchor ? Math.min(anchor.left, window.innerWidth - 220) : 0;
+  const tipTop = anchor ? anchor.bottom + 6 : 0;
+
   return (
-    <input
-      type="number"
-      value={value}
-      step={step}
-      min={min}
-      max={max}
-      onChange={e => onChange(Number(e.target.value))}
-      style={{ width: width ?? '100%' }}
-    />
+    <>
+      <button
+        ref={btnRef}
+        onMouseEnter={show}
+        onMouseLeave={hide}
+        onClick={toggle}
+        title="계좌별 출금액 보기"
+        style={{ background: 'none', padding: 4, color: 'var(--muted)', display: 'inline-flex' }}
+      >
+        <List size={14} />
+      </button>
+      {anchor && createPortal(
+        <div style={{
+          position: 'fixed', top: tipTop, left: Math.max(8, tipLeft), zIndex: 9999,
+          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
+          padding: '10px 12px', minWidth: 180, fontSize: 12, color: 'var(--text)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+        }}>
+          {withdrawn.length === 0
+            ? <div style={{ color: 'var(--muted)' }}>인출 없음</div>
+            : withdrawn.map(it => (
+              <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 14, marginBottom: 4 }}>
+                <span style={{ color: 'var(--muted)' }}>{it.name}</span>
+                <span style={{ fontWeight: 600 }}>{fmtWon(it.withdrawnKRW * 1e8 / 1e4)}만원</span>
+              </div>
+            ))}
+        </div>,
+        document.body
+      )}
+    </>
   );
 }
 
@@ -125,6 +161,7 @@ function SummaryTile({ label, value, warn }: { label: string; value: string; war
 export default function RetirementWithdrawalPlanner() {
   const [accounts, setAccounts] = useState<AccountConfig[]>(DEFAULT_ACCOUNTS);
   const [fxRate, setFxRate] = useState(1450);
+  const [fxAdjustPct, setFxAdjustPct] = useState(0); // -20 ~ +20
   const [baseMonthlyLivingKRW, setBaseMonthlyLivingKRW] = useState(13_000_000); // 월 1,300만원
   const [expenseAdjustPct, setExpenseAdjustPct] = useState(0); // -20 ~ +20
   const [inflationPct, setInflationPct] = useState(3.0);
@@ -134,6 +171,7 @@ export default function RetirementWithdrawalPlanner() {
   const [ssStartAge, setSsStartAge] = useState(62);
 
   const [viewMode, setViewMode] = useState<'table' | 'chart'>('table');
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // ===== 설정 불러오기 / 저장 =====
   const [loaded, setLoaded] = useState(false);
@@ -141,6 +179,7 @@ export default function RetirementWithdrawalPlanner() {
 
   useEffect(() => {
     (async () => {
+      let hasSavedFxRate = false;
       try {
         const res = await fetch(`/api/settings?key=${SETTINGS_KEY}`);
         if (res.ok) {
@@ -148,7 +187,8 @@ export default function RetirementWithdrawalPlanner() {
           if (value) {
             const saved: Partial<SavedSettings> = JSON.parse(value);
             if (saved.accounts) setAccounts(saved.accounts.map(normalizeAccount));
-            if (saved.fxRate != null) setFxRate(saved.fxRate);
+            if (saved.fxRate != null) { setFxRate(saved.fxRate); hasSavedFxRate = true; }
+            if (saved.fxAdjustPct != null) setFxAdjustPct(saved.fxAdjustPct);
             if (saved.baseMonthlyLivingKRW != null) setBaseMonthlyLivingKRW(saved.baseMonthlyLivingKRW);
             if (saved.expenseAdjustPct != null) setExpenseAdjustPct(saved.expenseAdjustPct);
             if (saved.inflationPct != null) setInflationPct(saved.inflationPct);
@@ -160,6 +200,16 @@ export default function RetirementWithdrawalPlanner() {
       } finally {
         setLoaded(true);
       }
+      // 저장된 환율이 없으면(첫 방문) 현재 시세를 기본값으로 사용
+      if (!hasSavedFxRate) {
+        try {
+          const res = await fetch('/api/exchange-rates');
+          if (res.ok) {
+            const { KRW } = await res.json();
+            if (typeof KRW === 'number' && KRW > 0) setFxRate(KRW);
+          }
+        } catch { /* 실패 시 기본값(1450) 유지 */ }
+      }
     })();
   }, []);
 
@@ -168,7 +218,7 @@ export default function RetirementWithdrawalPlanner() {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       const value: SavedSettings = {
-        accounts, fxRate, baseMonthlyLivingKRW, expenseAdjustPct, inflationPct,
+        accounts, fxRate, fxAdjustPct, baseMonthlyLivingKRW, expenseAdjustPct, inflationPct,
         ssMonthlyUSD, ssColaPct, ssStartAge,
       };
       fetch('/api/settings', {
@@ -177,7 +227,7 @@ export default function RetirementWithdrawalPlanner() {
         body: JSON.stringify({ key: SETTINGS_KEY, value: JSON.stringify(value) }),
       });
     }, 500);
-  }, [accounts, fxRate, baseMonthlyLivingKRW, expenseAdjustPct, inflationPct, ssMonthlyUSD, ssColaPct, ssStartAge, loaded]);
+  }, [accounts, fxRate, fxAdjustPct, baseMonthlyLivingKRW, expenseAdjustPct, inflationPct, ssMonthlyUSD, ssColaPct, ssStartAge, loaded]);
 
   const updateAccount = (id: string, field: keyof AccountConfig, value: number) => {
     setAccounts(prev => prev.map(a => a.id === id ? { ...a, [field]: value } : a));
@@ -216,6 +266,7 @@ export default function RetirementWithdrawalPlanner() {
     const rows: SimulationRow[] = [];
     let accState = accounts.map(a => ({ ...a }));
     const expenseMult = 1 + expenseAdjustPct / 100;
+    const effectiveFxRate = fxRate * (1 + fxAdjustPct / 100);
 
     for (let age = CURRENT_AGE + 1; age <= END_AGE; age++) {
       const yearsFromStart = age - CURRENT_AGE;
@@ -229,7 +280,7 @@ export default function RetirementWithdrawalPlanner() {
       if (age >= ssStartAge) {
         const yearsSinceSS = age - ssStartAge;
         const ssMonthlyGrown = ssMonthlyUSD * Math.pow(1 + ssColaPct / 100, yearsSinceSS);
-        ssNominalKRW = (ssMonthlyGrown * 12 * fxRate) / 1e8; // 억원
+        ssNominalKRW = (ssMonthlyGrown * 12 * effectiveFxRate) / 1e8; // 억원
       }
 
       // 3) SS가 생활비를 먼저 커버 → 계좌에서 인출해야 할 순생활비
@@ -240,6 +291,7 @@ export default function RetirementWithdrawalPlanner() {
       //    Step B: 자동조정 계좌는 (필요액 - A에서 나온 금액)만큼만 추가 인출.
       //            이미 충분하면 0원 인출, 부족하면 그 차액을 인출.
       let nonBufferWithdrawnKRW = 0;
+      const accountWithdrawals: AccountWithdrawal[] = [];
 
       accState = accState.map(a => {
         if (a.isBuffer) return a; // 자동조정 계좌는 Step B에서 처리
@@ -248,8 +300,9 @@ export default function RetirementWithdrawalPlanner() {
           const rate = effectiveWithdrawalRate(a.withdrawalSchedule, age);
           withdrawnUSD = Math.min(a.balance * (rate / 100), a.balance);
         }
-        const withdrawnKRW = (withdrawnUSD * fxRate) / 1e8;
+        const withdrawnKRW = (withdrawnUSD * effectiveFxRate) / 1e8;
         nonBufferWithdrawnKRW += withdrawnKRW;
+        accountWithdrawals.push({ id: a.id, name: a.name, withdrawnKRW });
 
         const balanceAfterWithdrawal = a.balance - withdrawnUSD;
         const balanceAfterGrowth = balanceAfterWithdrawal * (1 + a.expectedReturn / 100);
@@ -266,12 +319,13 @@ export default function RetirementWithdrawalPlanner() {
         if (canWithdraw) {
           const rate = effectiveWithdrawalRate(a.withdrawalSchedule, age);
           const minWithdrawUSD = a.balance * (rate / 100);
-          const shortfallUSD = (shortfallBeforeBufferKRW * 1e8) / fxRate;
+          const shortfallUSD = (shortfallBeforeBufferKRW * 1e8) / effectiveFxRate;
           // 최소 인출률만큼은 기본으로 인출하고, 부족분이 그보다 크면 부족분만큼 인출
           withdrawnUSD = Math.min(Math.max(minWithdrawUSD, shortfallUSD), a.balance);
         }
-        const withdrawnKRW = (withdrawnUSD * fxRate) / 1e8;
+        const withdrawnKRW = (withdrawnUSD * effectiveFxRate) / 1e8;
         bufferWithdrawnKRW = withdrawnKRW;
+        accountWithdrawals.push({ id: a.id, name: a.name, withdrawnKRW });
 
         const balanceAfterWithdrawal = a.balance - withdrawnUSD;
         const balanceAfterGrowth = balanceAfterWithdrawal * (1 + a.expectedReturn / 100);
@@ -280,7 +334,7 @@ export default function RetirementWithdrawalPlanner() {
 
       const totalWithdrawnKRW = nonBufferWithdrawnKRW + bufferWithdrawnKRW;
       const totalBalanceUSD = accState.reduce((sum, a) => sum + a.balance, 0);
-      const totalBalanceKRW = (totalBalanceUSD * fxRate) / 1e8;
+      const totalBalanceKRW = (totalBalanceUSD * effectiveFxRate) / 1e8;
 
       // 여전히 부족한 경우 (자동조정 계좌 최소인출+부족분 충당으로도 못 채운 경우) → 부족분
       const shortfallKRW = Math.max(0, netNeedKRW - totalWithdrawnKRW);
@@ -297,10 +351,11 @@ export default function RetirementWithdrawalPlanner() {
         surplusKRW,
         totalBalanceKRW,
         totalBalanceUSD,
+        accountWithdrawals,
       });
     }
     return rows;
-  }, [accounts, fxRate, baseMonthlyLivingKRW, expenseAdjustPct, inflationPct, ssMonthlyUSD, ssColaPct, ssStartAge]);
+  }, [accounts, fxRate, fxAdjustPct, baseMonthlyLivingKRW, expenseAdjustPct, inflationPct, ssMonthlyUSD, ssColaPct, ssStartAge]);
 
   const chartData = simulation.map(r => ({
     age: r.age,
@@ -313,142 +368,38 @@ export default function RetirementWithdrawalPlanner() {
   const shortfallYears = simulation.filter(r => r.shortfallKRW > 0).length;
   const lastRow = simulation[simulation.length - 1];
 
-  const cardStyle: React.CSSProperties = {
-    background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10,
-    padding: 16, marginBottom: 20,
-  };
-  const sectionTitleStyle: React.CSSProperties = { fontSize: 14, fontWeight: 700, marginBottom: 12, color: 'var(--text)' };
-  const helpTextStyle: React.CSSProperties = { fontSize: 11, color: 'var(--muted)', marginTop: 10, lineHeight: 1.6 };
-  const gridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 };
-
   return (
     <div>
-      {/* ===== 생활비 설정 ===== */}
-      <section style={cardStyle}>
-        <div style={sectionTitleStyle}>생활비 설정</div>
-        <div style={gridStyle}>
-          <div>
-            <FieldLabel>초기 월 생활비 (원)</FieldLabel>
-            <NumberField value={baseMonthlyLivingKRW} onChange={setBaseMonthlyLivingKRW} />
-          </div>
-          <div>
-            <FieldLabel>환율 (원/달러)</FieldLabel>
-            <NumberField value={fxRate} onChange={setFxRate} />
-          </div>
-          <div>
-            <FieldLabel>인플레이션 (%/년)</FieldLabel>
-            <NumberField value={inflationPct} onChange={setInflationPct} step={0.1} />
-          </div>
-          <div>
-            <FieldLabel>생활비 조정: {expenseAdjustPct > 0 ? '+' : ''}{expenseAdjustPct}%</FieldLabel>
-            <input
-              type="range" min={-20} max={20} step={1}
-              value={expenseAdjustPct}
-              onChange={e => setExpenseAdjustPct(Number(e.target.value))}
-              style={{ width: '100%', accentColor: 'var(--accent)' }}
-            />
-          </div>
-        </div>
-        <p style={helpTextStyle}>
-          지출은 은퇴 스마일 곡선(65세까지 유지 → 84세 -26% 저점 → 98세 90% 회복)을 자동 적용합니다.
-          위 슬라이더로 전체 곡선을 ±20% 범위에서 이동시켜 민감도를 확인할 수 있습니다.
-        </p>
-      </section>
+      {/* ===== 설정 버튼 ===== */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+        <button
+          onClick={() => setSettingsOpen(true)}
+          className="btn-sm btn-secondary"
+          style={{ display: 'flex', alignItems: 'center', gap: 5 }}
+        >
+          <Settings size={13} /> 설정
+        </button>
+      </div>
 
-      {/* ===== Social Security ===== */}
-      <section style={cardStyle}>
-        <div style={sectionTitleStyle}>Social Security</div>
-        <div style={gridStyle}>
-          <div>
-            <FieldLabel>예상 월 수급액 ($)</FieldLabel>
-            <NumberField value={ssMonthlyUSD} onChange={setSsMonthlyUSD} />
-          </div>
-          <div>
-            <FieldLabel>COLA (%/년)</FieldLabel>
-            <NumberField value={ssColaPct} onChange={setSsColaPct} step={0.1} />
-          </div>
-          <div>
-            <FieldLabel>수급 시작 연령</FieldLabel>
-            <NumberField value={ssStartAge} onChange={setSsStartAge} min={62} max={70} />
-          </div>
-        </div>
-        <p style={helpTextStyle}>
-          SS 수급액이 생활비를 먼저 커버하고, 부족분만 계좌에서 인출하는 구조로 계산됩니다.
-        </p>
-      </section>
-
-      {/* ===== 계좌별 설정 ===== */}
-      <section style={cardStyle}>
-        <div style={sectionTitleStyle}>계좌별 설정</div>
-        <div style={{ overflowX: 'auto' }}>
-          <table>
-            <thead>
-              <tr>
-                <th>계좌</th>
-                <th>잔액 ($)</th>
-                <th>기대수익률 (%)</th>
-                <th>인출률 (%/년)</th>
-                <th>인출 시작 연령</th>
-                <th>자동조정</th>
-              </tr>
-            </thead>
-            <tbody>
-              {accounts.map(a => (
-                <tr key={a.id}>
-                  <td style={{ fontWeight: 600, verticalAlign: 'top' }}>{a.name}</td>
-                  <td style={{ verticalAlign: 'top' }}><NumberField value={a.balance} onChange={v => updateAccount(a.id, 'balance', v)} width={120} /></td>
-                  <td style={{ verticalAlign: 'top' }}><NumberField value={a.expectedReturn} onChange={v => updateAccount(a.id, 'expectedReturn', v)} step={0.1} width={80} /></td>
-                  <td style={{ verticalAlign: 'top' }}>
-                    {[...a.withdrawalSchedule]
-                      .map((rule, i) => ({ rule, i }))
-                      .sort((x, y) => x.rule.fromAge - y.rule.fromAge)
-                      .map(({ rule, i }) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                          <NumberField value={rule.fromAge} onChange={v => updateScheduleRule(a.id, i, 'fromAge', v)} width={50} />
-                          <span style={{ fontSize: 12, color: 'var(--muted)' }}>세~</span>
-                          <NumberField value={rule.rate} onChange={v => updateScheduleRule(a.id, i, 'rate', v)} step={0.5} width={55} />
-                          <span style={{ fontSize: 12, color: 'var(--muted)' }}>%</span>
-                          {a.withdrawalSchedule.length > 1 && (
-                            <button
-                              onClick={() => removeScheduleRule(a.id, i)}
-                              title="구간 삭제"
-                              style={{ background: 'none', padding: 2, color: 'var(--muted)', display: 'flex' }}
-                            >
-                              <X size={12} />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    <button
-                      onClick={() => addScheduleRule(a.id)}
-                      className="btn-sm btn-secondary"
-                      style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}
-                    >
-                      <Plus size={11} /> 구간 추가
-                    </button>
-                    {a.isBuffer && <span style={{ fontSize: 10, color: 'var(--muted)', display: 'block', marginTop: 4 }}>최소 인출률</span>}
-                  </td>
-                  <td style={{ verticalAlign: 'top' }}><NumberField value={a.startAge} onChange={v => updateAccount(a.id, 'startAge', v)} width={80} /></td>
-                  <td style={{ textAlign: 'center', verticalAlign: 'top' }}>
-                    <input
-                      type="radio" name="bufferAccount" checked={a.isBuffer}
-                      onChange={() => setBufferAccount(a.id)}
-                      style={{ accentColor: 'var(--accent)', width: 16, height: 16, cursor: 'pointer' }}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p style={helpTextStyle}>
-          인출률은 계좌마다 여러 연령 구간으로 나눠 설정할 수 있습니다 (예: 54세~2%, 65세~4%).
-          각 나이에는 시작 연령이 그 나이 이하인 구간 중 가장 늦게 시작하는 구간의 인출률이 적용됩니다.
-          "자동조정" 계좌는 설정한 인출률만큼을 <strong>최소 인출액</strong>으로 매년 인출하고,
-          나머지 계좌들의 인출액 합이 필요액에 못 미치면 그 부족분과 최소 인출액 중 더 큰 금액을 인출합니다.
-          정확히 한 계좌만 선택할 수 있습니다.
-        </p>
-      </section>
+      {settingsOpen && (
+        <RetirementSettingsModal
+          onClose={() => setSettingsOpen(false)}
+          baseMonthlyLivingKRW={baseMonthlyLivingKRW} setBaseMonthlyLivingKRW={setBaseMonthlyLivingKRW}
+          expenseAdjustPct={expenseAdjustPct} setExpenseAdjustPct={setExpenseAdjustPct}
+          inflationPct={inflationPct} setInflationPct={setInflationPct}
+          fxRate={fxRate} setFxRate={setFxRate}
+          fxAdjustPct={fxAdjustPct} setFxAdjustPct={setFxAdjustPct}
+          ssMonthlyUSD={ssMonthlyUSD} setSsMonthlyUSD={setSsMonthlyUSD}
+          ssColaPct={ssColaPct} setSsColaPct={setSsColaPct}
+          ssStartAge={ssStartAge} setSsStartAge={setSsStartAge}
+          accounts={accounts}
+          updateAccount={updateAccount}
+          setBufferAccount={setBufferAccount}
+          addScheduleRule={addScheduleRule}
+          updateScheduleRule={updateScheduleRule}
+          removeScheduleRule={removeScheduleRule}
+        />
+      )}
 
       {/* ===== 결과 요약 ===== */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
@@ -503,6 +454,7 @@ export default function RetirementWithdrawalPlanner() {
                 <th>SS수급액</th>
                 <th>순인출필요액</th>
                 <th>계좌인출액</th>
+                <th>출금상세</th>
                 <th>부족분</th>
                 <th>잉여현금</th>
                 <th>자산잔액</th>
@@ -516,6 +468,7 @@ export default function RetirementWithdrawalPlanner() {
                   <td>{fmtWon(r.ssNominalKRW * 1e8 / 1e4)}만원</td>
                   <td>{fmtWon(r.netNeedKRW * 1e8 / 1e4)}만원</td>
                   <td>{fmtWon(r.totalWithdrawnKRW * 1e8 / 1e4)}만원</td>
+                  <td><WithdrawalDetailButton items={r.accountWithdrawals} /></td>
                   <td style={{ color: r.shortfallKRW > 0 ? 'var(--color-price-down)' : 'var(--muted)' }}>
                     {r.shortfallKRW > 0 ? `-${fmtWon(r.shortfallKRW * 1e8 / 1e4)}만원` : '-'}
                   </td>
