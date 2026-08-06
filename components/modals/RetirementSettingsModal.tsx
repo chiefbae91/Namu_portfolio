@@ -1,10 +1,10 @@
 'use client';
 import { X, Plus } from 'lucide-react';
-import type { AccountConfig, RealAccount, WithdrawalRule } from '@/components/RetirementWithdrawalPlanner';
+import type { AccountConfig, LivingExpenseRule, RealAccount, WithdrawalRule } from '@/components/RetirementWithdrawalPlanner';
 
 interface Props {
   onClose: () => void;
-  baseMonthlyLivingKRW: number; setBaseMonthlyLivingKRW: (v: number) => void;
+  livingExpenseSchedule: LivingExpenseRule[]; updateLivingExpenseRule: (fromAge: number, monthlyKRW: number) => void;
   expenseAdjustPct: number; setExpenseAdjustPct: (v: number) => void;
   inflationPct: number; setInflationPct: (v: number) => void;
   fxRate: number;
@@ -63,7 +63,7 @@ const gridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: '
 
 export default function RetirementSettingsModal({
   onClose,
-  baseMonthlyLivingKRW, setBaseMonthlyLivingKRW,
+  livingExpenseSchedule, updateLivingExpenseRule,
   expenseAdjustPct, setExpenseAdjustPct,
   inflationPct, setInflationPct,
   fxRate,
@@ -88,18 +88,6 @@ export default function RetirementSettingsModal({
         <section style={cardStyle}>
           <div style={{ ...sectionTitleStyle, marginBottom: 12 }}>생활비 설정</div>
           <div style={gridStyle}>
-            <div>
-              <FieldLabel>초기 월 생활비</FieldLabel>
-              <select
-                value={baseMonthlyLivingKRW}
-                onChange={e => setBaseMonthlyLivingKRW(Number(e.target.value))}
-                style={{ width: '100%' }}
-              >
-                {LIVING_OPTIONS.map(v => (
-                  <option key={v} value={v}>{(v / 10_000).toLocaleString('ko-KR')}만원</option>
-                ))}
-              </select>
-            </div>
             <div>
               <FieldLabel>인플레이션 (%/년)</FieldLabel>
               <NumberField value={inflationPct} onChange={setInflationPct} step={0.1} />
@@ -129,8 +117,30 @@ export default function RetirementSettingsModal({
               />
             </div>
           </div>
+
+          <div style={{ marginTop: 16 }}>
+            <FieldLabel>5년 단위 월 생활비 (오늘가치 기준)</FieldLabel>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+              {livingExpenseSchedule.map(rule => (
+                <div key={rule.fromAge}>
+                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>{rule.fromAge}세~</span>
+                  <select
+                    value={rule.monthlyKRW}
+                    onChange={e => updateLivingExpenseRule(rule.fromAge, Number(e.target.value))}
+                    style={{ width: '100%' }}
+                  >
+                    {LIVING_OPTIONS.map(v => (
+                      <option key={v} value={v}>{(v / 10_000).toLocaleString('ko-KR')}만원</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <p style={helpTextStyle}>
             지출은 은퇴 스마일 곡선(65세까지 유지 → 84세 -26% 저점 → 98세 90% 회복)을 자동 적용합니다.
+            월 생활비는 5년 단위로 다르게 설정할 수 있으며, 인플레이션은 구간과 무관하게 항상 53세(현재) 기준으로 복리 누적됩니다.
             환율은 현재 시세를 기준으로 드롭다운에서 ±200원까지 조정할 수 있습니다.
           </p>
         </section>

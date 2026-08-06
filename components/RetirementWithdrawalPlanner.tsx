@@ -33,11 +33,23 @@ export interface RealAccount {
   balanceUSD: number;
 }
 
+export interface LivingExpenseRule {
+  fromAge: number;   // 5년 단위 고정 구간 시작 연령
+  monthlyKRW: number; // 그 구간의 월 생활비 (오늘가치, 원)
+}
+
 // 주어진 나이 시점에 적용되는 인출률: fromAge <= age인 규칙 중 가장 늦게 시작하는 규칙
 function effectiveWithdrawalRate(schedule: WithdrawalRule[], age: number): number {
   const applicable = schedule.filter(r => r.fromAge <= age);
   if (applicable.length === 0) return 0;
   return applicable.reduce((latest, r) => (r.fromAge > latest.fromAge ? r : latest)).rate;
+}
+
+// 주어진 나이 시점에 적용되는 월 생활비(오늘가치): fromAge <= age인 구간 중 가장 늦게 시작하는 구간
+function effectiveLivingBase(schedule: LivingExpenseRule[], age: number, fallback: number): number {
+  const applicable = schedule.filter(r => r.fromAge <= age);
+  if (applicable.length === 0) return fallback;
+  return applicable.reduce((latest, r) => (r.fromAge > latest.fromAge ? r : latest)).monthlyKRW;
 }
 
 interface AccountWithdrawal {
@@ -80,13 +92,36 @@ function normalizeAccount(a: any): AccountConfig {
 const CURRENT_AGE = 53;
 const END_AGE = 98;
 
+// 5년 단위 고정 구간 시작 연령들 (53, 58, 63, ..., 98)
+const LIVING_CHECKPOINTS = Array.from(
+  { length: Math.floor((END_AGE - CURRENT_AGE) / 5) + 1 },
+  (_, i) => CURRENT_AGE + i * 5
+);
+const DEFAULT_MONTHLY_LIVING_KRW = 13_000_000; // 월 1,300만원
+const DEFAULT_LIVING_SCHEDULE: LivingExpenseRule[] = LIVING_CHECKPOINTS.map(fromAge => ({
+  fromAge, monthlyKRW: DEFAULT_MONTHLY_LIVING_KRW,
+}));
+
+// 구버전(단일 baseMonthlyLivingKRW) 저장 데이터를 5년 구간 스케줄로 이전
+function normalizeLivingSchedule(saved: Partial<SavedSettings>): LivingExpenseRule[] {
+  if (Array.isArray(saved.livingExpenseSchedule) && saved.livingExpenseSchedule.length > 0) {
+    const byAge = new Map(saved.livingExpenseSchedule.map(r => [r.fromAge, r.monthlyKRW]));
+    return LIVING_CHECKPOINTS.map(fromAge => ({ fromAge, monthlyKRW: byAge.get(fromAge) ?? DEFAULT_MONTHLY_LIVING_KRW }));
+  }
+  if (typeof saved.baseMonthlyLivingKRW === 'number') {
+    return LIVING_CHECKPOINTS.map(fromAge => ({ fromAge, monthlyKRW: saved.baseMonthlyLivingKRW as number }));
+  }
+  return DEFAULT_LIVING_SCHEDULE;
+}
+
 const SETTINGS_KEY = 'retirement_planner';
 
 interface SavedSettings {
   accounts: AccountConfig[];
   fxRate: number;
   fxAdjustKRW: number;
-  baseMonthlyLivingKRW: number;
+  livingExpenseSchedule: LivingExpenseRule[];
+  baseMonthlyLivingKRW?: number; // 구버전 호환용
   expenseAdjustPct: number;
   inflationPct: number;
   ssMonthlyUSD: number;
@@ -171,15 +206,17 @@ function Chip({ children }: { children: React.ReactNode }) {
 }
 
 function SettingsSummary({
-  baseMonthlyLivingKRW, fxRate, fxAdjustKRW, inflationPct, expenseAdjustPct,
+  livingExpenseSchedule, fxRate, fxAdjustKRW, inflationPct, expenseAdjustPct,
   ssMonthlyUSD, ssColaPct, ssStartAge, accounts,
 }: {
-  baseMonthlyLivingKRW: number; fxRate: number; fxAdjustKRW: number;
+  livingExpenseSchedule: LivingExpenseRule[]; fxRate: number; fxAdjustKRW: number;
   inflationPct: number; expenseAdjustPct: number;
   ssMonthlyUSD: number; ssColaPct: number; ssStartAge: number;
   accounts: AccountConfig[];
 }) {
   const effectiveFx = fxRate + fxAdjustKRW;
+  const startingMonthlyKRW = effectiveLivingBase(livingExpenseSchedule, CURRENT_AGE, DEFAULT_MONTHLY_LIVING_KRW);
+  const hasLivingChanges = livingExpenseSchedule.some(r => r.monthlyKRW !== startingMonthlyKRW);
   return (
     <div style={{
       background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10,
@@ -187,7 +224,11 @@ function SettingsSummary({
     }}>
       <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>현재 설정</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-        <Chip>월 생활비 {(baseMonthlyLivingKRW / 10_000).toLocaleString('ko-KR')}만원{expenseAdjustPct !== 0 ? ` (${expenseAdjustPct > 0 ? '+' : ''}${expenseAdjustPct}%)` : ''}</Chip>
+        <Chip>
+          월 생활비 (기준) {(startingMonthlyKRW / 10_000).toLocaleString('ko-KR')}만원
+          {hasLivingChanges ? ' · 5년 단위 변경 있음' : ''}
+          {expenseAdjustPct !== 0 ? ` (${expenseAdjustPct > 0 ? '+' : ''}${expenseAdjustPct}%)` : ''}
+        </Chip>
         <Chip>인플레이션 {inflationPct}%/년</Chip>
         <Chip>환율 {effectiveFx.toLocaleString('ko-KR')}원</Chip>
         <Chip>SS ${ssMonthlyUSD.toLocaleString('en-US')}/월 · {ssStartAge}세부터 · COLA {ssColaPct}%</Chip>
@@ -221,7 +262,7 @@ export default function RetirementWithdrawalPlanner() {
   const [accounts, setAccounts] = useState<AccountConfig[]>(DEFAULT_ACCOUNTS);
   const [fxRate, setFxRate] = useState(1450);
   const [fxAdjustKRW, setFxAdjustKRW] = useState(0); // -200 ~ +200원
-  const [baseMonthlyLivingKRW, setBaseMonthlyLivingKRW] = useState(13_000_000); // 월 1,300만원
+  const [livingExpenseSchedule, setLivingExpenseSchedule] = useState<LivingExpenseRule[]>(DEFAULT_LIVING_SCHEDULE);
   const [expenseAdjustPct, setExpenseAdjustPct] = useState(0); // -20 ~ +20
   const [inflationPct, setInflationPct] = useState(3.0);
 
@@ -282,7 +323,7 @@ export default function RetirementWithdrawalPlanner() {
             if (saved.accounts) setAccounts(saved.accounts.map(normalizeAccount));
             if (saved.fxRate != null) { setFxRate(saved.fxRate); hasSavedFxRate = true; }
             if (saved.fxAdjustKRW != null) setFxAdjustKRW(saved.fxAdjustKRW);
-            if (saved.baseMonthlyLivingKRW != null) setBaseMonthlyLivingKRW(saved.baseMonthlyLivingKRW);
+            setLivingExpenseSchedule(normalizeLivingSchedule(saved));
             if (saved.expenseAdjustPct != null) setExpenseAdjustPct(saved.expenseAdjustPct);
             if (saved.inflationPct != null) setInflationPct(saved.inflationPct);
             if (saved.ssMonthlyUSD != null) setSsMonthlyUSD(saved.ssMonthlyUSD);
@@ -311,7 +352,7 @@ export default function RetirementWithdrawalPlanner() {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       const value: SavedSettings = {
-        accounts, fxRate, fxAdjustKRW, baseMonthlyLivingKRW, expenseAdjustPct, inflationPct,
+        accounts, fxRate, fxAdjustKRW, livingExpenseSchedule, expenseAdjustPct, inflationPct,
         ssMonthlyUSD, ssColaPct, ssStartAge,
       };
       fetch('/api/settings', {
@@ -320,10 +361,14 @@ export default function RetirementWithdrawalPlanner() {
         body: JSON.stringify({ key: SETTINGS_KEY, value: JSON.stringify(value) }),
       });
     }, 500);
-  }, [accounts, fxRate, fxAdjustKRW, baseMonthlyLivingKRW, expenseAdjustPct, inflationPct, ssMonthlyUSD, ssColaPct, ssStartAge, loaded]);
+  }, [accounts, fxRate, fxAdjustKRW, livingExpenseSchedule, expenseAdjustPct, inflationPct, ssMonthlyUSD, ssColaPct, ssStartAge, loaded]);
 
   const updateAccount = (id: string, field: keyof AccountConfig, value: number) => {
     setAccounts(prev => prev.map(a => a.id === id ? { ...a, [field]: value } : a));
+  };
+
+  const updateLivingExpenseRule = (fromAge: number, monthlyKRW: number) => {
+    setLivingExpenseSchedule(prev => prev.map(r => r.fromAge === fromAge ? { ...r, monthlyKRW } : r));
   };
 
   const linkAccount = (id: string, realAccountId: string) => {
@@ -371,8 +416,10 @@ export default function RetirementWithdrawalPlanner() {
     for (let age = CURRENT_AGE + 1; age <= END_AGE; age++) {
       const yearsFromStart = age - CURRENT_AGE;
 
-      // 1) 오늘가치 기준 생활비 (스마일곡선 x 조정슬라이더), 명목가치로 환산 (인플레이션 복리)
-      const livingTodayValue = (baseMonthlyLivingKRW * 12 / 1e8) * spendingMultiplier(age) * expenseMult; // 억원, 오늘가치
+      // 1) 오늘가치 기준 생활비 (5년 단위 구간값 x 스마일곡선 x 조정슬라이더), 명목가치로 환산
+      //    (인플레이션은 구간이 바뀌어도 항상 53세 기준으로 복리 누적 — 구간값은 "오늘 기준이라면 이만큼" 이라는 가정)
+      const livingBaseKRW = effectiveLivingBase(livingExpenseSchedule, age, DEFAULT_MONTHLY_LIVING_KRW);
+      const livingTodayValue = (livingBaseKRW * 12 / 1e8) * spendingMultiplier(age) * expenseMult; // 억원, 오늘가치
       const livingNominal = livingTodayValue * Math.pow(1 + inflationPct / 100, yearsFromStart); // 억원, 명목
 
       // 2) SS 수급액 (수급시작 연령 이후, COLA 복리 반영), 원화 환산
@@ -455,7 +502,7 @@ export default function RetirementWithdrawalPlanner() {
       });
     }
     return rows;
-  }, [accounts, fxRate, fxAdjustKRW, baseMonthlyLivingKRW, expenseAdjustPct, inflationPct, ssMonthlyUSD, ssColaPct, ssStartAge]);
+  }, [accounts, fxRate, fxAdjustKRW, livingExpenseSchedule, expenseAdjustPct, inflationPct, ssMonthlyUSD, ssColaPct, ssStartAge]);
 
   const chartData = simulation.map(r => ({
     age: r.age,
@@ -484,7 +531,7 @@ export default function RetirementWithdrawalPlanner() {
       {settingsOpen && (
         <RetirementSettingsModal
           onClose={() => setSettingsOpen(false)}
-          baseMonthlyLivingKRW={baseMonthlyLivingKRW} setBaseMonthlyLivingKRW={setBaseMonthlyLivingKRW}
+          livingExpenseSchedule={livingExpenseSchedule} updateLivingExpenseRule={updateLivingExpenseRule}
           expenseAdjustPct={expenseAdjustPct} setExpenseAdjustPct={setExpenseAdjustPct}
           inflationPct={inflationPct} setInflationPct={setInflationPct}
           fxRate={fxRate}
@@ -505,7 +552,7 @@ export default function RetirementWithdrawalPlanner() {
 
       {/* ===== 현재 설정 요약 ===== */}
       <SettingsSummary
-        baseMonthlyLivingKRW={baseMonthlyLivingKRW}
+        livingExpenseSchedule={livingExpenseSchedule}
         fxRate={fxRate} fxAdjustKRW={fxAdjustKRW}
         inflationPct={inflationPct} expenseAdjustPct={expenseAdjustPct}
         ssMonthlyUSD={ssMonthlyUSD} ssColaPct={ssColaPct} ssStartAge={ssStartAge}
